@@ -1,0 +1,14 @@
+.env
+.venv/
+.muc/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.uv-cache/
+build/
+dist/
+*.egg-info/
+*.pyc
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
