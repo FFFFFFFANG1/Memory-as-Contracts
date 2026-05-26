@@ -1,171 +1,90 @@
 from __future__ import annotations
 
-from pathlib import Path
+import json
+from datetime import datetime, timezone
 
 from typer.testing import CliRunner
 
-from memory_use_contracts.cli import app
-from memory_use_contracts.models import Contract, ContractType, Modality, ScopeLevel, Source, SourceKind
+from memory_as_contracts.cli import app
+from memory_as_contracts.models import (
+    ActionConstraints,
+    Contract,
+    ContractKind,
+    ContractSource,
+    EdgeRelation,
+    Lifecycle,
+    LifecycleType,
+    Modality,
+    Scope,
+    ScopeLevel,
+    SourceKind,
+)
+from memory_as_contracts.store import ContractStore
 
 
-runner = CliRunner()
+def test_mac_help_uses_new_package_identity() -> None:
+    result = CliRunner().invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "Memory-as-Contracts" in result.output
 
 
-def sample_contract() -> Contract:
-    return Contract(
-        text="Use uv run pytest.",
-        type=ContractType.PROCEDURE,
-        modality=Modality.MUST,
-        source=Source(kind=SourceKind.PROJECT_DOC, span="Use uv run pytest."),
+def test_env_reads_mac_variables(monkeypatch) -> None:
+    monkeypatch.setenv("MAC_LLM_MODEL", "test-model")
+    monkeypatch.setenv("MAC_DB_PATH", ".mac/test.sqlite")
+
+    result = CliRunner().invoke(app, ["env", "--json"])
+
+    assert result.exit_code == 0
+    assert '"llm_model": "test-model"' in result.output
+    assert '"db_path": ".mac/test.sqlite"' in result.output
+
+
+def test_mac_rule_override_creates_override_edge(monkeypatch, tmp_path) -> None:
+    db_path = tmp_path / "contracts.sqlite"
+    monkeypatch.setenv("MAC_DB_PATH", str(db_path))
+    store = ContractStore(db_path)
+    store.init_db()
+    store.add_contract(
+        Contract(
+            id="MAC-block",
+            text="Do not push code.",
+            kind=ContractKind.PROHIBITION,
+            modality=Modality.MUST_NOT,
+            source=ContractSource(
+                kind=SourceKind.USER_TURN,
+                span="Do not push code.",
+                created_at=datetime(2026, 5, 23, tzinfo=timezone.utc),
+            ),
+            scope=Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project", repo="project"),
+            lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
+            action_constraints=ActionConstraints(host_actions=["git.push"]),
+        )
     )
 
-
-def test_ingest_file_reads_text_and_calls_layer(monkeypatch, tmp_path: Path) -> None:
-    calls = {}
-    path = tmp_path / "AGENTS.md"
-    path.write_text("Use uv run pytest.", encoding="utf-8")
-
-    class FakeLayer:
-        @classmethod
-        def from_env(cls):
-            return cls()
-
-        def ingest_text(self, text, source_kind, workspace="default"):
-            calls["text"] = text
-            calls["source_kind"] = source_kind
-            calls["workspace"] = workspace
-            return [sample_contract()]
-
-    monkeypatch.setattr("memory_use_contracts.cli.MemoryContractLayer", FakeLayer)
-
-    result = runner.invoke(app, ["ingest-file", str(path), "--workspace", "demo"])
-
-    assert result.exit_code == 0
-    assert calls == {
-        "text": "Use uv run pytest.",
-        "source_kind": SourceKind.PROJECT_DOC,
-        "workspace": "demo",
-    }
-
-
-def test_gate_command_maps_and_records(monkeypatch) -> None:
-    calls = {}
-
-    class FakeDecision:
-        applicable_contracts = []
-
-        def model_dump_json(self):
-            return '{"decision":"allow"}'
-
-    class FakeReceipt:
-        def model_dump_json(self):
-            return '{"result":"pending"}'
-
-    class FakeLayer:
-        @classmethod
-        def from_env(cls):
-            return cls()
-
-        def gate(self, action):
-            calls["action_class"] = action.action_class.value
-            calls["target"] = action.target
-            return FakeDecision()
-
-        def record_result(self, action, decision, result):
-            calls["recorded"] = result
-            return FakeReceipt()
-
-    monkeypatch.setattr("memory_use_contracts.cli.MemoryContractLayer", FakeLayer)
-
-    result = runner.invoke(app, ["gate-command", "--command", "git push origin main", "--record"])
-
-    assert result.exit_code == 0
-    assert calls == {
-        "action_class": "push",
-        "target": "git push origin main",
-        "recorded": "pending",
-    }
-
-
-def test_ingest_codex_scans_agents_md(monkeypatch, tmp_path: Path) -> None:
-    calls = []
-    (tmp_path / "AGENTS.md").write_text("Codex rules", encoding="utf-8")
-    (tmp_path / "CLAUDE.md").write_text("Claude rules", encoding="utf-8")
-
-    class FakeLayer:
-        @classmethod
-        def from_env(cls):
-            return cls()
-
-        def ingest_text(self, text, source_kind, workspace="default"):
-            calls.append((text, source_kind, workspace))
-            return [sample_contract()]
-
-    monkeypatch.setattr("memory_use_contracts.cli.MemoryContractLayer", FakeLayer)
-
-    result = runner.invoke(app, ["ingest-codex", "--root", str(tmp_path), "--workspace", "demo"])
-
-    assert result.exit_code == 0
-    assert calls == [("Codex rules", SourceKind.PROJECT_DOC, "demo")]
-
-
-def test_ingest_cc_scans_claude_md(monkeypatch, tmp_path: Path) -> None:
-    calls = []
-    (tmp_path / "AGENTS.md").write_text("Codex rules", encoding="utf-8")
-    (tmp_path / "CLAUDE.md").write_text("Claude rules", encoding="utf-8")
-
-    class FakeLayer:
-        @classmethod
-        def from_env(cls):
-            return cls()
-
-        def ingest_text(self, text, source_kind, workspace="default"):
-            calls.append((text, source_kind, workspace))
-            return [sample_contract()]
-
-    monkeypatch.setattr("memory_use_contracts.cli.MemoryContractLayer", FakeLayer)
-
-    result = runner.invoke(app, ["ingest-cc", "--root", str(tmp_path), "--workspace", "demo"])
-
-    assert result.exit_code == 0
-    assert calls == [("Claude rules", SourceKind.PROJECT_DOC, "demo")]
-
-
-def test_add_contract_writes_direct_contract(monkeypatch) -> None:
-    calls = {}
-
-    class FakeLayer:
-        @classmethod
-        def from_env(cls):
-            return cls()
-
-        def add_contract(self, contract):
-            calls["contract"] = contract
-            return contract
-
-    monkeypatch.setattr("memory_use_contracts.cli.MemoryContractLayer", FakeLayer)
-
-    result = runner.invoke(
+    result = CliRunner().invoke(
         app,
         [
-            "add-contract",
-            "--text",
-            "Do not edit this file.",
-            "--type",
-            "prohibition",
-            "--modality",
-            "MUST_NOT",
-            "--scope",
-            "file",
-            "--path",
-            "src/a.py",
-            "--action-class",
-            "edit_file",
+            "mac_rule_override",
+            "MAC-block",
+            "--scope-json",
+            json.dumps(
+                {
+                    "level": "project",
+                    "workspace": "/workspace/project",
+                    "repo": "project",
+                }
+            ),
+            "--lifecycle-json",
+            json.dumps({"type": "bounded_task"}),
+            "--reason",
+            "user approved this single action",
+            "--json",
         ],
     )
 
     assert result.exit_code == 0
-    contract = calls["contract"]
-    assert contract.scope.level == ScopeLevel.FILE
-    assert contract.scope.path_globs == ["src/a.py"]
-    assert contract.action_classes[0].value == "edit_file"
+    payload = json.loads(result.output)
+    assert payload["to_contract"] == "MAC-block"
+    assert payload["relation"] == EdgeRelation.OVERRIDE.value
+    assert store.list_edges()[0].relation == EdgeRelation.OVERRIDE

@@ -1,6 +1,6 @@
 .env
 .venv/
-.muc/
+.mac/
 __pycache__/
 .pytest_cache/
 .ruff_cache/

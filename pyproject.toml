@@ -1,7 +1,7 @@
 [project]
-name = "memory-use-contracts"
+name = "memory-as-contracts"
 version = "0.1.0"
-description = "Training-free contract layer for memory-mediated coding-agent actions."
+description = "Contract layer for memory-mediated agent behavior."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-muc = "memory_use_contracts.cli:app"
+mac = "memory_as_contracts.cli:app"
 
 [dependency-groups]
 dev = [
