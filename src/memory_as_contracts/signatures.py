@@ -129,25 +129,41 @@ class ActionSignatureBuilder:
         raw_arguments: dict,
         context: SignatureContext,
     ) -> tuple[str, set[str], list[str], RiskLevel, SideEffect]:
-        if tool_name in {
-            "file.write",
-            "file.delete",
-            "file.read",
-            "web.search",
-            "email.send",
-            "message.send",
-            "memory.write",
-        }:
-            return self._classify_direct_tool(tool_name, raw_arguments)
-        if tool_name == "exec":
+        normalized = _normalized_tool_name(tool_name)
+        if normalized in {"bash", "shell", "exec", "exec_command", "terminal", "run_command", "run", "command"}:
             return self._classify_exec(raw_arguments, context)
-        return tool_name, set(), [], RiskLevel.MEDIUM, SideEffect.WRITE
+        if normalized in {"read", "read_file", "fileread", "file.read", "ls", "glob", "grep"}:
+            return self._classify_direct_tool("file.read", raw_arguments)
+        if normalized in {
+            "write",
+            "edit",
+            "multiedit",
+            "apply_patch",
+            "patch",
+            "filewrite",
+            "file.write",
+        }:
+            return self._classify_direct_tool("file.write", raw_arguments)
+        if normalized in {"delete", "remove", "filedelete", "file.delete"}:
+            return self._classify_direct_tool("file.delete", raw_arguments)
+        if normalized in {"websearch", "web_search", "web.search", "search", "webfetch", "web_fetch"}:
+            return self._classify_direct_tool("web.search", raw_arguments)
+        if normalized in {"send_message", "message_send", "message.send", "message", "notify", "slack", "sessions_send"}:
+            return self._classify_direct_tool("message.send", raw_arguments)
+        if normalized in {"send_email", "email_send", "email.send"}:
+            return self._classify_direct_tool("email.send", raw_arguments)
+        if normalized in {"memory_record", "memory_write", "memory.write"}:
+            return self._classify_direct_tool("memory.write", raw_arguments)
+        if raw_arguments.get("cmd") or raw_arguments.get("command"):
+            return self._classify_exec(raw_arguments, context)
+        available = {action.name for action in context.available_actions}
+        host_action = tool_name if tool_name in available else "exec"
+        return host_action, set(), [], RiskLevel.MEDIUM, SideEffect.WRITE
 
     def _classify_direct_tool(
         self, tool_name: str, raw_arguments: dict
     ) -> tuple[str, set[str], list[str], RiskLevel, SideEffect]:
-        path = raw_arguments.get("path")
-        targets = [str(path)] if path else []
+        targets = _path_targets(raw_arguments)
         if tool_name == "file.read":
             return "file.read", {"file_read"}, targets, RiskLevel.LOW, SideEffect.READ
         if tool_name == "file.delete":
@@ -173,7 +189,7 @@ class ActionSignatureBuilder:
         return (
             "file.write",
             {"file_write", "source_modification", "workspace_write"},
-            targets,
+            targets or _patch_targets(raw_arguments),
             RiskLevel.MEDIUM,
             SideEffect.WRITE,
         )
@@ -221,3 +237,40 @@ def _looks_like_dependency_install(tokens: list[str]) -> bool:
 
 def _looks_effectful(tokens: list[str]) -> bool:
     return any(token in tokens for token in {">", ">>", "rm", "mv", "cp", "touch", "apply_patch"})
+
+
+def _normalized_tool_name(tool_name: str) -> str:
+    return tool_name.strip().lower().replace("-", "_")
+
+
+def _path_targets(raw_arguments: dict) -> list[str]:
+    targets: list[str] = []
+    for key in ("path", "file_path", "filepath", "filename"):
+        value = raw_arguments.get(key)
+        if value:
+            targets.append(str(value))
+    for key in ("paths", "file_paths"):
+        value = raw_arguments.get(key)
+        if isinstance(value, list):
+            targets.extend(str(item) for item in value if item)
+    return sorted({target for target in targets if target})
+
+
+def _patch_targets(raw_arguments: dict) -> list[str]:
+    patch = raw_arguments.get("patch") or raw_arguments.get("value") or raw_arguments.get("input") or ""
+    if not isinstance(patch, str):
+        return []
+    targets: list[str] = []
+    prefixes = (
+        "*** Add File: ",
+        "*** Update File: ",
+        "*** Delete File: ",
+        "*** Move to: ",
+    )
+    for line in patch.splitlines():
+        for prefix in prefixes:
+            if line.startswith(prefix):
+                targets.append(line.removeprefix(prefix).strip())
+        if line.startswith("+++ b/") or line.startswith("--- a/"):
+            targets.append(line[6:].strip())
+    return sorted({target for target in targets if target and target != "/dev/null"})

@@ -7,6 +7,7 @@ from memory_as_contracts.compiler import PolicyCompiler
 from memory_as_contracts.gate import ActionGate, ExcludedActionPattern
 from memory_as_contracts.models import (
     ActionConstraints,
+    ArgPattern,
     CompiledPredicateVersion,
     Contract,
     ContractEdge,
@@ -24,8 +25,10 @@ from memory_as_contracts.models import (
     PredicateStatus,
     Scope,
     ScopeLevel,
+    RuleAuthority,
     SourceKind,
     Strength,
+    ToolPattern,
 )
 from memory_as_contracts.resolver import ConflictResolver
 from memory_as_contracts.retrieval import (
@@ -78,7 +81,17 @@ def push_prohibition(contract_id: str = "MAC-push") -> Contract:
             host_actions=["git.push"],
             canonical_tags=["external_write", "publish_code"],
         ),
+        tool_patterns=git_push_tool_patterns(),
     )
+
+
+def git_push_tool_patterns() -> list[ToolPattern]:
+    return [
+        ToolPattern(tool="exec", args={"cmd": ArgPattern(regex=r"^git\s+push(\s|$)")}),
+        ToolPattern(tool="exec", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
+        ToolPattern(tool="Bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
+        ToolPattern(tool="exec_command", args={"cmd": ArgPattern(regex=r"^git\s+push(\s|$)")}),
+    ]
 
 
 def push_prohibition_from_source(
@@ -86,8 +99,15 @@ def push_prohibition_from_source(
     source_kind: SourceKind,
     text: str = "Do not push any code changes to Git before asking me.",
 ) -> Contract:
+    authority = (
+        RuleAuthority.USER_EXPLICIT
+        if source_kind == SourceKind.USER_TURN
+        else RuleAuthority.PROJECT_INSTRUCTION
+        if source_kind == SourceKind.PROJECT_DOC
+        else RuleAuthority.MEMORY_IMPORT
+    )
     return push_prohibition(contract_id).model_copy(
-        update={"text": text, "source": source(source_kind)}
+        update={"text": text, "source": source(source_kind), "authority": authority}
     )
 
 
@@ -132,7 +152,20 @@ def file_rule(
             host_actions=[host_action],
             canonical_tags=[tag],
         ),
+        tool_patterns=_file_tool_patterns(path_glob)
+        if host_action in {"file.write", "file.delete"}
+        else [],
     )
+
+
+def _file_tool_patterns(path_glob: str) -> list[ToolPattern]:
+    return [
+        ToolPattern(tool="file.write", args={"path": ArgPattern(path_glob=path_glob)}),
+        ToolPattern(tool="Write", args={"file_path": ArgPattern(path_glob=path_glob)}),
+        ToolPattern(tool="Edit", args={"file_path": ArgPattern(path_glob=path_glob)}),
+        ToolPattern(tool="MultiEdit", args={"file_path": ArgPattern(path_glob=path_glob)}),
+        ToolPattern(tool="apply_patch", args={"patch": ArgPattern(mentions_path_glob=path_glob)}),
+    ]
 
 
 def git_push_signature():
@@ -187,6 +220,85 @@ def test_policy_compiler_evaluates_exact_tool_name_and_parameter_regex() -> None
     assert compiler.evaluate(predicate, status_signature) == MatchOutcome.NOT_MATCHED
 
 
+def test_policy_compiler_materializes_seeded_git_push_pattern_to_exec_cmd() -> None:
+    compiler = PolicyCompiler()
+    contract = Contract(
+        id="MAC-seeded-push",
+        text="Do not run git push until I approve it.",
+        kind=ContractKind.PROHIBITION,
+        modality=Modality.MUST_NOT,
+        strength=Strength.HARD,
+        source=source(),
+        scope=project_scope(),
+        lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
+        action_constraints=ActionConstraints(
+            host_actions=["git.push"],
+            canonical_tags=["external_write", "publish_code"],
+        ),
+        tool_patterns=[
+            ToolPattern(tool="Bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
+        ],
+    )
+    push_signature = git_push_signature()
+    status_signature = ActionSignatureBuilder().build(
+        tool_name="exec",
+        raw_arguments={"cmd": "git status --short"},
+        context=SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project"),
+    )
+
+    predicate = compiler.compile(contract, push_signature.available_actions)
+
+    assert any(pattern.tool == "exec" and "cmd" in pattern.args for pattern in predicate.tool_patterns)
+    assert compiler.evaluate(predicate, push_signature) == MatchOutcome.MATCHED
+    assert compiler.evaluate(predicate, status_signature) == MatchOutcome.NOT_MATCHED
+
+
+def test_policy_compiler_materializes_seeded_path_pattern_to_file_write_tool() -> None:
+    compiler = PolicyCompiler()
+    contract = Contract(
+        id="MAC-seeded-generated",
+        text="Do not edit files under generated/**.",
+        kind=ContractKind.PROHIBITION,
+        modality=Modality.MUST_NOT,
+        strength=Strength.HARD,
+        source=source(),
+        scope=Scope(
+            level=ScopeLevel.PATH,
+            workspace="/workspace/project",
+            repo="project",
+            path_globs=["generated/**"],
+        ),
+        lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
+        action_constraints=ActionConstraints(
+            host_actions=["file.write"],
+            canonical_tags=["file_write", "workspace_write"],
+        ),
+        tool_patterns=[
+            ToolPattern(tool="Edit", args={"file_path": ArgPattern(path_glob="generated/**")})
+        ],
+    )
+    context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
+    generated_write = ActionSignatureBuilder().build(
+        tool_name="file.write",
+        raw_arguments={"path": "generated/core.py"},
+        context=context,
+    )
+    source_write = ActionSignatureBuilder().build(
+        tool_name="file.write",
+        raw_arguments={"path": "src/core.py"},
+        context=context,
+    )
+
+    predicate = compiler.compile(contract, generated_write.available_actions)
+
+    assert any(
+        pattern.tool == "file.write" and pattern.args["path"].path_glob == "generated/**"
+        for pattern in predicate.tool_patterns
+    )
+    assert compiler.evaluate(predicate, generated_write) == MatchOutcome.MATCHED
+    assert compiler.evaluate(predicate, source_write) == MatchOutcome.NOT_MATCHED
+
+
 def test_policy_compiler_does_not_overblock_generic_exec_for_git_push_rule() -> None:
     compiler = PolicyCompiler()
     contract = push_prohibition()
@@ -227,6 +339,7 @@ def test_policy_compiler_targets_bare_filename_rules() -> None:
             host_actions=["file.write"],
             canonical_tags=["file_write"],
         ),
+        tool_patterns=_file_tool_patterns("package-lock.json"),
     )
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
@@ -260,6 +373,7 @@ def test_policy_compiler_prefers_negated_bare_filename_target() -> None:
             host_actions=["file.write"],
             canonical_tags=["file_write"],
         ),
+        tool_patterns=_file_tool_patterns("package-lock.json"),
     )
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
@@ -326,6 +440,7 @@ def test_policy_compiler_expands_lockfile_category_without_blocking_manifest(tmp
             host_actions=["file.write"],
             canonical_tags=["file_write"],
         ),
+        tool_patterns=[ToolPattern(tool="file.write")],
     )
     predicate = PolicyCompiler().compile(contract, coding_available_actions())
     builder = ActionSignatureBuilder()
@@ -366,12 +481,16 @@ def test_policy_compiler_grounds_llm_hint_before_gate_uses_it() -> None:
     store.add_contract(push_prohibition("MAC-push").model_copy(update={"compiled_predicates": hint}))
 
     result = ActionGate(store).gate(git_push_signature())
-    grounded = store.get_contract("MAC-push").compiled_predicates
+    stored_contract = store.get_contract("MAC-push")
+    grounded = store.get_active_rule_pattern_version("MAC-push")
 
     assert result.decision.decision.value == "block"
-    assert grounded.id != "PV-raw"
-    assert grounded.host_action_patterns[0].action == "git.push"
-    assert grounded.host_action_patterns[0].parameter_regex["cmd"] == r"^git\s+push(\s|$)"
+    assert stored_contract is not None
+    assert stored_contract.compiled_predicates is None
+    assert grounded is not None
+    assert grounded.id == "PV-raw"
+    assert grounded.tool_patterns[0].tool == "exec"
+    assert grounded.tool_patterns[0].args["cmd"].regex == "git push"
 
 
 def test_signature_builder_supports_external_message_action() -> None:
@@ -399,6 +518,96 @@ def test_action_gate_blocks_matched_hard_prohibition_and_writes_receipt() -> Non
     assert store.list_receipts()[0].decision.value == "block"
 
 
+def test_action_gate_requires_tool_patterns_not_semantics_alone() -> None:
+    store = make_store()
+    store.add_contract(
+        Contract.model_validate(
+            {
+                "id": "MAC-semantic-only",
+                "text": "Do not run git push.",
+                "effect": "deny",
+                "authority": "user_explicit",
+                "scope": {"repo": "project", "workspace": "/workspace/project"},
+                "semantics": {"actions": ["git.push"], "tags": ["publish_code"]},
+                "validity": {"from": "2026-05-23T10:00:00Z", "until": None},
+            }
+        )
+    )
+
+    result = ActionGate(store).gate(git_push_signature())
+
+    assert result.decision.decision.value == "allow"
+    assert result.receipt.contracts_used == []
+    assert result.receipt.contracts_ignored[0].reason == "missing_tool_pattern"
+
+
+def test_action_gate_matches_native_tool_patterns_for_linked_repo_rule() -> None:
+    store = make_store()
+    store.add_contract(
+        Contract.model_validate(
+            {
+                "id": "MAC-linked",
+                "text": "Do not modify the linked repo unless the current turn explicitly asks.",
+                "effect": "deny",
+                "authority": "user_explicit",
+                "scope": {"repo": "project", "paths": ["../linked_repo/**"]},
+                "semantics": {
+                    "actions": ["file.write"],
+                    "tags": ["workspace_write", "source_modification"],
+                },
+                "tool_patterns": [
+                    {"tool": "Edit", "args": {"file_path": {"path_glob": "../linked_repo/**"}}},
+                    {"tool": "Write", "args": {"file_path": {"path_glob": "../linked_repo/**"}}},
+                    {"tool": "MultiEdit", "args": {"file_path": {"path_glob": "../linked_repo/**"}}},
+                    {"tool": "apply_patch", "args": {"patch": {"mentions_path_glob": "../linked_repo/**"}}},
+                    {
+                        "tool": "Bash",
+                        "args": {
+                            "command": {
+                                "regex": r"(^|\s)(sed|python|node|rm|mv|cp|touch|cat\s+>|tee|perl).*\.\./linked_repo/"
+                            }
+                        },
+                    },
+                ],
+                "targets": [{"kind": "path_glob", "value": "../linked_repo/**"}],
+                "validity": {"from": "2026-05-23T10:00:00Z", "until": None},
+            }
+        )
+    )
+    builder = ActionSignatureBuilder()
+    context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
+
+    signatures = [
+        builder.build(tool_name="Edit", raw_arguments={"file_path": "../linked_repo/a.py"}, context=context),
+        builder.build(tool_name="Write", raw_arguments={"file_path": "../linked_repo/a.py"}, context=context),
+        builder.build(tool_name="MultiEdit", raw_arguments={"file_path": "../linked_repo/a.py"}, context=context),
+        builder.build(
+            tool_name="apply_patch",
+            raw_arguments={"patch": "*** Update File: ../linked_repo/a.py\n@@\n-old\n+new"},
+            context=context,
+        ),
+        builder.build(
+            tool_name="Bash",
+            raw_arguments={"command": "sed -i '' s/old/new/ ../linked_repo/a.py"},
+            context=context,
+        ),
+    ]
+
+    assert [ActionGate(store).gate(signature).decision.decision.value for signature in signatures] == [
+        "block",
+        "block",
+        "block",
+        "block",
+        "block",
+    ]
+    assert (
+        ActionGate(store)
+        .gate(builder.build(tool_name="Read", raw_arguments={"file_path": "../linked_repo/a.py"}, context=context))
+        .decision.decision.value
+        == "allow"
+    )
+
+
 def test_action_gate_drops_generic_exec_when_specific_action_is_available() -> None:
     store = make_store()
     store.add_contract(
@@ -415,6 +624,7 @@ def test_action_gate_drops_generic_exec_when_specific_action_is_available() -> N
                 host_actions=["exec", "web.search"],
                 canonical_tags=["external_write", "network_read"],
             ),
+            tool_patterns=[ToolPattern(tool="web.search")],
         )
     )
     builder = ActionSignatureBuilder()
@@ -497,6 +707,7 @@ def test_file_read_is_not_excluded_by_default() -> None:
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
             action_constraints=ActionConstraints(host_actions=["file.read"]),
+            tool_patterns=[ToolPattern(tool="file.read")],
         )
     )
     signature = ActionSignatureBuilder().build(
@@ -813,6 +1024,7 @@ def test_conflict_resolver_keeps_broader_publish_clause_independent() -> None:
             host_actions=["git.push"],
             canonical_tags=["external_write", "publish_code"],
         ),
+        tool_patterns=git_push_tool_patterns(),
     )
 
     result = ConflictResolver(store).insert(broader)
@@ -839,6 +1051,7 @@ def test_action_gate_reports_specific_approval_boundary_before_broader_publish_r
                 host_actions=["git.push"],
                 canonical_tags=["external_write", "publish_code"],
             ),
+            tool_patterns=git_push_tool_patterns(),
         )
     )
     store.add_contract(push_prohibition("MAC-push"))
@@ -1002,6 +1215,9 @@ def test_action_gate_auto_enqueues_refinement_job_after_ambiguity_window() -> No
         id="PV-current",
         contract_id="MAC-push",
         version="PV-001",
+        tool_patterns=[
+            ToolPattern(tool="exec", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
+        ],
     )
     store.add_contract(
         Contract(
@@ -1034,7 +1250,7 @@ def test_action_gate_auto_enqueues_refinement_job_after_ambiguity_window() -> No
     jobs = store.list_refinement_jobs(JobStatus.PENDING.value)
     assert len(jobs) == 1
     assert jobs[0].contract_id == "MAC-push"
-    assert jobs[0].predicate_version_id != "PV-current"
+    assert jobs[0].pattern_version_id == "PV-current"
     assert len(jobs[0].recent_signature_ids) == 10
 
 
@@ -1044,9 +1260,9 @@ def test_llm_predicate_refinement_uses_ambiguous_invocation_results_only_for_pat
     def provider(prompt: str) -> str:
         prompts.append(prompt)
         return (
-            '{"host_action_patterns":['
-            '{"action":"git.push","tool_name":"exec","parameter_regex":{"cmd":"^git\\\\s+push(\\\\s|$)"}}'
-            '],"target_patterns":[],"canonical_tags":["external_write","publish_code"]}'
+            '{"tool_patterns":['
+            '{"tool":"exec","args":{"cmd":{"regex":"^git\\\\s+push(\\\\s|$)"}}}'
+            '],"targets":[]}'
         )
 
     store = make_store()
@@ -1054,6 +1270,9 @@ def test_llm_predicate_refinement_uses_ambiguous_invocation_results_only_for_pat
         id="PV-current",
         contract_id="MAC-push",
         version="PV-001",
+        tool_patterns=[
+            ToolPattern(tool="exec", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
+        ],
     )
     store.add_contract(
         Contract(
@@ -1092,16 +1311,19 @@ def test_llm_predicate_refinement_uses_ambiguous_invocation_results_only_for_pat
     assert prompts
     assert prompts[0].count("git push origin branch-") == 10
     assert "Do not perform risky release actions without approval." in prompts[0]
-    assert "host_action_patterns" in prompts[0]
-    refined = store.list_predicate_versions("MAC-push")[-1]
-    assert refined.refines == job.predicate_version_id
-    assert refined.host_action_patterns[0].action == "git.push"
-    assert refined.host_action_patterns[0].tool_name == "exec"
-    assert refined.host_action_patterns[0].parameter_regex["cmd"].startswith("^git")
-    versions = {item.id: item for item in store.list_predicate_versions("MAC-push")}
-    assert refined.scope_predicate == versions[job.predicate_version_id].scope_predicate
+    assert "immutable_rule" in prompts[0]
+    assert "current_pattern_version" in prompts[0]
+    assert "semantics" in prompts[0]
+    assert "tool_patterns" in prompts[0]
+    refined = store.list_rule_pattern_versions("MAC-push")[-1]
+    assert refined.refines == job.pattern_version_id
+    assert refined.tool_patterns[0].tool == "exec"
+    assert refined.tool_patterns[0].args["cmd"].regex.startswith("^git")
+    versions = {item.id: item for item in store.list_rule_pattern_versions("MAC-push")}
+    assert refined.scope_predicate == versions[job.pattern_version_id].scope_predicate
     stored_contract = store.get_contract("MAC-push")
     assert stored_contract.text == "Do not perform risky release actions without approval."
-    assert stored_contract.compiled_predicates.id == refined.id
-    assert versions[job.predicate_version_id].status == PredicateStatus.SUPERSEDED
+    assert stored_contract.compiled_predicates is None
+    assert store.get_active_rule_pattern_version("MAC-push").id == refined.id
+    assert versions[job.pattern_version_id].status == PredicateStatus.SUPERSEDED
     assert versions[refined.id].status == PredicateStatus.ACTIVE

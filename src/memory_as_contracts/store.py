@@ -17,20 +17,34 @@ from memory_as_contracts.models import (
     PredicateStatus,
     Receipt,
     RefinementJob,
+    RulePatternVersion,
     SourceSnapshot,
     utc_now,
 )
+from memory_as_contracts.schema_compat import (
+    canonical_contract_payload,
+    canonical_pattern_version_payload,
+)
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 
 def _dump_model(model: Any) -> str:
-    return model.model_dump_json()
+    return model.model_dump_json(by_alias=True)
 
 
 def _dump_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _dump_contract_payload(contract: Contract) -> str:
+    payload = contract.model_dump(mode="json", by_alias=True)
+    return _dump_json(canonical_contract_payload(payload))
+
+
+def _dump_pattern_version_payload(pattern_version: RulePatternVersion) -> str:
+    return _dump_json(canonical_pattern_version_payload(pattern_version.model_dump(mode="json")))
 
 
 def _load_json(value: str | None) -> Any:
@@ -68,14 +82,21 @@ class ContractStore:
                 strength TEXT NOT NULL,
                 status TEXT NOT NULL,
                 confidence REAL NOT NULL,
+                effect TEXT,
+                authority TEXT,
                 source_json TEXT NOT NULL,
                 scope_json TEXT NOT NULL,
                 lifecycle_json TEXT NOT NULL,
                 action_constraints_json TEXT NOT NULL,
+                semantics_json TEXT,
+                tool_patterns_json TEXT,
+                targets_json TEXT,
+                validity_json TEXT,
                 compiled_predicates_json TEXT,
                 override_json TEXT NOT NULL,
                 supersedes_json TEXT NOT NULL,
                 conflicts_with_json TEXT NOT NULL,
+                payload_json TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -96,7 +117,7 @@ class ContractStore:
                 created_at TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS predicate_versions (
+            CREATE TABLE IF NOT EXISTS rule_pattern_versions (
                 id TEXT PRIMARY KEY,
                 contract_id TEXT NOT NULL,
                 version TEXT NOT NULL,
@@ -164,9 +185,66 @@ class ContractStore:
         row = self.conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
         if row is None:
             self.conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
+        elif int(row["version"]) < SCHEMA_VERSION:
+            self._migrate_schema(int(row["version"]))
         elif int(row["version"]) != SCHEMA_VERSION:
             raise RuntimeError(f"unsupported MAC schema version: {row['version']}")
         self.conn.commit()
+
+    def _migrate_schema(self, version: int) -> None:
+        if version in {1, 2}:
+            self._ensure_contract_columns()
+            self.conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rule_pattern_versions (
+                    id TEXT PRIMARY KEY,
+                    contract_id TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    refines TEXT,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            if self._table_exists("predicate_versions"):
+                self.conn.execute(
+                    """
+                    INSERT OR IGNORE INTO rule_pattern_versions (
+                        id, contract_id, version, status, refines, payload_json, created_at
+                    )
+                    SELECT id, contract_id, version, status, refines, payload_json, created_at
+                    FROM predicate_versions
+                    """
+                )
+            self.conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
+            return
+        raise RuntimeError(f"unsupported MAC schema version: {version}")
+
+    def _table_exists(self, table: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()
+        return row is not None
+
+    def _ensure_contract_columns(self) -> None:
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(contracts)").fetchall()
+        }
+        additions = {
+            "payload_json": "TEXT",
+            "effect": "TEXT",
+            "authority": "TEXT",
+            "semantics_json": "TEXT",
+            "tool_patterns_json": "TEXT",
+            "targets_json": "TEXT",
+            "validity_json": "TEXT",
+        }
+        for name, column_type in additions.items():
+            if name not in columns:
+                self.conn.execute(f"ALTER TABLE contracts ADD COLUMN {name} {column_type}")
 
     def add_contract(self, contract: Contract) -> Contract:
         now = utc_now().isoformat()
@@ -175,10 +253,11 @@ class ContractStore:
                 """
                 INSERT OR REPLACE INTO contracts (
                     id, text, kind, modality, strength, status, confidence,
-                    source_json, scope_json, lifecycle_json, action_constraints_json,
+                    effect, authority, source_json, scope_json, lifecycle_json, action_constraints_json,
+                    semantics_json, tool_patterns_json, targets_json, validity_json,
                     compiled_predicates_json, override_json, supersedes_json,
-                    conflicts_with_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    conflicts_with_json, payload_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     contract.id,
@@ -188,16 +267,23 @@ class ContractStore:
                     contract.strength.value,
                     contract.status.value,
                     contract.confidence,
+                    contract.effect.value,
+                    contract.authority.value,
                     _dump_model(contract.source),
                     _dump_model(contract.scope),
                     _dump_model(contract.lifecycle),
                     _dump_model(contract.action_constraints),
+                    _dump_model(contract.semantics),
+                    _dump_json([pattern.model_dump(mode="json") for pattern in contract.tool_patterns]),
+                    _dump_json([target.model_dump(mode="json") for target in contract.targets]),
+                    _dump_model(contract.validity),
                     _dump_model(contract.compiled_predicates)
                     if contract.compiled_predicates
                     else None,
                     _dump_model(contract.override),
                     _dump_json(contract.supersedes),
                     _dump_json(contract.conflicts_with),
+                    _dump_contract_payload(contract),
                     contract.source.created_at.isoformat(),
                     now,
                 ),
@@ -209,7 +295,7 @@ class ContractStore:
             )
             if contract.compiled_predicates is not None:
                 predicate = contract.compiled_predicates.model_copy(update={"contract_id": contract.id})
-                self.add_predicate_version(predicate)
+                self.add_rule_pattern_version(predicate)
         return contract
 
     def get_contract(self, contract_id: str) -> Contract | None:
@@ -304,35 +390,40 @@ class ContractStore:
         rows = self.conn.execute(f"SELECT * FROM contract_edges {where} ORDER BY created_at, id", params)
         return [self._row_to_edge(row) for row in rows]
 
-    def add_predicate_version(
-        self, predicate: CompiledPredicateVersion
-    ) -> CompiledPredicateVersion:
-        if predicate.contract_id is None:
+    def add_rule_pattern_version(
+        self, pattern_version: RulePatternVersion
+    ) -> RulePatternVersion:
+        if pattern_version.contract_id is None:
             raise ValueError("predicate version requires contract_id before storage")
         with self.conn:
             self.conn.execute(
                 """
-                INSERT OR REPLACE INTO predicate_versions (
+                INSERT OR REPLACE INTO rule_pattern_versions (
                     id, contract_id, version, status, refines, payload_json, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    predicate.id,
-                    predicate.contract_id,
-                    predicate.version,
-                    predicate.status.value,
-                    predicate.refines,
-                    _dump_model(predicate),
-                    predicate.created_at.isoformat(),
+                    pattern_version.id,
+                    pattern_version.contract_id,
+                    pattern_version.version,
+                    pattern_version.status.value,
+                    pattern_version.refines,
+                    _dump_pattern_version_payload(pattern_version),
+                    pattern_version.created_at.isoformat(),
                 ),
             )
-        return predicate
+        return pattern_version
 
-    def list_predicate_versions(
+    def add_predicate_version(
+        self, predicate: CompiledPredicateVersion
+    ) -> CompiledPredicateVersion:
+        return self.add_rule_pattern_version(predicate)
+
+    def list_rule_pattern_versions(
         self,
         contract_id: str | None = None,
         status: PredicateStatus | None = None,
-    ) -> list[CompiledPredicateVersion]:
+    ) -> list[RulePatternVersion]:
         clauses: list[str] = []
         params: list[Any] = []
         if contract_id is not None:
@@ -343,10 +434,21 @@ class ContractStore:
             params.append(status.value)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = self.conn.execute(
-            f"SELECT payload_json FROM predicate_versions {where} ORDER BY created_at, id",
+            f"SELECT payload_json FROM rule_pattern_versions {where} ORDER BY created_at, id",
             params,
         )
-        return [CompiledPredicateVersion.model_validate_json(row["payload_json"]) for row in rows]
+        return [RulePatternVersion.model_validate_json(row["payload_json"]) for row in rows]
+
+    def get_active_rule_pattern_version(self, contract_id: str) -> RulePatternVersion | None:
+        rows = self.list_rule_pattern_versions(contract_id, PredicateStatus.ACTIVE)
+        return rows[-1] if rows else None
+
+    def list_predicate_versions(
+        self,
+        contract_id: str | None = None,
+        status: PredicateStatus | None = None,
+    ) -> list[CompiledPredicateVersion]:
+        return self.list_rule_pattern_versions(contract_id=contract_id, status=status)
 
     def add_receipt(self, receipt: Receipt) -> Receipt:
         with self.conn:
@@ -420,9 +522,7 @@ class ContractStore:
         rows = self.conn.execute("SELECT payload_json FROM source_snapshots ORDER BY observed_at")
         return [SourceSnapshot.model_validate_json(row["payload_json"]) for row in rows]
 
-    def add_predicate_evaluation(
-        self, evaluation: PredicateEvaluation
-    ) -> PredicateEvaluation:
+    def add_pattern_evaluation(self, evaluation: PredicateEvaluation) -> PredicateEvaluation:
         with self.conn:
             self.conn.execute(
                 """
@@ -434,7 +534,7 @@ class ContractStore:
                 (
                     evaluation.id,
                     evaluation.contract_id,
-                    evaluation.predicate_version_id,
+                    evaluation.pattern_version_id,
                     evaluation.signature_id,
                     evaluation.match_outcome.value,
                     _dump_model(evaluation),
@@ -445,17 +545,22 @@ class ContractStore:
             self.add_ambiguity_event(
                 AmbiguityEvent(
                     contract_id=evaluation.contract_id,
-                    predicate_version_id=evaluation.predicate_version_id,
+                    pattern_version_id=evaluation.pattern_version_id,
                     signature_id=evaluation.signature_id,
                     reason=evaluation.reason,
                 )
             )
         return evaluation
 
-    def recent_predicate_evaluations(
+    def add_predicate_evaluation(
+        self, evaluation: PredicateEvaluation
+    ) -> PredicateEvaluation:
+        return self.add_pattern_evaluation(evaluation)
+
+    def recent_pattern_evaluations(
         self,
         contract_id: str,
-        predicate_version_id: str,
+        pattern_version_id: str,
         *,
         limit: int = 10,
     ) -> list[PredicateEvaluation]:
@@ -466,14 +571,23 @@ class ContractStore:
             ORDER BY evaluated_at DESC, id DESC
             LIMIT ?
             """,
-            (contract_id, predicate_version_id, limit),
+            (contract_id, pattern_version_id, limit),
         ).fetchall()
         return [PredicateEvaluation.model_validate_json(row["payload_json"]) for row in rows]
 
-    def predicate_evaluations_by_signature_ids(
+    def recent_predicate_evaluations(
         self,
         contract_id: str,
         predicate_version_id: str,
+        *,
+        limit: int = 10,
+    ) -> list[PredicateEvaluation]:
+        return self.recent_pattern_evaluations(contract_id, predicate_version_id, limit=limit)
+
+    def pattern_evaluations_by_signature_ids(
+        self,
+        contract_id: str,
+        pattern_version_id: str,
         signature_ids: Iterable[str],
     ) -> list[PredicateEvaluation]:
         ordered_ids = list(signature_ids)
@@ -487,7 +601,7 @@ class ContractStore:
             AND predicate_version_id = ?
             AND signature_id IN ({placeholders})
             """,
-            [contract_id, predicate_version_id, *ordered_ids],
+            [contract_id, pattern_version_id, *ordered_ids],
         ).fetchall()
         by_id = {
             evaluation.signature_id: evaluation
@@ -496,6 +610,16 @@ class ContractStore:
             )
         }
         return [by_id[signature_id] for signature_id in ordered_ids if signature_id in by_id]
+
+    def predicate_evaluations_by_signature_ids(
+        self,
+        contract_id: str,
+        predicate_version_id: str,
+        signature_ids: Iterable[str],
+    ) -> list[PredicateEvaluation]:
+        return self.pattern_evaluations_by_signature_ids(
+            contract_id, predicate_version_id, signature_ids
+        )
 
     def add_ambiguity_event(self, event: AmbiguityEvent) -> AmbiguityEvent:
         with self.conn:
@@ -509,7 +633,7 @@ class ContractStore:
                 (
                     event.id,
                     event.contract_id,
-                    event.predicate_version_id,
+                    event.pattern_version_id,
                     event.signature_id,
                     event.match_outcome.value,
                     _dump_model(event),
@@ -519,7 +643,7 @@ class ContractStore:
         return event
 
     def recent_ambiguity_events(
-        self, contract_id: str, predicate_version_id: str, *, limit: int = 10
+        self, contract_id: str, pattern_version_id: str, *, limit: int = 10
     ) -> list[AmbiguityEvent]:
         rows = self.conn.execute(
             """
@@ -528,7 +652,7 @@ class ContractStore:
             ORDER BY evaluated_at DESC, id DESC
             LIMIT ?
             """,
-            (contract_id, predicate_version_id, limit),
+            (contract_id, pattern_version_id, limit),
         )
         return [AmbiguityEvent.model_validate_json(row["payload_json"]) for row in rows]
 
@@ -544,7 +668,7 @@ class ContractStore:
                 (
                     job.id,
                     job.contract_id,
-                    job.predicate_version_id,
+                    job.pattern_version_id,
                     job.status.value,
                     _dump_model(job),
                     job.created_at.isoformat(),
@@ -566,6 +690,11 @@ class ContractStore:
         return [RefinementJob.model_validate_json(row["payload_json"]) for row in rows]
 
     def _row_to_contract(self, row: sqlite3.Row) -> Contract:
+        if "payload_json" in row.keys() and row["payload_json"]:
+            payload = _load_json(row["payload_json"])
+            if isinstance(payload, dict):
+                payload["status"] = row["status"]
+                return Contract.model_validate(payload)
         payload = {
             "id": row["id"],
             "text": row["text"],
@@ -583,6 +712,19 @@ class ContractStore:
             "supersedes": _load_json(row["supersedes_json"]) or [],
             "conflicts_with": _load_json(row["conflicts_with_json"]) or [],
         }
+        row_keys = set(row.keys())
+        if "effect" in row_keys and row["effect"]:
+            payload["effect"] = row["effect"]
+        if "authority" in row_keys and row["authority"]:
+            payload["authority"] = row["authority"]
+        if "semantics_json" in row_keys and row["semantics_json"]:
+            payload["semantics"] = _load_json(row["semantics_json"])
+        if "tool_patterns_json" in row_keys and row["tool_patterns_json"]:
+            payload["tool_patterns"] = _load_json(row["tool_patterns_json"]) or []
+        if "targets_json" in row_keys and row["targets_json"]:
+            payload["targets"] = _load_json(row["targets_json"]) or []
+        if "validity_json" in row_keys and row["validity_json"]:
+            payload["validity"] = _load_json(row["validity_json"])
         return Contract.model_validate(payload)
 
     def _row_to_edge(self, row: sqlite3.Row) -> ContractEdge:

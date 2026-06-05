@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from memory_as_contracts.models import HostActionPattern, TargetPattern
+from memory_as_contracts.models import TargetPattern
 
 
 IGNORED_DIRS = {
@@ -92,60 +92,6 @@ CATEGORY_TERMS = {
     "generated": ("generated", "build output", "generated file", "generated files"),
 }
 
-COMMAND_PATTERNS: dict[tuple[str, str | None], tuple[str, str]] = {
-    ("git", "push"): ("git.push", r"^git\s+push(\s|$)"),
-    ("git", "commit"): ("git.commit", r"^git\s+commit(\s|$)"),
-    ("git", "merge"): ("exec", r"^git\s+merge(\s|$)"),
-    ("git", "rebase"): ("exec", r"^git\s+rebase(\s|$)"),
-    ("git", "checkout"): ("exec", r"^git\s+checkout(\s|$)"),
-    ("git", "reset"): ("exec", r"^git\s+reset(\s|$)"),
-    ("git", "tag"): ("exec", r"^git\s+tag(\s|$)"),
-    ("git", "clean"): ("exec", r"^git\s+clean(\s|$)"),
-    ("git", "pull"): ("exec", r"^git\s+pull(\s|$)"),
-    ("git", "fetch"): ("exec", r"^git\s+fetch(\s|$)"),
-    ("npm", "install"): ("dependency.install", r"^npm\s+install(\s|$)"),
-    ("npm", "publish"): ("exec", r"^npm\s+publish(\s|$)"),
-    ("npm", "version"): ("exec", r"^npm\s+version(\s|$)"),
-    ("pnpm", "install"): ("dependency.install", r"^pnpm\s+install(\s|$)"),
-    ("pnpm", "add"): ("dependency.install", r"^pnpm\s+add(\s|$)"),
-    ("pnpm", "publish"): ("exec", r"^pnpm\s+publish(\s|$)"),
-    ("yarn", "install"): ("dependency.install", r"^yarn\s+install(\s|$)"),
-    ("yarn", "add"): ("dependency.install", r"^yarn\s+add(\s|$)"),
-    ("yarn", "publish"): ("exec", r"^yarn\s+publish(\s|$)"),
-    ("uv", "sync"): ("dependency.install", r"^uv\s+sync(\s|$)"),
-    ("uv", "add"): ("dependency.install", r"^uv\s+add(\s|$)"),
-    ("uv", "remove"): ("dependency.install", r"^uv\s+remove(\s|$)"),
-    ("uv", "pip"): ("dependency.install", r"^uv\s+pip\s+install(\s|$)"),
-    ("pip", "install"): ("dependency.install", r"^pip\s+install(\s|$)"),
-    ("pip", "uninstall"): ("dependency.install", r"^pip\s+uninstall(\s|$)"),
-    ("poetry", "install"): ("dependency.install", r"^poetry\s+install(\s|$)"),
-    ("poetry", "add"): ("dependency.install", r"^poetry\s+add(\s|$)"),
-    ("poetry", "publish"): ("exec", r"^poetry\s+publish(\s|$)"),
-    ("docker", "build"): ("exec", r"^docker\s+build(\s|$)"),
-    ("docker", "run"): ("exec", r"^docker\s+run(\s|$)"),
-    ("docker", "push"): ("exec", r"^docker\s+push(\s|$)"),
-    ("docker", "compose"): ("exec", r"^docker\s+compose\s+up(\s|$)"),
-    ("kubectl", "apply"): ("exec", r"^kubectl\s+apply(\s|$)"),
-    ("kubectl", "delete"): ("exec", r"^kubectl\s+delete(\s|$)"),
-    ("kubectl", "rollout"): ("exec", r"^kubectl\s+rollout(\s|$)"),
-    ("terraform", "apply"): ("exec", r"^terraform\s+apply(\s|$)"),
-    ("terraform", "destroy"): ("exec", r"^terraform\s+destroy(\s|$)"),
-    ("terraform", "plan"): ("exec", r"^terraform\s+plan(\s|$)"),
-    ("pytest", None): ("exec", r"^pytest(\s|$)"),
-    ("ruff", None): ("exec", r"^ruff(\s|$)"),
-    ("mypy", None): ("exec", r"^mypy(\s|$)"),
-    ("cargo", "test"): ("exec", r"^cargo\s+test(\s|$)"),
-    ("go", "test"): ("exec", r"^go\s+test(\s|$)"),
-    ("rm", None): ("exec", r"^rm(\s|$)"),
-    ("mv", None): ("exec", r"^mv(\s|$)"),
-    ("cp", None): ("exec", r"^cp(\s|$)"),
-    ("chmod", None): ("exec", r"^chmod(\s|$)"),
-    ("chown", None): ("exec", r"^chown(\s|$)"),
-    ("curl", None): ("exec", r"^curl(\s|$)"),
-    ("wget", None): ("exec", r"^wget(\s|$)"),
-    ("gh", None): ("exec", r"^gh(\s|$)"),
-}
-
 RELATIVE_PATH_PATTERN = re.compile(
     r"\b(?:[A-Za-z0-9_.-]+/)+(?:[A-Za-z0-9_.-]+)\."
     r"(?:py|js|jsx|ts|tsx|md|json|toml|yaml|yml|txt|lock|rs|go|java|c|cc|cpp|h|css|html|sh)\b"
@@ -165,19 +111,6 @@ class GroundingCache:
         if not workspace:
             return cls()
         return cls(workspace=Path(workspace).expanduser().resolve(strict=False))
-
-    def ground_host_patterns(
-        self,
-        *,
-        text: str,
-        hint_patterns: list[HostActionPattern],
-        action_names: set[str],
-    ) -> list[HostActionPattern]:
-        result: list[HostActionPattern] = []
-        for pattern in hint_patterns:
-            result.extend(self._ground_hint_pattern(pattern, action_names))
-        result.extend(self._patterns_from_text(text, action_names))
-        return _dedupe_host_patterns(result)
 
     def ground_targets(
         self,
@@ -239,29 +172,6 @@ class GroundingCache:
         self._scan()
         return sorted(self._files_by_name.get(filename, []))
 
-    def _ground_hint_pattern(
-        self,
-        pattern: HostActionPattern,
-        action_names: set[str],
-    ) -> list[HostActionPattern]:
-        if not _valid_parameter_regex(pattern):
-            return []
-        phrase = " ".join(str(value) for value in pattern.parameter_regex.values())
-        command = _command_from_text(f"{pattern.action} {pattern.program or ''} {pattern.subcommand or ''} {phrase}")
-        if command is not None:
-            return [_command_pattern(command, action_names)]
-        action = _valid_action(pattern.action, action_names)
-        if action is None:
-            return []
-        return [pattern.model_copy(update={"action": action})]
-
-    def _patterns_from_text(self, text: str, action_names: set[str]) -> list[HostActionPattern]:
-        patterns: list[HostActionPattern] = []
-        lower = text.lower()
-        for command in _commands_from_text(lower):
-            patterns.append(_command_pattern(command, action_names))
-        return patterns
-
     def _scan(self) -> None:
         if self._scanned:
             return
@@ -284,56 +194,6 @@ class GroundingCache:
             self._files_by_name.setdefault(path.name, []).append(rel)
             count += 1
 
-
-def _command_pattern(command: tuple[str, str | None], action_names: set[str]) -> HostActionPattern:
-    preferred, regex = COMMAND_PATTERNS[command]
-    action = preferred if preferred in action_names else "exec"
-    program, subcommand = command
-    return HostActionPattern(
-        action=action,
-        tool_name="exec",
-        program=program,
-        subcommand=subcommand,
-        parameter_regex={"cmd": regex},
-    )
-
-
-def _commands_from_text(text: str) -> list[tuple[str, str | None]]:
-    return [command for command in COMMAND_PATTERNS if _command_mentioned(text, command)]
-
-
-def _command_from_text(text: str) -> tuple[str, str | None] | None:
-    lower = text.lower()
-    for command in COMMAND_PATTERNS:
-        if _command_mentioned(lower, command):
-            return command
-    return None
-
-
-def _command_mentioned(text: str, command: tuple[str, str | None]) -> bool:
-    program, subcommand = command
-    if subcommand is None:
-        return re.search(rf"(^|\W){re.escape(program)}(\W|$)", text) is not None
-    return re.search(rf"(^|\W){re.escape(program)}\s+{re.escape(subcommand)}(\W|$)", text) is not None
-
-
-def _valid_action(action: str, action_names: set[str]) -> str | None:
-    if not action_names or action in action_names:
-        return action
-    if action == "exec":
-        return "exec"
-    return None
-
-
-def _valid_parameter_regex(pattern: HostActionPattern) -> bool:
-    for regex in pattern.parameter_regex.values():
-        try:
-            re.compile(regex)
-        except re.error:
-            return False
-    return True
-
-
 def _relative_paths(text: str) -> list[str]:
     return [match.group(0).rstrip(".,;:") for match in RELATIVE_PATH_PATTERN.finditer(text)]
 
@@ -350,22 +210,4 @@ def _dedupe(values: list[str]) -> list[str]:
         if value not in seen:
             seen.add(value)
             result.append(value)
-    return result
-
-
-def _dedupe_host_patterns(patterns: list[HostActionPattern]) -> list[HostActionPattern]:
-    seen: set[tuple] = set()
-    result: list[HostActionPattern] = []
-    for pattern in patterns:
-        key = (
-            pattern.action,
-            pattern.tool_name,
-            pattern.program,
-            pattern.subcommand,
-            tuple(sorted(pattern.parameter_regex.items())),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        result.append(pattern)
     return result

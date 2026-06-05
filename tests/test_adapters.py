@@ -13,6 +13,7 @@ from memory_as_contracts.adapters import (
 )
 from memory_as_contracts.models import (
     ActionConstraints,
+    ArgPattern,
     Contract,
     ContractKind,
     ContractSource,
@@ -25,6 +26,7 @@ from memory_as_contracts.models import (
     ScopeLevel,
     SourceKind,
     Strength,
+    ToolPattern,
 )
 from memory_as_contracts.store import ContractStore
 
@@ -100,6 +102,11 @@ def push_prohibition(workspace: Path) -> Contract:
             host_actions=["git.push"],
             canonical_tags=["external_write", "publish_code"],
         ),
+        tool_patterns=[
+            ToolPattern(tool="Bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
+            ToolPattern(tool="bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
+            ToolPattern(tool="shell", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
+        ],
     )
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from memory_as_contracts.models import (
@@ -16,7 +17,9 @@ from memory_as_contracts.models import (
     MatchOutcome,
     Modality,
     PredicateEvaluation,
+    PredicateStatus,
     Receipt,
+    RulePatternVersion,
     Scope,
     ScopeLevel,
     SourceKind,
@@ -104,7 +107,11 @@ def test_store_round_trips_contract_edge_receipt_snapshot_and_events() -> None:
         )
     )
 
-    assert store.get_contract(contract.id) == contract
+    stored_contract = store.get_contract(contract.id)
+    assert stored_contract is not None
+    assert stored_contract.compiled_predicates is None
+    assert stored_contract.text == contract.text
+    assert store.get_active_rule_pattern_version(contract.id) is not None
     assert store.list_edges()[0].id == edge.id
     assert store.list_receipts()[0].id == receipt.id
     assert store.list_source_snapshots()[0].source_key == snapshot.source_key
@@ -118,3 +125,55 @@ def test_fts_search_uses_contract_text() -> None:
     results = store.search_contracts("push")
 
     assert [contract.id for contract in results] == ["MAC-test"]
+
+
+def test_store_uses_schema_v3_rule_columns_and_rule_pattern_versions() -> None:
+    store = make_store()
+    contract = store.add_contract(make_contract())
+
+    version = RulePatternVersion(
+        id="RPV-next",
+        contract_id=contract.id,
+        version="PV-002",
+        status=PredicateStatus.ACTIVE,
+    )
+    store.add_rule_pattern_version(version)
+
+    schema_version = store.conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+    columns = {row["name"] for row in store.conn.execute("PRAGMA table_info(contracts)").fetchall()}
+    payload = json.loads(
+        store.conn.execute(
+            "SELECT payload_json FROM contracts WHERE id = ?",
+            (contract.id,),
+        ).fetchone()["payload_json"]
+    )
+    pattern_payload = json.loads(
+        store.conn.execute(
+            "SELECT payload_json FROM rule_pattern_versions WHERE id = ?",
+            ("RPV-next",),
+        ).fetchone()["payload_json"]
+    )
+
+    assert schema_version == 3
+    assert {
+        "effect",
+        "authority",
+        "semantics_json",
+        "tool_patterns_json",
+        "targets_json",
+        "validity_json",
+    } <= columns
+    assert "action_constraints" not in payload
+    assert "compiled_predicates" not in payload
+    assert "pattern_version" not in payload
+    assert "from" in payload["validity"]
+    assert "start" not in payload["validity"]
+    assert "target_patterns" not in pattern_payload
+    assert "targets" in pattern_payload
+    assert "host_action_patterns" not in pattern_payload
+    assert store.list_rule_pattern_versions(contract.id)[-1].id == "RPV-next"
+    assert store.list_predicate_versions(contract.id)[-1].id == "RPV-next"
+    predicate_versions_table = store.conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'predicate_versions'"
+    ).fetchone()
+    assert predicate_versions_table is None

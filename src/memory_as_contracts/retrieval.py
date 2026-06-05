@@ -8,11 +8,11 @@ from zoneinfo import ZoneInfo
 
 from memory_as_contracts.matching import lifecycle_is_active
 from memory_as_contracts.models import (
-    ActionConstraints,
     ActionSignature,
     Contract,
     ContractKind,
     ContractStatus,
+    RuleSemantics,
     Scope,
     ScopeLevel,
     Strength,
@@ -144,7 +144,7 @@ class PromptIntakeRetriever:
                     global_rules.append(contract)
                 continue
             if not target_paths and not target_components and not _action_relevant(
-                contract.action_constraints,
+                contract.semantics,
                 action_hints,
             ):
                 continue
@@ -174,7 +174,7 @@ class PromptIntakeRetriever:
                 contract,
                 "local-reminder",
                 _target_reason(
-                    contract.action_constraints,
+                    contract.semantics,
                     target_paths,
                     target_components,
                     action_hints,
@@ -398,12 +398,12 @@ def _action_hints(query: str) -> set[str]:
     return hints
 
 
-def _action_relevant(constraints: ActionConstraints, action_hints: set[str]) -> bool:
+def _action_relevant(semantics: RuleSemantics, action_hints: set[str]) -> bool:
     if not action_hints:
         return False
     return bool(
-        action_hints.intersection(constraints.host_actions)
-        or action_hints.intersection(constraints.canonical_tags)
+        action_hints.intersection(semantics.actions)
+        or action_hints.intersection(semantics.tags)
     )
 
 
@@ -436,7 +436,7 @@ def _glob_prefix(glob: str) -> str:
 
 
 def _target_reason(
-    constraints: ActionConstraints,
+    semantics: RuleSemantics,
     target_paths: list[str],
     target_components: list[str],
     action_hints: set[str] | None = None,
@@ -446,14 +446,14 @@ def _target_reason(
         parts.append("target=" + ",".join(target_paths[:3]))
     if target_components:
         parts.append("component=" + ",".join(target_components[:3]))
-    if constraints.host_actions:
-        parts.append("actions=" + ",".join(constraints.host_actions))
-    if constraints.canonical_tags:
-        parts.append("tags=" + ",".join(constraints.canonical_tags))
+    if semantics.actions:
+        parts.append("actions=" + ",".join(semantics.actions))
+    if semantics.tags:
+        parts.append("tags=" + ",".join(semantics.tags))
     if action_hints:
         matching = sorted(
-            action_hints.intersection(constraints.host_actions)
-            | action_hints.intersection(constraints.canonical_tags)
+            action_hints.intersection(semantics.actions)
+            | action_hints.intersection(semantics.tags)
         )
         if matching:
             parts.append("query-actions=" + ",".join(matching[:3]))

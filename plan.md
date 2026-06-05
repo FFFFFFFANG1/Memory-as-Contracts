@@ -89,7 +89,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 工作内容：
 
-- 实现 `Contract`、`ContractSource`、`Scope`、`Lifecycle`、`ActionConstraints`、`CompiledPredicateVersion`、`ContractEdge`、`AvailableAction`、`ActionSignature`、`GateDecision`、`Receipt`、`AmbiguityEvent`。
+- 实现 `Rule/Contract`、`ContractSource`、`Scope`、`Lifecycle`、`RuleSemantics`、`ToolPattern`、`TargetPattern`、`RulePatternVersion`、`ContractEdge`、`AvailableAction`、`ActionSignature`、`GateDecision`、`Receipt`、`AmbiguityEvent`。
 - 定义 contract kind、modality、strength、status、source kind、edge relation、lifecycle type、decision、match outcome 等 enum。
 - 支持 edge 自己的 scope/lifecycle，不能只把关系写成全局替代。
 - 保留 source span 和 created_at，用于 provenance、relative time grounding 和 audit。
@@ -114,11 +114,11 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 ## Step 3: SQLite store、FTS 和迁移机制
 
-目标：建立 durable store，能保存 contracts、edges、predicate versions、receipts、source snapshots 和 ambiguity/refinement 状态。
+目标：建立 durable store，能保存 contracts、edges、rule pattern versions、receipts、source snapshots 和 ambiguity/refinement 状态。
 
 工作内容：
 
-- 建表：contracts、contract FTS、contract edges、predicate versions、receipts、source snapshots、ambiguity events、refinement jobs。
+- 建表：contracts、contract FTS、contract edges、rule pattern versions、receipts、source snapshots、ambiguity events、refinement jobs。
 - 常用过滤字段用显式列，adapter-specific 扩展保留 JSON 字段。
 - 支持 SQLite FTS/BM25 检索 contract text 和 source span。
 - 加 `schema_version` 或等价 migration 机制，避免未来 MAC DB schema 被静默误用。
@@ -137,7 +137,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 完成标准：
 
 - 空数据库 init 幂等。
-- roundtrip 测试覆盖 contract、edge、predicate version、receipt、snapshot、ambiguity event。
+- roundtrip 测试覆盖 contract、edge、rule pattern version、receipt、snapshot、ambiguity event。
 - FTS 检索能和结构化过滤一起工作。
 
 ## Step 4: 抽取、scope normalization 和 lifecycle normalization
@@ -175,35 +175,35 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 - 测试覆盖用户输入抽取、项目文档导入、relative time grounding、source span 保留、非 contract 文本拒绝。
 - live LLM diagnostic 可以 dry-run，不写 DB。
 
-## Step 5: Deterministic predicate materializer 和 predicate versions
+## Step 5: Deterministic pattern materializer 和 rule pattern versions
 
-目标：把能机器检查的 contracts 转成 action-time 可确定执行的 predicates。这里仍保留 compiler/materializer 这一步，但它不调用 LLM；它只消费 extraction 阶段产出的 `predicate_hints`，校验到当前 adapter `available_actions`，并在 hint 缺失时使用有限 rule-base fallback。
+目标：把能机器检查的 contracts 转成 action-time 可确定执行的 patterns。这里仍保留 compiler/materializer 这一步，但它不调用 LLM；它只消费 extraction 阶段产出的 `tool_patterns/targets` operational seed，校验到当前 adapter `available_actions`，并在 seed 缺失时使用有限 rule-base fallback。
 
 工作内容：
 
-- 定义 predicate schema：host action patterns、target patterns、canonical tags、scope predicate、lifecycle predicate、parser hints。
-- extraction 输出可选 `predicate_hints`，用于把自然语言 rule 投影成初始 predicate；Step 5 不新增任何 LLM call。
-- compiler/materializer 的职责是 deterministic：读取 `predicate_hints`、校验 tool/action 是否在 adapter 的 `available_actions` 中、补齐 scope/lifecycle predicate、生成 predicate version、执行 action-time evaluation。
-- 当 `predicate_hints` 缺失时，compiler 只允许使用有限 rule-base fallback：path glob、git push/commit、dependency install、package-manager command、generated-file edit ban 等可机器解析模式。
-- action-time predicate 中 `tool_name` 使用 exact match；对 tool parameter 的要求使用字段级 regex，例如 `parameter_regex.cmd = "^git\\s+push(\\s|$)"`。
+- 定义 rule pattern version schema：native `tool_patterns`、`targets`、scope predicate、lifecycle predicate、parser hints。
+- extraction 输出可选 `tool_patterns/targets` seed，用于把自然语言 rule 投影成初始 operational surface；Step 5 不新增任何 LLM call。
+- compiler/materializer 的职责是 deterministic：读取 `tool_patterns/targets` seed、校验 native tool/action 是否在 adapter 的 `available_actions` 中、补齐 scope/lifecycle predicate、生成 rule pattern version、执行 action-time evaluation。
+- 当 operational seed 缺失时，compiler 只允许使用有限 rule-base fallback：path glob、git push/commit、dependency install、package-manager command、generated-file edit ban 等可机器解析模式。
+- action-time pattern 中 native `tool` 使用 exact match；对 tool parameter 的要求使用字段级 matcher，例如 `args.command.regex = "^git\\s+push(\\s|$)"`。
 - compiler 接收 adapter 的 `available_actions`，避免依赖固定 global action enum。
 - 不可稳定 rule-base 编译的语义规则保持无 binding predicate，action-time evaluation 返回 `ambiguous`，不 unsafe allow/block。
 - 覆盖 coding 常见规则：path edit bans、git commit/push 限制、dependency manager 限制、test command requirement、generated-file edit ban、confirmation-before-action。
-- predicate version 独立于 source contract 保存。
-- predicate evaluation 返回 `matched`、`not_matched`、`ambiguous`。
+- rule pattern version 独立于 source contract 保存。
+- pattern evaluation 返回 `matched`、`not_matched`、`ambiguous`。
 - 对欠规格规则默认进入 ambiguity，而不是 unsafe allow/block。
 
 边界：
 
 - compiler/materializer 不调用 LLM；需要 LLM 判断的 predicate projection 必须并入 extraction 或 dedup/relation 预算。
-- 不删除 compiler 这一步，因为它是 extraction 输出和 action-time gate 之间的 schema validation、adapter grounding、predicate versioning 边界。
-- action-time predicate evaluation 不得调用 LLM。
-- 本阶段只产生和执行初始 predicate，不做异步 refinement。
+- 不删除 compiler 这一步，因为它是 extraction 输出和 action-time gate 之间的 schema validation、adapter grounding、pattern versioning 边界。
+- action-time pattern evaluation 不得调用 LLM。
+- 本阶段只产生和执行初始 pattern version，不做异步 refinement。
 
 仍需决策：
 
-- 当前决策：predicate language 使用结构化 JSON pattern，允许字段级 regex；v0 不使用 Python policy functions 作为默认 predicate language。
-- 当前决策：LLM call budget 最多两次：extraction 和 dedup/relation；compiler/materializer 不调用 LLM，只消费 extraction 输出的 `predicate_hints` 或 rule-base fallback。
+- 当前决策：pattern language 使用结构化 JSON pattern，允许字段级 regex；v0 不使用 Python policy functions 作为默认 pattern language。
+- 当前决策：LLM call budget 最多两次：extraction 和 dedup/relation；compiler/materializer 不调用 LLM，只消费 extraction 输出的 `tool_patterns/targets` seed 或 rule-base fallback。
 - 当前决策：保留 compiler/materializer 这一步；它不是自然语言理解模块，而是 deterministic adapter-grounded predicate projection、validation 和 versioning 模块。
 - 当前决策：tool name exact match；tool parameter 条件生成 regex。不要把整个 action 压成单一字符串 regex。
 - 当前决策：generic command parsing 只覆盖 shell/git/package-manager 基础形态；复杂 host tool 参数解析交给 adapter。
@@ -212,7 +212,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 完成标准：
 
 - 测试覆盖 `git push`、路径保护、dependency commands、package manager preferences 和 ambiguous semantic rules。
-- predicate version history 可以持久化和查询。
+- rule pattern version history 可以持久化和查询。
 
 ## Step 6: 相似检索、冲突处理和 scoped edges
 
@@ -358,16 +358,16 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 ## Step 10: Ambiguity monitor 和异步 predicate refinement
 
-目标：当某个 predicate 在 action-time 反复 ambiguous 时，自动排队修正 action-signature predicate projection。
+目标：当某个 rule pattern version 在 action-time 反复 ambiguous 时，自动排队修正 action-signature pattern projection。
 
 工作内容：
 
-- 按 contract predicate version 记录 match outcomes。
+- 按 contract rule pattern version 记录 match outcomes。
 - 维护 rolling ambiguity window。
 - 当最近窗口 evaluated >= 10 且 ambiguous ratio >= 0.60 时，enqueue refinement job。
-- background job 调用 LLM，输入 original contract、current predicate、以及触发 ambiguity window 的调用结果：signature id、match outcome、receipt、tool name、raw arguments、host action、tags、targets、intent、decision/result。
-- refinement 的定义收窄：默认认为 rule 本身没有问题，ambiguous 是 action signature pattern 匹配问题；LLM 只能修改 `host_action_patterns`、`target_patterns`、`canonical_tags`，不能修改 rule text、source、scope、lifecycle、modality、strength。
-- 输出新的 predicate version，并通过 `refines` 记录 `PV-004 refines PV-003 for MAC-014` 这样的 version edge。
+- background job 调用 LLM，输入 immutable rule、current rule pattern version、adapter available_actions、以及触发 ambiguity window 的调用结果：signature id、match outcome、receipt、tool name、raw arguments、host action、tags、targets、intent、decision/result。
+- refinement 的定义收窄：默认认为 rule 本身没有问题，ambiguous 是 action signature pattern 匹配问题；LLM 只能修改 active pattern version 的 `tool_patterns` 和 `targets`，不能修改 rule text、source、scope、semantics、validity、lifecycle、modality、strength。
+- 输出新的 rule pattern version，并通过 `refines` 记录 `PV-004 refines PV-003 for MAC-014` 这样的 version edge。
 - refinement pending 时，当前 gate 不等待；ambiguous non-preference contract 在 action gate 中按 allow/block 模型处理，高风险默认 block 并通过 override 流程处理人工批准。
 
 边界：
@@ -377,15 +377,15 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 仍需决策：
 
-- 当前决策：refinement job 仍然是 DB queue；worker 取 pending job 后调用 LLM-backed predicate refiner。
+- 当前决策：refinement job 仍然是 DB queue；worker 取 pending job 后调用 LLM-backed pattern refiner。
 - failed refinement 如何标记和去重。
-- 某些 refined predicates 是否需要用户确认后才激活。
+- 某些 refined pattern versions 是否需要用户确认后才激活。
 
 完成标准：
 
 - 测试可模拟 ambiguous window 并触发 job enqueue。
-- refinement job 能写新 predicate version，source contract 不变。
-- 测试证明 LLM refinement prompt 包含触发 window 的 ambiguous invocation results，且输出只能更新 action signature patterns。
+- refinement job 能写新 rule pattern version，source contract 不变。
+- 测试证明 LLM refinement prompt 包含触发 window 的 ambiguous invocation results 和 available_actions，且输出只能更新 `tool_patterns/targets`。
 
 ## Step 11: Adapter skeletons 和 cold-start import
 

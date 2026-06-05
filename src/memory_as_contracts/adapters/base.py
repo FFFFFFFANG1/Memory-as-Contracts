@@ -138,10 +138,7 @@ class BaseAdapter:
         return list(self.always_on_tool_capsules)
 
     def tool_capsule_system_prompt(self) -> str | None:
-        return render_tool_capsule_system_prompt(
-            agent_name=self.agent_name,
-            capsules=self.tool_capsules(),
-        )
+        return render_tool_capsule_system_prompt(self.tool_capsules())
 
     def discover_sources(self, context: AdapterContext) -> list[MemorySourceSpec]:
         raise NotImplementedError
@@ -278,7 +275,7 @@ class BaseAdapter:
         if not isinstance(raw_arguments, dict):
             raw_arguments = {"value": raw_arguments}
         intent = str(_event_value(event, "intent", ""))
-        return _canonical_tool_call(tool_name, raw_arguments), canonical_raw_arguments(tool_name, raw_arguments), intent
+        return tool_name, dict(raw_arguments), intent
 
     def _format_gate_payload(self, result: GateResult) -> dict[str, Any]:
         payload = _receipt_summary(result)

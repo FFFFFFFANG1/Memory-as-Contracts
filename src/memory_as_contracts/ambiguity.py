@@ -6,14 +6,15 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from memory_as_contracts.models import (
-    CompiledPredicateVersion,
-    HostActionPattern,
+    Contract,
     JobStatus,
     MatchOutcome,
     PredicateStatus,
     Receipt,
     RefinementJob,
+    RulePatternVersion,
     TargetPattern,
+    ToolPattern,
     prefixed_id,
     utc_now,
 )
@@ -21,12 +22,13 @@ from memory_as_contracts.store import ContractStore
 
 
 PREDICATE_REFINEMENT_SYSTEM_PROMPT = """
-You refine Memory-as-Contracts action-signature predicates. Return only valid JSON.
+You refine only the operational pattern version for a Memory-as-Contracts rule.
+Return only valid JSON.
 
-The rule text is authoritative and must not be changed. Treat ambiguity as a
-predicate matching problem, not as a rule problem. You may only revise action
-signature patterns: host_action_patterns, target_patterns, and canonical_tags.
-Do not change rule text, source, scope, lifecycle, modality, or strength.
+The immutable_rule object is authoritative and must not be changed. Treat
+ambiguity as a hook matching problem, not as a rule problem. You may only revise
+tool_patterns and targets. Do not change or output rule text, effect, authority,
+scope, semantics, validity, source, lifecycle, modality, strength, or status.
 """.strip()
 
 
@@ -42,10 +44,10 @@ class PredicateRefiner(Protocol):
     def refine(
         self,
         *,
-        contract_text: str,
-        current: CompiledPredicateVersion,
+        contract: Contract,
+        current: RulePatternVersion,
         invocation_results: list[PredicateInvocationResult],
-    ) -> CompiledPredicateVersion:
+    ) -> RulePatternVersion:
         ...
 
 
@@ -55,10 +57,10 @@ class CopyingPredicateRefiner:
     def refine(
         self,
         *,
-        contract_text: str,
-        current: CompiledPredicateVersion,
+        contract: Contract,
+        current: RulePatternVersion,
         invocation_results: list[PredicateInvocationResult],
-    ) -> CompiledPredicateVersion:
+    ) -> RulePatternVersion:
         next_number = _next_version_number(current.version)
         return current.model_copy(
             update={
@@ -80,12 +82,12 @@ class LLMPredicateRefiner:
     def refine(
         self,
         *,
-        contract_text: str,
-        current: CompiledPredicateVersion,
+        contract: Contract,
+        current: RulePatternVersion,
         invocation_results: list[PredicateInvocationResult],
-    ) -> CompiledPredicateVersion:
+    ) -> RulePatternVersion:
         prompt = _predicate_refinement_prompt(
-            contract_text=contract_text,
+            contract=contract,
             current=current,
             invocation_results=invocation_results,
         )
@@ -97,17 +99,14 @@ class LLMPredicateRefiner:
                 "version": f"PV-{next_number:03d}",
                 "refines": current.id,
                 "status": PredicateStatus.ACTIVE,
-                "host_action_patterns": [
-                    HostActionPattern.model_validate(item)
-                    for item in payload.get("host_action_patterns", [])
+                "tool_patterns": [
+                    ToolPattern.model_validate(item)
+                    for item in payload.get("tool_patterns", [])
                 ],
                 "target_patterns": [
                     TargetPattern.model_validate(item)
-                    for item in payload.get("target_patterns", [])
+                    for item in payload.get("targets", payload.get("target_patterns", []))
                 ],
-                "canonical_tags": sorted(
-                    {str(item) for item in payload.get("canonical_tags", [])}
-                ),
                 "created_at": utc_now(),
             }
         )
@@ -125,9 +124,9 @@ class AmbiguityMonitor:
         self.window = window
         self.threshold = threshold
 
-    def should_enqueue(self, contract_id: str, predicate_version_id: str) -> bool:
-        evaluations = self.store.recent_predicate_evaluations(
-            contract_id, predicate_version_id, limit=self.window
+    def should_enqueue(self, contract_id: str, pattern_version_id: str) -> bool:
+        evaluations = self.store.recent_pattern_evaluations(
+            contract_id, pattern_version_id, limit=self.window
         )
         if len(evaluations) < self.window:
             return False
@@ -135,20 +134,20 @@ class AmbiguityMonitor:
         return ambiguous / len(evaluations) >= self.threshold
 
     def enqueue_if_needed(
-        self, contract_id: str, predicate_version_id: str
+        self, contract_id: str, pattern_version_id: str
     ) -> RefinementJob | None:
-        if not self.should_enqueue(contract_id, predicate_version_id):
+        if not self.should_enqueue(contract_id, pattern_version_id):
             return None
         for status in (JobStatus.PENDING, JobStatus.RUNNING):
             for job in self.store.list_refinement_jobs(status.value):
-                if job.contract_id == contract_id and job.predicate_version_id == predicate_version_id:
+                if job.contract_id == contract_id and job.pattern_version_id == pattern_version_id:
                     return job
-        evaluations = self.store.recent_predicate_evaluations(
-            contract_id, predicate_version_id, limit=self.window
+        evaluations = self.store.recent_pattern_evaluations(
+            contract_id, pattern_version_id, limit=self.window
         )
         job = RefinementJob(
             contract_id=contract_id,
-            predicate_version_id=predicate_version_id,
+            pattern_version_id=pattern_version_id,
             recent_signature_ids=[item.signature_id for item in evaluations],
         )
         return self.store.add_refinement_job(job)
@@ -161,8 +160,8 @@ class AmbiguityMonitor:
         self.store.add_refinement_job(job)
         refiner = refiner or CopyingPredicateRefiner()
         contract = self.store.get_contract(job.contract_id)
-        predicates = self.store.list_predicate_versions(job.contract_id)
-        current = next((item for item in predicates if item.id == job.predicate_version_id), None)
+        pattern_versions = self.store.list_rule_pattern_versions(job.contract_id)
+        current = next((item for item in pattern_versions if item.id == job.pattern_version_id), None)
         if contract is None or current is None:
             failed = job.model_copy(
                 update={
@@ -175,20 +174,19 @@ class AmbiguityMonitor:
         try:
             invocation_results = self._invocation_results(job)
             refined = refiner.refine(
-                contract_text=contract.text,
+                contract=contract,
                 current=current,
                 invocation_results=invocation_results,
             )
             refined = refined.model_copy(update={"contract_id": contract.id})
-            self.store.add_predicate_version(
+            self.store.add_rule_pattern_version(
                 current.model_copy(update={"status": PredicateStatus.SUPERSEDED})
             )
-            self.store.add_predicate_version(refined)
-            self.store.add_contract(contract.model_copy(update={"compiled_predicates": refined}))
+            self.store.add_rule_pattern_version(refined)
             completed = job.model_copy(
                 update={
                     "status": JobStatus.COMPLETED,
-                    "result_predicate_version_id": refined.id,
+                    "result_pattern_version_id": refined.id,
                     "updated_at": utc_now(),
                 }
             )
@@ -200,9 +198,9 @@ class AmbiguityMonitor:
             return self.store.add_refinement_job(failed)
 
     def _invocation_results(self, job: RefinementJob) -> list[PredicateInvocationResult]:
-        evaluations = self.store.predicate_evaluations_by_signature_ids(
+        evaluations = self.store.pattern_evaluations_by_signature_ids(
             job.contract_id,
-            job.predicate_version_id,
+            job.pattern_version_id,
             job.recent_signature_ids,
         )
         receipts = self.store.receipts_by_signature_ids(job.recent_signature_ids)
@@ -226,36 +224,62 @@ def _next_version_number(version: str) -> int:
 
 def _predicate_refinement_prompt(
     *,
-    contract_text: str,
-    current: CompiledPredicateVersion,
+    contract: Contract,
+    current: RulePatternVersion,
     invocation_results: list[PredicateInvocationResult],
 ) -> str:
     payload = {
-        "rule_text": contract_text,
-        "current_predicate": current.model_dump(mode="json"),
+        "immutable_rule": {
+            "id": contract.id,
+            "text": contract.text,
+            "effect": contract.effect.value,
+            "authority": contract.authority.value,
+            "scope": contract.scope.model_dump(mode="json"),
+            "semantics": contract.semantics.model_dump(mode="json"),
+            "validity": contract.validity.model_dump(mode="json"),
+            "status": contract.status.value,
+        },
+        "current_pattern_version": current.model_dump(mode="json"),
+        "available_actions": _available_actions_payload(invocation_results),
         "ambiguous_invocation_results": [
             _invocation_payload(item) for item in invocation_results
         ],
         "output_contract": {
-            "host_action_patterns": [
+            "tool_patterns": [
                 {
-                    "action": "git.push",
-                    "tool_name": "exec",
-                    "parameter_regex": {"cmd": r"^git\s+push(\s|$)"},
+                    "tool": "Bash",
+                    "args": {"command": {"regex": r"^git\s+push(\s|$)"}},
                 }
             ],
-            "target_patterns": [{"kind": "path_glob", "value": "generated/**"}],
-            "canonical_tags": ["external_write"],
+            "targets": [{"kind": "path_glob", "value": "generated/**"}],
         },
     }
     return (
         f"{PREDICATE_REFINEMENT_SYSTEM_PROMPT}\n\n"
         "Use all ambiguous invocation results below. Produce a stricter or more "
-        "complete predicate that would make future matching deterministic. "
+        "complete operational pattern version that would make future matching "
+        "deterministic against the provided available_actions registry. "
+        "Do not return host_action_patterns, target_patterns, "
+        "canonical_tags, semantics, scope, text, effect, or authority. "
         "Return exactly this JSON shape, with no extra text:\n"
-        '{"host_action_patterns":[],"target_patterns":[],"canonical_tags":[]}\n\n'
+        '{"tool_patterns":[],"targets":[]}\n\n'
         f"Input:\n{json.dumps(payload, sort_keys=True)}"
     )
+
+
+def _available_actions_payload(invocation_results: list[PredicateInvocationResult]) -> list[dict]:
+    seen: set[str] = set()
+    actions: list[dict] = []
+    for item in invocation_results:
+        if item.receipt is None:
+            continue
+        for action in item.receipt.available_actions:
+            key = action.model_dump_json()
+            if key in seen:
+                continue
+            seen.add(key)
+            actions.append(action.model_dump(mode="json"))
+    return actions
 
 
 def _invocation_payload(item: PredicateInvocationResult) -> dict:
@@ -271,6 +295,9 @@ def _invocation_payload(item: PredicateInvocationResult) -> dict:
             "host_action": receipt.host_action,
             "tool_name": receipt.tool_name,
             "raw_arguments": receipt.raw_arguments,
+            "available_actions": [
+                action.model_dump(mode="json") for action in receipt.available_actions
+            ],
             "canonical_tags": receipt.canonical_tags,
             "targets": receipt.targets,
             "intent": receipt.intent,
@@ -294,7 +321,9 @@ def _load_refinement_payload(raw: str) -> dict:
         payload = json.loads(raw[start : end + 1])
     if "compiled_predicate" in payload and isinstance(payload["compiled_predicate"], dict):
         payload = payload["compiled_predicate"]
-    for key in ("host_action_patterns", "target_patterns", "canonical_tags"):
+    if "target_patterns" in payload and "targets" not in payload:
+        payload["targets"] = payload["target_patterns"]
+    for key in ("tool_patterns", "targets"):
         if key not in payload:
             payload[key] = []
         if not isinstance(payload[key], list):

@@ -16,6 +16,8 @@ from memory_as_contracts.models import (
     ContractStatus,
     EdgeRelation,
     Modality,
+    RuleAuthority,
+    RuleEffect,
     SourceKind,
     Strength,
 )
@@ -36,13 +38,25 @@ Allowed relations:
 
 Use the provided similarity scores only as retrieval evidence, not as the final
 label. Prefer independent when uncertain.
+
+Classify semantic rule relations from text, effect, authority, scope, validity,
+semantics.actions, semantics.tags, and targets. tool_patterns are operational
+hook matchers; use them only as weak auxiliary evidence about the same target or
+invocation surface. Different native tool patterns do not make overlapping
+rules independent, and similar tool patterns do not by themselves prove a
+duplicate or conflict when the semantics differ.
+
+Return relation edges only. Do not decide final active/rejected/superseded or
+pending-conflict status; the deterministic apply phase handles precedence and
+equal-authority conflicts.
 """.strip()
 
 
 DEFAULT_RELATION_SIMILARITY_THRESHOLD = 0.35
 DEFAULT_RELATION_TOP_K = 3
-TEXT_SIMILARITY_WEIGHT = 0.70
-PATTERN_SIMILARITY_WEIGHT = 0.30
+TEXT_SIMILARITY_WEIGHT = 0.55
+SEMANTIC_SIMILARITY_WEIGHT = 0.30
+OPERATIONAL_PATTERN_SIMILARITY_WEIGHT = 0.15
 
 
 SOURCE_AUTHORITY = {
@@ -52,6 +66,15 @@ SOURCE_AUTHORITY = {
     SourceKind.USER_PROFILE: 60,
     SourceKind.TOOL_OBSERVATION: 30,
     SourceKind.AGENT_INFERRED: 10,
+}
+
+AUTHORITY_SCORE = {
+    RuleAuthority.USER_EXPLICIT: 100,
+    RuleAuthority.PROJECT_INSTRUCTION: 70,
+    RuleAuthority.MEMORY_IMPORT: 60,
+    RuleAuthority.USER_PROFILE: 60,
+    RuleAuthority.TOOL_OBSERVATION: 30,
+    RuleAuthority.AGENT_INFERRED: 10,
 }
 
 
@@ -68,6 +91,7 @@ class DedupCandidate:
     relation: EdgeRelation
     similarity: float
     text_score: float = 0.0
+    semantic_score: float = 0.0
     pattern_score: float = 0.0
 
 
@@ -76,6 +100,7 @@ class RelationCandidate:
     existing: Contract
     similarity: float
     text_score: float
+    semantic_score: float
     pattern_score: float
 
 
@@ -86,6 +111,7 @@ class RelationDecision:
     relation: EdgeRelation
     similarity: float
     text_score: float
+    semantic_score: float
     pattern_score: float
 
 
@@ -185,6 +211,7 @@ class ConflictResolver:
                 relation=self.classify_relation(candidate, item.existing),
                 similarity=item.similarity,
                 text_score=item.text_score,
+                semantic_score=item.semantic_score,
                 pattern_score=item.pattern_score,
             )
             for item in relation_candidates
@@ -218,6 +245,7 @@ class ConflictResolver:
                     relation=relation,
                     similarity=item.similarity,
                     text_score=item.text_score,
+                    semantic_score=item.semantic_score,
                     pattern_score=item.pattern_score,
                 )
             )
@@ -256,9 +284,14 @@ class ConflictResolver:
                 candidate_pattern_text,
                 _predicate_pattern_text(existing),
             )
+            semantic_score = max(
+                _set_overlap(set(candidate.semantics.actions), set(existing.semantics.actions)),
+                _set_overlap(set(candidate.semantics.tags), set(existing.semantics.tags)),
+            )
             similarity = (
                 TEXT_SIMILARITY_WEIGHT * text_score
-                + PATTERN_SIMILARITY_WEIGHT * pattern_score
+                + SEMANTIC_SIMILARITY_WEIGHT * semantic_score
+                + OPERATIONAL_PATTERN_SIMILARITY_WEIGHT * pattern_score
             )
             if similarity < threshold:
                 continue
@@ -267,6 +300,7 @@ class ConflictResolver:
                     existing=existing,
                     similarity=similarity,
                     text_score=text_score,
+                    semantic_score=semantic_score,
                     pattern_score=pattern_score,
                 )
             )
@@ -279,7 +313,7 @@ class ConflictResolver:
     def classify_relation(self, candidate: Contract, existing: Contract) -> EdgeRelation:
         if _normalize(candidate.text) == _normalize(existing.text) and candidate.scope == existing.scope:
             return EdgeRelation.DUPLICATE
-        if candidate.kind == ContractKind.EXCEPTION:
+        if candidate.effect == RuleEffect.ALLOW or candidate.kind == ContractKind.EXCEPTION:
             return EdgeRelation.EXCEPTION_TO if _overlaps(candidate, existing) else EdgeRelation.INDEPENDENT
         if _says_supersedes(candidate.text) and _overlaps(candidate, existing):
             return EdgeRelation.SUPERSEDES
@@ -328,6 +362,7 @@ class ConflictResolver:
                     relation=relation,
                     similarity=item.similarity,
                     text_score=item.text_score,
+                    semantic_score=item.semantic_score,
                     pattern_score=item.pattern_score,
                 )
             )
@@ -343,6 +378,7 @@ class ConflictResolver:
                         relation=EdgeRelation.INDEPENDENT,
                         similarity=item.similarity,
                         text_score=item.text_score,
+                        semantic_score=item.semantic_score,
                         pattern_score=item.pattern_score,
                     )
                 )
@@ -413,6 +449,7 @@ class ConflictResolver:
                     relation=relation,
                     similarity=item.similarity,
                     text_score=item.text_score,
+                    semantic_score=item.semantic_score,
                     pattern_score=item.pattern_score,
                 )
             )
@@ -429,6 +466,7 @@ class ConflictResolver:
                     relation=EdgeRelation.INDEPENDENT,
                     similarity=item.similarity,
                     text_score=item.text_score,
+                    semantic_score=item.semantic_score,
                     pattern_score=item.pattern_score,
                 )
             )
@@ -446,6 +484,7 @@ class ConflictResolver:
                 relation=self.classify_relation(candidate, item.existing),
                 similarity=item.similarity,
                 text_score=item.text_score,
+                semantic_score=item.semantic_score,
                 pattern_score=item.pattern_score,
             )
             for candidate in candidates
@@ -587,9 +626,10 @@ def _relation_prompt(candidate: Contract, relation_candidates: list[RelationCand
     candidate_json = _contract_payload(candidate)
     return (
         f"{RELATION_CLASSIFICATION_SYSTEM_PROMPT}\n\n"
-        "Similarity is 0.7 * text_score + 0.3 * pattern_score. text_score is "
-        "BM25 over contract text; pattern_score is word overlap over "
-        "host_action/tool_name/parameter_regex predicate text.\n"
+        "Similarity is retrieval evidence: 0.55 * text_score + 0.30 * semantic "
+        "overlap + 0.15 * operational pattern overlap. text_score is BM25 over "
+        "contract text; pattern_score is weak auxiliary overlap over "
+        "tool_patterns and targets, not semantic overlap.\n"
         "Classify every candidate pair. Return exactly this JSON shape:\n"
         '{"relations":[{"existing_id":"MAC-...",'
         '"relation":"duplicate|refinement|supersedes|conflicts_with|exception_to|independent",'
@@ -629,6 +669,7 @@ def _batch_relation_prompt(
                 entry["scores_by_new_id"][candidate.id] = {
                     "similarity": round(item.similarity, 4),
                     "text_score": round(item.text_score, 4),
+                    "semantic_score": round(item.semantic_score, 4),
                     "pattern_score": round(item.pattern_score, 4),
                 }
 
@@ -642,6 +683,8 @@ def _batch_relation_prompt(
         "This is a batch relation-classification component. Multiple new rules "
         "share at least one retrieved existing rule, so classify the component as "
         "one graph rather than as independent pairwise updates.\n"
+        "Use semantics.actions/tags and targets for semantic overlap; treat "
+        "tool_patterns only as weak operational evidence.\n"
         "Return relation edges only; do not decide final active/rejected/superseded "
         "status. The deterministic apply phase handles status updates.\n"
         "Return exactly this JSON shape:\n"
@@ -656,12 +699,16 @@ def _contract_payload(contract: Contract) -> dict:
     return {
         "id": contract.id,
         "text": contract.text,
+        "effect": contract.effect.value,
+        "authority": contract.authority.value,
         "kind": contract.kind.value,
         "modality": contract.modality.value,
         "source": contract.source.kind.value,
         "scope": contract.scope.model_dump(mode="json"),
-        "lifecycle": contract.lifecycle.model_dump(mode="json"),
-        "action_constraints": contract.action_constraints.model_dump(mode="json"),
+        "validity": contract.validity.model_dump(mode="json"),
+        "semantics": contract.semantics.model_dump(mode="json"),
+        "tool_patterns": [pattern.model_dump(mode="json") for pattern in contract.tool_patterns],
+        "targets": [target.model_dump(mode="json") for target in contract.targets],
         "predicate_pattern": _predicate_pattern_text(contract),
     }
 
@@ -672,6 +719,7 @@ def _relation_candidate_payload(item: RelationCandidate) -> dict:
         "existing_rule": _contract_payload(item.existing),
         "similarity": round(item.similarity, 4),
         "text_score": round(item.text_score, 4),
+        "semantic_score": round(item.semantic_score, 4),
         "pattern_score": round(item.pattern_score, 4),
     }
 
@@ -708,11 +756,11 @@ def _overlaps(left: Contract, right: Contract) -> bool:
         return False
     if left.scope.repo and right.scope.repo and left.scope.repo != right.scope.repo:
         return False
-    if left.action_constraints.host_actions and right.action_constraints.host_actions:
-        if not set(left.action_constraints.host_actions).intersection(right.action_constraints.host_actions):
+    if left.semantics.actions and right.semantics.actions:
+        if not set(left.semantics.actions).intersection(right.semantics.actions):
             return False
-    if left.action_constraints.canonical_tags and right.action_constraints.canonical_tags:
-        if not set(left.action_constraints.canonical_tags).intersection(right.action_constraints.canonical_tags):
+    if left.semantics.tags and right.semantics.tags:
+        if not set(left.semantics.tags).intersection(right.semantics.tags):
             return False
     if left.scope.path_globs and right.scope.path_globs:
         return _path_globs_overlap(left.scope.path_globs, right.scope.path_globs)
@@ -746,13 +794,13 @@ def _scope_lifecycle_overlaps(left: Contract, right: Contract) -> bool:
 def _contradicts(left: Contract, right: Contract) -> bool:
     if not _overlaps(left, right):
         return False
-    left_bans = left.kind == ContractKind.PROHIBITION or left.modality == Modality.MUST_NOT
-    right_bans = right.kind == ContractKind.PROHIBITION or right.modality == Modality.MUST_NOT
-    left_requires = left.modality == Modality.MUST or left.kind in {
+    left_bans = left.effect == RuleEffect.DENY or left.kind == ContractKind.PROHIBITION or left.modality == Modality.MUST_NOT
+    right_bans = right.effect == RuleEffect.DENY or right.kind == ContractKind.PROHIBITION or right.modality == Modality.MUST_NOT
+    left_requires = left.effect == RuleEffect.REQUIRE or left.modality == Modality.MUST or left.kind in {
         ContractKind.REQUIREMENT,
         ContractKind.PROCEDURE,
     }
-    right_requires = right.modality == Modality.MUST or right.kind in {
+    right_requires = right.effect == RuleEffect.REQUIRE or right.modality == Modality.MUST or right.kind in {
         ContractKind.REQUIREMENT,
         ContractKind.PROCEDURE,
     }
@@ -760,18 +808,18 @@ def _contradicts(left: Contract, right: Contract) -> bool:
 
 
 def _same_direction(left: Contract, right: Contract) -> bool:
-    return left.kind == right.kind or left.modality == right.modality
+    return left.effect == right.effect or left.kind == right.kind or left.modality == right.modality
 
 
 def _contract_similarity(left: Contract, right: Contract) -> float:
     text_score = _text_similarity(left.text, right.text)
     action_score = _set_overlap(
-        set(left.action_constraints.host_actions),
-        set(right.action_constraints.host_actions),
+        set(left.semantics.actions),
+        set(right.semantics.actions),
     )
     tag_score = _set_overlap(
-        set(left.action_constraints.canonical_tags),
-        set(right.action_constraints.canonical_tags),
+        set(left.semantics.tags),
+        set(right.semantics.tags),
     )
     scope_score = 1.0 if left.scope.level == right.scope.level else 0.5
     return (text_score * 0.55) + (action_score * 0.2) + (tag_score * 0.15) + (scope_score * 0.1)
@@ -795,10 +843,10 @@ def _is_refinement(candidate: Contract, existing: Contract) -> bool:
 
 
 def _has_narrower_action_binding(candidate: Contract, existing: Contract) -> bool:
-    candidate_actions = set(candidate.action_constraints.host_actions)
-    existing_actions = set(existing.action_constraints.host_actions)
-    candidate_tags = set(candidate.action_constraints.canonical_tags)
-    existing_tags = set(existing.action_constraints.canonical_tags)
+    candidate_actions = set(candidate.semantics.actions)
+    existing_actions = set(existing.semantics.actions)
+    candidate_tags = set(candidate.semantics.tags)
+    existing_tags = set(existing.semantics.tags)
     return bool(
         existing_actions
         and candidate_actions
@@ -822,7 +870,7 @@ def _is_generic_broader_clause(candidate_text: str, existing_text: str) -> bool:
 def _is_duplicate(left: Contract, right: Contract, similarity: float) -> bool:
     return (
         similarity >= DEFAULT_RELATION_SIMILARITY_THRESHOLD
-        and left.kind == right.kind
+        and left.effect == right.effect
         and left.modality == right.modality
         and left.scope.level == right.scope.level
     )
@@ -910,19 +958,14 @@ def _bm25_score(query_tokens: list[str], document_tokens: list[str], corpus: lis
 
 def _predicate_pattern_text(contract: Contract) -> str:
     parts: list[str] = []
-    predicates = contract.compiled_predicates
-    if predicates is not None:
-        for pattern in predicates.host_action_patterns:
-            parts.append(pattern.action)
-            if pattern.tool_name:
-                parts.append(pattern.tool_name)
-            if pattern.program:
-                parts.append(pattern.program)
-            if pattern.subcommand:
-                parts.append(pattern.subcommand)
-            parts.extend(f"{key} {value}" for key, value in sorted(pattern.parameter_regex.items()))
-    parts.extend(contract.action_constraints.host_actions)
-    parts.extend(contract.action_constraints.canonical_tags)
+    for pattern in contract.tool_patterns:
+        parts.append(pattern.tool)
+        for key, matcher in sorted(pattern.args.items()):
+            parts.append(key)
+            parts.append(matcher.model_dump_json())
+    for target in contract.targets:
+        parts.append(target.kind)
+        parts.append(target.value)
     return " ".join(parts)
 
 
@@ -955,7 +998,7 @@ def _compare_precedence(candidate: Contract, existing: Contract) -> int:
 
 
 def _precedence_score(contract: Contract) -> tuple[int, int, int, int]:
-    source = SOURCE_AUTHORITY[contract.source.kind]
+    source = AUTHORITY_SCORE[contract.authority]
     scope = scope_specificity(contract.scope)
     lifecycle = 1 if not contract.is_expired() else 0
     strength = {

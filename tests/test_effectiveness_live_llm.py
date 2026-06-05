@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
+from openai import APIConnectionError, APITimeoutError
 
 from memory_as_contracts.extractor import (
     CandidateJsonContractExtractor,
@@ -62,18 +63,21 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
         turn_id="u-effect",
     )
 
-    project_contracts = extractor.extract_cold_start_source(
-        text=PROJECT_DOC,
-        source_kind=SourceKind.PROJECT_DOC,
-        context=context,
-        path="AGENTS.md",
-        fingerprint="effect-project-doc",
-    )
-    user_contracts = extractor.extract_online_turn(
-        role="user",
-        text=USER_TURN,
-        context=context,
-    )
+    try:
+        project_contracts = extractor.extract_cold_start_source(
+            text=PROJECT_DOC,
+            source_kind=SourceKind.PROJECT_DOC,
+            context=context,
+            path="AGENTS.md",
+            fingerprint="effect-project-doc",
+        )
+        user_contracts = extractor.extract_online_turn(
+            role="user",
+            text=USER_TURN,
+            context=context,
+        )
+    except (APIConnectionError, APITimeoutError) as exc:
+        pytest.skip(f"live LLM endpoint unavailable: {exc}")
     all_contracts = project_contracts + user_contracts
     diagnostics = _diagnostics(all_contracts)
 
@@ -174,7 +178,9 @@ def _diagnostics(contracts: list[Contract]) -> list[dict]:
             "status": contract.status.value,
             "source": contract.source.kind.value,
             "scope": contract.scope.model_dump(mode="json"),
-            "actions": contract.action_constraints.model_dump(mode="json"),
+            "semantics": contract.semantics.model_dump(mode="json"),
+            "tool_patterns": [pattern.model_dump(mode="json") for pattern in contract.tool_patterns],
+            "targets": [target.model_dump(mode="json") for target in contract.targets],
         }
         for contract in contracts
     ]

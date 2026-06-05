@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import re
-import shlex
 from fnmatch import fnmatch
 
 from memory_as_contracts.grounding_cache import GroundingCache
 from memory_as_contracts.models import (
     ActionSignature,
+    ArgPattern,
     AvailableAction,
-    CompiledPredicateVersion,
     Contract,
-    HostActionPattern,
     MatchOutcome,
+    RulePatternVersion,
     TargetPattern,
+    ToolPattern,
 )
 
 
@@ -42,71 +42,21 @@ class PolicyCompiler:
         *,
         version: str = "PV-001",
         refines: str | None = None,
-    ) -> CompiledPredicateVersion:
-        action_names = {action.name for action in available_actions}
-        host_patterns: list[HostActionPattern] = []
+    ) -> RulePatternVersion:
         target_patterns: list[TargetPattern] = []
-        tags = set(contract.action_constraints.canonical_tags)
+        tool_patterns: list[ToolPattern] = list(contract.tool_patterns)
+        tags = set(contract.semantics.tags)
         grounding = self._grounding_cache(contract)
-
-        hint = contract.compiled_predicates
-        if hint is not None:
-            host_patterns.extend(
-                grounding.ground_host_patterns(
-                    text=contract.text,
-                    hint_patterns=hint.host_action_patterns,
-                    action_names=action_names,
-                )
-            )
-            target_patterns.extend(
-                grounding.ground_targets(
-                    text=contract.text,
-                    hint_targets=hint.target_patterns,
-                    scope_globs=[],
-                )
-            )
-            tags.update(hint.canonical_tags)
-
-        constraint_actions = _narrow_host_actions(contract.action_constraints.host_actions)
-        for host_action in constraint_actions:
-            if not action_names or host_action in action_names:
-                host_patterns.append(HostActionPattern(action=host_action))
-
-        lower = contract.text.lower()
-        if "publish" in lower and not any(pattern.action == "git.push" for pattern in host_patterns):
-            if "git.push" in action_names:
-                host_patterns.append(HostActionPattern(action="git.push"))
-            tags.update({"external_write", "publish_code"})
-        if any(pattern.action == "git.push" for pattern in host_patterns):
-            tags.update({"external_write", "publish_code"})
-        if any(pattern.action == "git.commit" for pattern in host_patterns):
-            tags.update({"source_modification", "version_control"})
-        if any(token in lower for token in ("web search", "web-search", "browse", "browser")):
-            if "web.search" in action_names:
-                host_patterns.append(HostActionPattern(action="web.search"))
-            tags.add("network_read")
-        if any(token in lower for token in ("email", "message", "messages", "slack", "send", "notify")):
-            for action in ("email.send", "message.send"):
-                if not action_names or action in action_names:
-                    host_patterns.append(HostActionPattern(action=action))
-            tags.update({"external_write", "notify_human"})
-        if "npm" in lower and ("not npm" in lower or "do not use npm" in lower):
-            host_patterns.append(_command_pattern(action_names, "exec", "npm", None))
-            tags.add("dependency_change")
-        if any(token in lower for token in ("install", "dependency")):
-            if "dependency.install" in action_names:
-                host_patterns.append(HostActionPattern(action="dependency.install"))
-            else:
-                host_patterns.append(HostActionPattern(action="exec"))
-            tags.add("dependency_change")
-        host_patterns.extend(
-            grounding.ground_host_patterns(
+        target_patterns.extend(
+            grounding.ground_targets(
                 text=contract.text,
-                hint_patterns=[],
-                action_names=action_names,
+                hint_targets=contract.targets,
+                scope_globs=[],
             )
         )
 
+        has_operational_seed = bool(tool_patterns)
+        lower = contract.text.lower()
         path_match = self.path_pattern.search(contract.text)
         glob_match = self.glob_pattern.search(contract.text)
         relative_path = self.relative_path_pattern.search(contract.text)
@@ -149,11 +99,19 @@ class PolicyCompiler:
                 scope_globs=contract.scope.path_globs,
             )
         )
+        if has_operational_seed:
+            tool_patterns.extend(
+                _materialize_tool_patterns(
+                    contract=contract,
+                    target_patterns=target_patterns,
+                    available_actions=available_actions,
+                )
+            )
 
-        return CompiledPredicateVersion(
+        return RulePatternVersion(
             contract_id=contract.id,
             version=version,
-            host_action_patterns=_dedupe_host_patterns(host_patterns),
+            tool_patterns=_dedupe_tool_patterns(tool_patterns),
             target_patterns=_dedupe_target_patterns(target_patterns),
             canonical_tags=sorted(tags),
             scope_predicate=contract.scope.model_dump(mode="json"),
@@ -168,19 +126,19 @@ class PolicyCompiler:
 
     def evaluate(
         self,
-        predicate: CompiledPredicateVersion,
+        predicate: RulePatternVersion,
         signature: ActionSignature,
     ) -> MatchOutcome:
         if not predicate.has_binding_predicates():
             return MatchOutcome.AMBIGUOUS
 
-        if predicate.host_action_patterns:
-            action_matches = [
-                _host_pattern_matches(pattern, signature)
-                for pattern in predicate.host_action_patterns
+        if predicate.tool_patterns:
+            tool_matches = [
+                _tool_pattern_matches(pattern, signature)
+                for pattern in predicate.tool_patterns
             ]
-            if MatchOutcome.MATCHED not in action_matches:
-                if MatchOutcome.AMBIGUOUS in action_matches:
+            if MatchOutcome.MATCHED not in tool_matches:
+                if tool_matches and all(outcome == MatchOutcome.AMBIGUOUS for outcome in tool_matches):
                     return MatchOutcome.AMBIGUOUS
                 return MatchOutcome.NOT_MATCHED
 
@@ -194,21 +152,7 @@ class PolicyCompiler:
             ):
                 return MatchOutcome.NOT_MATCHED
 
-        if predicate.canonical_tags and not set(predicate.canonical_tags).intersection(signature.canonical_tags):
-            if not predicate.host_action_patterns and not predicate.target_patterns:
-                return MatchOutcome.NOT_MATCHED
-
         return MatchOutcome.MATCHED
-
-
-def _command_pattern(
-    available_action_names: set[str],
-    preferred_action: str,
-    program: str,
-    subcommand: str | None,
-) -> HostActionPattern:
-    action = preferred_action if preferred_action in available_action_names else "exec"
-    return HostActionPattern(action=action, program=program, subcommand=subcommand)
 
 
 def _selected_bare_file_target(text: str, pattern: re.Pattern[str]) -> str | None:
@@ -222,70 +166,61 @@ def _selected_bare_file_target(text: str, pattern: re.Pattern[str]) -> str | Non
     return (after_trigger[0] if after_trigger else matches[0]).group(0).rstrip(".,;:")
 
 
-def _narrow_host_actions(host_actions: list[str]) -> list[str]:
-    actions = set(host_actions)
-    if "exec" in actions and actions - {"exec"}:
-        actions.remove("exec")
-    return sorted(actions)
-
-
-def _host_pattern_matches(
-    pattern: HostActionPattern,
-    signature: ActionSignature,
-) -> MatchOutcome:
-    if pattern.tool_name is not None and pattern.tool_name != signature.tool.name:
+def _tool_pattern_matches(pattern: ToolPattern, signature: ActionSignature) -> MatchOutcome:
+    if pattern.tool != "*" and pattern.tool != signature.tool.name:
         return MatchOutcome.NOT_MATCHED
-
-    parameter_outcome = _parameter_regex_matches(pattern, signature)
-    if parameter_outcome != MatchOutcome.MATCHED:
-        return parameter_outcome
-
-    parsed = _parse_signature_command(signature)
-    action_is_binding = pattern.action != "*"
-    action_matches = not action_is_binding or pattern.action == signature.host_action
-    if pattern.program and signature.host_action != "exec" and not action_matches:
-        return MatchOutcome.NOT_MATCHED
-    if (
-        action_is_binding
-        and not action_matches
-        and pattern.action == "exec"
-        and signature.host_action != "exec"
-    ):
-        return MatchOutcome.NOT_MATCHED
-    command_matches = True
-    if pattern.program:
-        if parsed is None:
-            command_matches = False if action_matches else None
-        else:
-            program, subcommand = parsed
-            command_matches = program == pattern.program and (
-                pattern.subcommand is None or subcommand == pattern.subcommand
-            )
-    if action_matches and command_matches is not False:
-        return MatchOutcome.MATCHED
-    if pattern.program and command_matches is True:
-        return MatchOutcome.MATCHED
-    if command_matches is None:
+    outcomes = [
+        _arg_pattern_matches(signature.tool.raw_arguments.get(key), matcher)
+        for key, matcher in pattern.args.items()
+    ]
+    if MatchOutcome.AMBIGUOUS in outcomes:
         return MatchOutcome.AMBIGUOUS
-    return MatchOutcome.NOT_MATCHED
+    if MatchOutcome.NOT_MATCHED in outcomes:
+        return MatchOutcome.NOT_MATCHED
+    return MatchOutcome.MATCHED
 
 
-def _parameter_regex_matches(
-    pattern: HostActionPattern,
-    signature: ActionSignature,
-) -> MatchOutcome:
-    if not pattern.parameter_regex:
+def _arg_pattern_matches(value, matcher: ArgPattern) -> MatchOutcome:
+    if matcher.is_empty():
         return MatchOutcome.MATCHED
-    for key, regex in pattern.parameter_regex.items():
-        value = signature.tool.raw_arguments.get(key)
-        if value is None:
-            return MatchOutcome.NOT_MATCHED
+    if value is None:
+        return MatchOutcome.AMBIGUOUS
+    text = str(value)
+    if matcher.equals is not None and value != matcher.equals:
+        return MatchOutcome.NOT_MATCHED
+    if matcher.contains is not None and matcher.contains not in text:
+        return MatchOutcome.NOT_MATCHED
+    if matcher.regex is not None:
         try:
-            if re.search(regex, str(value)) is None:
+            if re.search(matcher.regex, text) is None:
                 return MatchOutcome.NOT_MATCHED
         except re.error:
             return MatchOutcome.AMBIGUOUS
+    if matcher.path_glob is not None and not _path_value_matches(text, matcher.path_glob):
+        return MatchOutcome.NOT_MATCHED
+    if matcher.mentions_path_glob is not None and not _text_mentions_path_glob(
+        text, matcher.mentions_path_glob
+    ):
+        return MatchOutcome.NOT_MATCHED
     return MatchOutcome.MATCHED
+
+
+def _path_value_matches(value: str, glob: str) -> bool:
+    if fnmatch(value, glob):
+        return True
+    if glob.startswith("**/") and fnmatch(value, glob.removeprefix("**/")):
+        return True
+    if "/" not in glob and (value == glob or value.endswith(f"/{glob}")):
+        return True
+    return False
+
+
+def _text_mentions_path_glob(text: str, glob: str) -> bool:
+    prefix = glob.split("*", 1)[0].rstrip("/")
+    if prefix and prefix in text:
+        return True
+    candidates = re.findall(r"[A-Za-z0-9_./-]+", text)
+    return any(_path_value_matches(candidate, glob) for candidate in candidates)
 
 
 def _target_pattern_matches(pattern: TargetPattern, target: str) -> bool:
@@ -298,33 +233,118 @@ def _target_pattern_matches(pattern: TargetPattern, target: str) -> bool:
     return pattern.value == target
 
 
-def _parse_signature_command(signature: ActionSignature) -> tuple[str, str | None] | None:
-    raw = signature.tool.raw_arguments
-    command = raw.get("cmd") or raw.get("command")
-    if not isinstance(command, str):
-        return None
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        tokens = command.split()
-    if not tokens:
-        return None
-    program = tokens[0]
-    subcommand = tokens[1] if len(tokens) > 1 else None
-    return program, subcommand
-
-
-def _dedupe_host_patterns(patterns: list[HostActionPattern]) -> list[HostActionPattern]:
-    seen: set[tuple[str, str | None, str | None, str | None, tuple[tuple[str, str], ...]]] = set()
-    result: list[HostActionPattern] = []
-    for pattern in patterns:
-        key = (
-            pattern.action,
-            pattern.tool_name,
-            pattern.program,
-            pattern.subcommand,
-            tuple(sorted(pattern.parameter_regex.items())),
+def _materialize_tool_patterns(
+    *,
+    contract: Contract,
+    target_patterns: list[TargetPattern],
+    available_actions: list[AvailableAction],
+) -> list[ToolPattern]:
+    actions = set(contract.semantics.actions)
+    action_names = {action.name for action in available_actions}
+    patterns: list[ToolPattern] = []
+    if "git.push" in actions and _action_available(action_names, "git.push", "exec"):
+        patterns.extend(_command_tool_patterns(r"^git\s+push(\s|$)"))
+    if "git.commit" in actions and _action_available(action_names, "git.commit", "exec"):
+        patterns.extend(_command_tool_patterns(r"^git\s+commit(\s|$)"))
+    if "dependency.install" in actions and _action_available(
+        action_names, "dependency.install", "exec"
+    ):
+        patterns.extend(
+            _command_tool_patterns(r"^(?:npm|pnpm|yarn|uv|pip|pipx)\s+(?:install|add|sync)(\s|$)")
         )
+    if {"file.write", "file.delete"}.intersection(actions):
+        if _action_available(action_names, "file.write", "file.delete"):
+            patterns.extend(_file_tool_patterns(_path_glob_targets(target_patterns)))
+    if "web.search" in actions and _action_available(action_names, "web.search"):
+        patterns.extend(
+            [
+                ToolPattern(tool="WebSearch"),
+                ToolPattern(tool="web_search"),
+                ToolPattern(tool="web.search"),
+                ToolPattern(tool="search"),
+            ]
+        )
+    if "message.send" in actions and _action_available(action_names, "message.send"):
+        patterns.extend(
+            [
+                ToolPattern(tool="message.send"),
+                ToolPattern(tool="send_message"),
+                ToolPattern(tool="message"),
+                ToolPattern(tool="sessions_send"),
+            ]
+        )
+    if "email.send" in actions and _action_available(action_names, "email.send"):
+        patterns.extend([ToolPattern(tool="email.send"), ToolPattern(tool="send_email")])
+    if "memory.write" in actions and _action_available(action_names, "memory.write"):
+        patterns.extend([ToolPattern(tool="memory.write"), ToolPattern(tool="memory_record")])
+    return patterns
+
+
+def _action_available(action_names: set[str], *actions: str) -> bool:
+    return not action_names or bool(action_names.intersection(actions))
+
+
+def _path_glob_targets(target_patterns: list[TargetPattern]) -> list[str]:
+    return [pattern.value for pattern in target_patterns if pattern.kind == "path_glob"]
+
+
+def _command_tool_patterns(regex: str) -> list[ToolPattern]:
+    return [
+        ToolPattern(tool="Bash", args={"command": ArgPattern(regex=regex)}),
+        ToolPattern(tool="exec", args={"command": ArgPattern(regex=regex)}),
+        ToolPattern(tool="exec", args={"cmd": ArgPattern(regex=regex)}),
+        ToolPattern(tool="exec_command", args={"cmd": ArgPattern(regex=regex)}),
+        ToolPattern(tool="shell", args={"command": ArgPattern(regex=regex)}),
+    ]
+
+
+def _file_tool_patterns(path_globs: list[str]) -> list[ToolPattern]:
+    if not path_globs:
+        return [
+            ToolPattern(tool="Write"),
+            ToolPattern(tool="Edit"),
+            ToolPattern(tool="MultiEdit"),
+            ToolPattern(tool="apply_patch"),
+            ToolPattern(tool="write"),
+            ToolPattern(tool="edit"),
+            ToolPattern(tool="file.write"),
+        ]
+    patterns: list[ToolPattern] = []
+    for glob in path_globs:
+        patterns.extend(
+            [
+                ToolPattern(tool="Write", args={"file_path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="Edit", args={"file_path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="MultiEdit", args={"file_path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="write", args={"path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="edit", args={"path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="file.write", args={"path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="apply_patch", args={"patch": ArgPattern(mentions_path_glob=glob)}),
+            ]
+        )
+        shell_regex = _shell_path_write_regex(glob)
+        if shell_regex:
+            patterns.append(ToolPattern(tool="Bash", args={"command": ArgPattern(regex=shell_regex)}))
+            patterns.append(ToolPattern(tool="exec", args={"command": ArgPattern(regex=shell_regex)}))
+            patterns.append(ToolPattern(tool="exec", args={"cmd": ArgPattern(regex=shell_regex)}))
+    return patterns
+
+
+def _shell_path_write_regex(path_glob: str) -> str | None:
+    prefix = path_glob.split("*", 1)[0].rstrip("/")
+    if not prefix:
+        return None
+    return (
+        r"(^|\s)(sed|python|node|rm|mv|cp|touch|cat\s+>|tee|perl)"
+        rf".*{re.escape(prefix)}/?"
+    )
+
+
+def _dedupe_tool_patterns(patterns: list[ToolPattern]) -> list[ToolPattern]:
+    seen: set[str] = set()
+    result: list[ToolPattern] = []
+    for pattern in patterns:
+        key = pattern.model_dump_json()
         if key not in seen:
             seen.add(key)
             result.append(pattern)

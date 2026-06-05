@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from memory_as_contracts.models import (
     ActionConstraints,
     ActionSignature,
+    ArgPattern,
     AvailableAction,
     CompiledPredicateVersion,
     Contract,
@@ -29,6 +30,7 @@ from memory_as_contracts.models import (
     SideEffect,
     SourceKind,
     Strength,
+    ToolPattern,
     ToolCall,
     WorkspaceContext,
 )
@@ -82,6 +84,47 @@ def test_contract_serializes_proposal_style_example() -> None:
     assert payload["kind"] == "prohibition"
     assert payload["scope"]["level"] == "project"
     assert payload["compiled_predicates"]["host_action_patterns"][0]["subcommand"] == "push"
+
+
+def test_rule_schema_round_trips_linked_repo_tool_patterns() -> None:
+    payload = {
+        "id": "rule_01",
+        "text": "不要修改 linked repo，除非用户本轮显式要求。",
+        "effect": "deny",
+        "status": "active",
+        "authority": "user_explicit",
+        "scope": {"repo": "current", "paths": ["../linked_repo/**"]},
+        "semantics": {
+            "actions": ["file.write"],
+            "tags": ["workspace_write", "source_modification"],
+        },
+        "tool_patterns": [
+            {
+                "tool": "Edit",
+                "args": {"file_path": {"path_glob": "../linked_repo/**"}},
+            },
+            {
+                "tool": "apply_patch",
+                "args": {"patch": {"mentions_path_glob": "../linked_repo/**"}},
+            },
+        ],
+        "targets": [{"kind": "path_glob", "value": "../linked_repo/**"}],
+        "override": {"type": "explicit_user_current_turn"},
+        "validity": {"from": "2026-06-03T10:00:00Z", "until": None},
+    }
+
+    rule = Contract.model_validate(payload)
+    dumped = rule.model_dump(mode="json")
+
+    assert rule.effect == "deny"
+    assert rule.scope.path_globs == ["../linked_repo/**"]
+    assert rule.action_constraints.host_actions == ["file.write"]
+    assert rule.compiled_predicates is None
+    assert rule.tool_patterns[0] == ToolPattern(
+        tool="Edit",
+        args={"file_path": ArgPattern(path_glob="../linked_repo/**")},
+    )
+    assert dumped["semantics"]["tags"] == ["workspace_write", "source_modification"]
 
 
 def test_fact_cannot_bind_action_constraints() -> None:

@@ -8,7 +8,6 @@ from memory_as_contracts.adapters.base import (
     BaseAdapter,
     ColdStartExtractor,
     MemorySourceSpec,
-    canonical_raw_arguments,
     dedupe_specs,
     source_spec,
 )
@@ -252,29 +251,7 @@ class OpenClawAdapter(BaseAdapter):
         raw = _value(event, "params", _value(event, "tool_input", _value(event, "arguments", {})))
         if not isinstance(raw, dict):
             raw = {"value": raw}
-        canonical = _openclaw_tool_name(str(tool_name), raw)
-        return canonical, canonical_raw_arguments(canonical, raw), str(_value(event, "intent", ""))
-
-
-def _openclaw_tool_name(tool_name: str, raw: dict[str, Any]) -> str:
-    lower = tool_name.lower()
-    if lower in {"bash", "shell", "exec", "command"}:
-        return "exec"
-    if lower in {"read", "file_read", "file.read"}:
-        return "file.read"
-    if lower in {"write", "edit", "patch", "file_write", "file.write"}:
-        return "file.write"
-    if lower in {"delete", "remove", "file_delete", "file.delete"}:
-        return "file.delete"
-    if lower in {"search", "web_search", "web.search"}:
-        return "web.search"
-    if lower in {"send_message", "message_send", "message.send", "notify", "slack"}:
-        return "message.send"
-    if lower in {"send_email", "email_send", "email.send"}:
-        return "email.send"
-    if raw.get("cmd") or raw.get("command"):
-        return "exec"
-    return tool_name
+        return str(tool_name), dict(raw), str(_value(event, "intent", ""))
 
 
 def _value(event: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:

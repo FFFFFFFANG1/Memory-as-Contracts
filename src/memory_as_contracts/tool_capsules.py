@@ -23,22 +23,18 @@ class ToolCapabilityCapsule:
 
 
 def render_tool_capsule_system_prompt(
-    *,
-    agent_name: str,
     capsules: Sequence[ToolCapabilityCapsule],
 ) -> str | None:
     if not capsules:
         return None
     payload = {
-        "tool_capsules_version": "v1",
-        "agent": agent_name,
         "tools": [capsule.as_dict() for capsule in capsules],
     }
     return (
         "Tool definitions available to the acting agent are provided below as read-only "
         "environment context. Do not extract contracts from these tool definitions. Use "
-        "them only to ground optional predicate_hints with exact tool names and parameter "
-        "names when the source text states a user or source contract.\n\n"
+        "them only to ground tool_patterns and targets with exact native tool names and "
+        "raw parameter names when the source text states a user or source contract.\n\n"
         f"{json.dumps(payload, indent=2, sort_keys=True)}"
     )
 

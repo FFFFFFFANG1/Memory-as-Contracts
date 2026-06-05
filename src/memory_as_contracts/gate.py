@@ -20,6 +20,8 @@ from memory_as_contracts.models import (
     MatchOutcome,
     PredicateEvaluation,
     Receipt,
+    RuleEffect,
+    RulePatternVersion,
 )
 from memory_as_contracts.store import ContractStore
 
@@ -82,7 +84,7 @@ class ActionGate:
         final_outcome = MatchOutcome.NOT_MATCHED
 
         for contract in sorted(contracts, key=_gate_contract_rank, reverse=True):
-            if contract.kind == ContractKind.PREFERENCE:
+            if contract.effect == RuleEffect.PREFER or contract.kind == ContractKind.PREFERENCE:
                 ignored.append(IgnoredContract(id=contract.id, reason="preference_not_gated"))
                 continue
             if contract.is_expired(signature.time.now):
@@ -99,12 +101,15 @@ class ActionGate:
             if self._has_active_exception(signature, contract):
                 ignored.append(IgnoredContract(id=contract.id, reason="exception_applied"))
                 continue
-            predicate = self._compiled_predicate(contract, signature)
-            outcome = self.compiler.evaluate(predicate, signature)
-            evaluation = self.store.add_predicate_evaluation(
+            pattern_version = self._active_pattern_version(contract, signature)
+            if pattern_version is None:
+                ignored.append(IgnoredContract(id=contract.id, reason="missing_tool_pattern"))
+                continue
+            outcome = self.compiler.evaluate(pattern_version, signature)
+            evaluation = self.store.add_pattern_evaluation(
                 PredicateEvaluation(
                     contract_id=contract.id,
-                    predicate_version_id=predicate.id,
+                    pattern_version_id=pattern_version.id,
                     signature_id=signature.signature_id,
                     match_outcome=outcome,
                 )
@@ -122,9 +127,13 @@ class ActionGate:
                 final_reason = _block_hint(contract)
                 break
             if outcome == MatchOutcome.AMBIGUOUS:
-                final_decision = GateDecisionType.BLOCK
-                final_reason = _block_hint(contract)
-                break
+                decision = self._decision_for_matched_contract(contract)
+                if decision == GateDecisionType.BLOCK:
+                    final_decision = GateDecisionType.BLOCK
+                    final_reason = _block_hint(contract)
+                    break
+                final_reason = f"matched ambiguous non-blocking contract {contract.id}"
+                continue
 
             decision = self._decision_for_matched_contract(contract)
             if decision != GateDecisionType.ALLOW:
@@ -144,37 +153,23 @@ class ActionGate:
             contracts_ignored=ignored,
         )
 
-    def _compiled_predicate(self, contract: Contract, signature: ActionSignature):
-        if contract.compiled_predicates is not None:
-            predicate = contract.compiled_predicates
-            if predicate.contract_id is None:
-                predicate = predicate.model_copy(update={"contract_id": contract.id})
-            grounded = self.compiler.compile(
-                contract,
-                signature.available_actions,
-                version=predicate.version,
-                refines=predicate.refines,
-            )
-            grounded = grounded.model_copy(
-                update={
-                    "id": predicate.id if _predicate_semantics_equal(predicate, grounded) else grounded.id,
-                    "contract_id": contract.id,
-                }
-            )
-            if _predicate_semantics_equal(predicate, grounded):
-                if predicate.contract_id is None:
-                    self.store.add_predicate_version(grounded)
-                return grounded
-            updated = contract.model_copy(update={"compiled_predicates": grounded})
-            self.store.add_contract(updated)
-            return grounded
-        predicate = self.compiler.compile(contract, signature.available_actions)
-        updated = contract.model_copy(update={"compiled_predicates": predicate})
-        self.store.add_contract(updated)
-        return predicate
+    def _active_pattern_version(
+        self, contract: Contract, signature: ActionSignature
+    ) -> RulePatternVersion | None:
+        current = self.store.get_active_rule_pattern_version(contract.id)
+        if current is not None:
+            return current if current.tool_patterns else None
+        if not contract.tool_patterns:
+            return None
+        pattern_version = self.compiler.compile(contract, signature.available_actions)
+        if not pattern_version.has_binding_predicates():
+            return None
+        return self.store.add_rule_pattern_version(
+            pattern_version.model_copy(update={"contract_id": contract.id})
+        )
 
     def _decision_for_matched_contract(self, contract: Contract) -> GateDecisionType:
-        if contract.kind == ContractKind.PROHIBITION:
+        if contract.effect == RuleEffect.DENY or contract.kind == ContractKind.PROHIBITION:
             return GateDecisionType.BLOCK
         return GateDecisionType.ALLOW
 
@@ -183,7 +178,7 @@ class ActionGate:
             return
         self.ambiguity_monitor.enqueue_if_needed(
             evaluation.contract_id,
-            evaluation.predicate_version_id,
+            evaluation.pattern_version_id,
         )
 
     def _active_override_edge_id(self, signature: ActionSignature, contract: Contract) -> str | None:
@@ -218,8 +213,10 @@ class ActionGate:
                 continue
             if not contract_applies_to_signature(exception_contract, signature):
                 continue
-            exception_predicate = self._compiled_predicate(exception_contract, signature)
-            if self.compiler.evaluate(exception_predicate, signature) != MatchOutcome.MATCHED:
+            exception_pattern_version = self._active_pattern_version(exception_contract, signature)
+            if exception_pattern_version is None:
+                continue
+            if self.compiler.evaluate(exception_pattern_version, signature) != MatchOutcome.MATCHED:
                 continue
             if _exception_can_cover_contract(exception_contract, contract):
                 return True
@@ -251,6 +248,7 @@ class ActionGate:
             host_action=signature.host_action,
             tool_name=signature.tool.name,
             raw_arguments=signature.tool.raw_arguments,
+            available_actions=signature.available_actions,
             canonical_tags=signature.canonical_tags,
             match_outcome=match_outcome,
             targets=signature.targets,
@@ -265,9 +263,9 @@ class ActionGate:
 
 
 def _exception_can_cover_contract(exception_contract: Contract, contract: Contract) -> bool:
-    if exception_contract.kind != ContractKind.EXCEPTION:
+    if exception_contract.effect != RuleEffect.ALLOW and exception_contract.kind != ContractKind.EXCEPTION:
         return False
-    if contract.kind != ContractKind.PROHIBITION:
+    if contract.effect != RuleEffect.DENY and contract.kind != ContractKind.PROHIBITION:
         return False
     if (
         exception_contract.scope.workspace
@@ -281,12 +279,12 @@ def _exception_can_cover_contract(exception_contract: Contract, contract: Contra
         and exception_contract.scope.repo != contract.scope.repo
     ):
         return False
-    exception_actions = set(exception_contract.action_constraints.host_actions)
-    contract_actions = set(contract.action_constraints.host_actions)
+    exception_actions = set(exception_contract.semantics.actions)
+    contract_actions = set(contract.semantics.actions)
     if exception_actions and contract_actions and not exception_actions.intersection(contract_actions):
         return False
-    exception_tags = set(exception_contract.action_constraints.canonical_tags)
-    contract_tags = set(contract.action_constraints.canonical_tags)
+    exception_tags = set(exception_contract.semantics.tags)
+    contract_tags = set(contract.semantics.tags)
     if exception_tags and contract_tags and not exception_tags.intersection(contract_tags):
         return False
     exception_globs = exception_contract.scope.path_globs
@@ -301,19 +299,6 @@ def _exception_can_cover_contract(exception_contract: Contract, contract: Contra
     return True
 
 
-def _predicate_semantics_equal(
-    left,
-    right,
-) -> bool:
-    return (
-        left.host_action_patterns == right.host_action_patterns
-        and left.target_patterns == right.target_patterns
-        and left.canonical_tags == right.canonical_tags
-        and left.scope_predicate == right.scope_predicate
-        and left.lifecycle_predicate == right.lifecycle_predicate
-    )
-
-
 def _gate_contract_rank(contract: Contract) -> tuple[int, int, int]:
     return (
         _binding_specificity(contract),
@@ -324,17 +309,18 @@ def _gate_contract_rank(contract: Contract) -> tuple[int, int, int]:
 
 def _binding_specificity(contract: Contract) -> int:
     score = 0
-    actions = set(contract.action_constraints.host_actions)
-    tags = set(contract.action_constraints.canonical_tags)
+    actions = set(contract.semantics.actions)
+    tags = set(contract.semantics.tags)
     if actions:
         score += 10
     if tags:
         score += 3
     if actions.difference({"exec"}):
         score += 10
-    if contract.compiled_predicates is not None:
-        score += len(contract.compiled_predicates.host_action_patterns) * 2
-        score += len(contract.compiled_predicates.target_patterns) * 3
+    if contract.tool_patterns:
+        score += len(contract.tool_patterns) * 4
+    if contract.targets:
+        score += len(contract.targets) * 3
     return score
 
 

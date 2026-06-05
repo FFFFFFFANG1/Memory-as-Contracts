@@ -9,10 +9,8 @@ from memory_as_contracts.extractor import (
     ExtractionContext,
     HeuristicContractExtractor,
 )
-from memory_as_contracts.compiler import PolicyCompiler
 from memory_as_contracts.models import ContractKind, LifecycleType, Modality, ScopeLevel, SourceKind
 from memory_as_contracts.normalizers import LifecycleNormalizer, NormalizationContext, ScopeNormalizer
-from memory_as_contracts.signatures import coding_available_actions
 
 
 def context() -> ExtractionContext:
@@ -217,8 +215,8 @@ def test_llm_extractor_falls_back_to_prompt_injection_for_simple_providers() -> 
 
 def test_llm_extractor_treats_predicate_hints_as_non_authoritative() -> None:
     def response_provider(prompt: str) -> str:
-        assert "parameter_regex.cmd" in prompt
-        assert "tool_name \"exec\"" in prompt
+        assert "tool_patterns" in prompt
+        assert "native tool name" in prompt
         return r'''
         {"contracts": [{
           "text": "For this repo, do not use web search without asking me first.",
@@ -247,11 +245,9 @@ def test_llm_extractor_treats_predicate_hints_as_non_authoritative() -> None:
     )
 
     contract = contracts[0]
-    assert contract.compiled_predicates is None
     assert contract.action_constraints.host_actions == ["web.search"]
-
-    predicate = PolicyCompiler().compile(contract, coding_available_actions())
-    assert any(pattern.action == "web.search" for pattern in predicate.host_action_patterns)
+    assert contract.compiled_predicates is None
+    assert any(pattern.tool == "web.search" for pattern in contract.tool_patterns)
 
 
 def test_scope_and_lifecycle_normalizers_ground_relative_fields() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from fnmatch import fnmatch
 
 from memory_as_contracts.models import (
@@ -50,11 +51,14 @@ def scope_matches(scope: Scope, signature: ActionSignature) -> bool:
             component in target.lower() for target in signature.targets
         )
     if scope.level == ScopeLevel.PATH:
-        return any(
+        if any(
             fnmatch(target, glob)
             for target in signature.targets
             for glob in scope.path_globs
-        )
+        ):
+            return True
+        raw_text = _raw_arguments_text(signature)
+        return any(_glob_prefix(glob) in raw_text for glob in scope.path_globs if _glob_prefix(glob))
     if scope.level == ScopeLevel.TASK:
         return bool(scope.task and scope.task == signature.session.task_id)
     if scope.level == ScopeLevel.SESSION:
@@ -62,6 +66,14 @@ def scope_matches(scope: Scope, signature: ActionSignature) -> bool:
     if scope.level == ScopeLevel.PER_TURN:
         return True
     return False
+
+
+def _raw_arguments_text(signature: ActionSignature) -> str:
+    return json.dumps(signature.tool.raw_arguments, sort_keys=True)
+
+
+def _glob_prefix(glob: str) -> str:
+    return glob.split("*", 1)[0].rstrip("/")
 
 
 def contract_applies_to_signature(contract: Contract, signature: ActionSignature) -> bool:

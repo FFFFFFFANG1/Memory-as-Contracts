@@ -11,7 +11,6 @@ from memory_as_contracts.adapters.base import (
     ColdStartExtractor,
     MemorySourceSpec,
     ancestor_dirs,
-    canonical_raw_arguments,
     dedupe_specs,
     source_spec,
 )
@@ -308,8 +307,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         raw = _value(event, "tool_input", _value(event, "arguments", {}))
         if not isinstance(raw, dict):
             raw = {"value": raw}
-        canonical = _claude_tool_name(str(tool_name), raw)
-        return canonical, canonical_raw_arguments(canonical, raw), str(_value(event, "intent", ""))
+        return str(tool_name), dict(raw), str(_value(event, "intent", ""))
 
 
 def _claude_memory_roots(workspace: Path) -> list[Path]:
@@ -321,27 +319,6 @@ def _claude_memory_roots(workspace: Path) -> list[Path]:
         Path.home() / ".claude" / "projects" / project_slug / "memory",
         Path.home() / ".claude" / "projects" / workspace.name / "memory",
     ]
-
-
-def _claude_tool_name(tool_name: str, raw: dict[str, Any]) -> str:
-    lower = tool_name.lower()
-    if lower == "bash":
-        return "exec"
-    if lower == "read":
-        return "file.read"
-    if lower in {"write", "edit", "multiedit"}:
-        return "file.write"
-    if lower in {"delete", "remove"}:
-        return "file.delete"
-    if lower == "websearch":
-        return "web.search"
-    if lower in {"send_message", "message_send", "message.send", "notify", "slack"}:
-        return "message.send"
-    if lower in {"send_email", "email_send", "email.send"}:
-        return "email.send"
-    if raw.get("cmd") or raw.get("command"):
-        return "exec"
-    return tool_name
 
 
 def _value(event: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:

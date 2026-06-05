@@ -151,6 +151,8 @@ An initial contract object should look like this:
 {
   "id": "MAC-001",
   "text": "This week, do not push any code changes to Git before asking me.",
+  "effect": "deny",
+  "authority": "user_explicit",
   "kind": "prohibition",
   "modality": "MUST_NOT",
   "strength": "hard",
@@ -164,7 +166,7 @@ An initial contract object should look like this:
   "scope": {
     "level": "project",
     "workspace": "/workspace/project",
-    "repo": "current",
+    "repo": "*",
     "path_globs": [],
     "task": null,
     "agent_family": ["codex", "cc"]
@@ -175,17 +177,17 @@ An initial contract object should look like this:
     "until_revoked": false,
     "trigger_event": null
   },
-  "action_constraints": {
-    "host_actions": ["exec"],
-    "canonical_tags": ["external_write", "publish_code"]
+  "semantics": {
+    "actions": ["git.push"],
+    "tags": ["external_write", "publish_code"]
   },
-  "compiled_predicates": {
-    "version": "PV-001",
-    "host_action_patterns": [
-      {"action": "exec", "program": "git", "subcommand": "push"}
-    ],
-    "canonical_tags": ["external_write", "publish_code"]
-  },
+  "tool_patterns": [
+    {
+      "tool": "Bash",
+      "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}
+    }
+  ],
+  "targets": [{"kind": "git_remote", "value": "*"}],
   "override": {
     "allowed": true,
     "requires": "explicit_user_confirmation"
@@ -294,7 +296,9 @@ The extractor should identify:
 - kind and modality;
 - scope;
 - lifecycle;
-- affected host actions, capability patterns, and canonical effect tags;
+- semantic actions/tags;
+- native `tool_patterns` and `targets` as operational seeds when the rule is
+  hookable;
 - source span;
 - authority/source type;
 - confidence;
@@ -306,13 +310,15 @@ at action time:
 
 ```json
 {
-  "compiled_predicates": {
+  "rule_pattern_version": {
     "version": "PV-001",
-    "host_action_patterns": [
-      {"action": "exec", "program": "git", "subcommand": "push"}
+    "tool_patterns": [
+      {
+        "tool": "Bash",
+        "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}
+      }
     ],
-    "target_patterns": [{"kind": "git_remote", "value": "*"}],
-    "canonical_tags": ["external_write", "publish_code"],
+    "targets": [{"kind": "git_remote", "value": "*"}],
     "scope_predicate": {"level": "project"},
     "lifecycle_predicate": {"type": "bounded_time"}
   }
@@ -320,12 +326,15 @@ at action time:
 ```
 
 The compiler should receive the adapter's current available-action registry, so
-it does not depend on a fixed global action-class enum. A coding adapter might
-advertise `exec`, `file.read`, `file.write`, and `web.search`; a general-work
-adapter might additionally advertise `email.send`, `calendar.create`,
-`document.edit`, or `task.update`. MAC can still maintain a small cross-agent
-tag vocabulary such as `external_write`, `destructive`, `memory_write`,
-`publish_code`, and `notify_human`, but host action names come from the adapter.
+it does not depend on a fixed global action-class enum. Extraction may provide
+`tool_patterns` and `targets` as native operational seeds, but the compiler owns
+adapter grounding, validation, fallback materialization, and versioning. A
+coding adapter might advertise semantic actions such as `exec`, `file.read`,
+`file.write`, and `web.search`; a general-work adapter might additionally
+advertise `email.send`, `calendar.create`, `document.edit`, or `task.update`.
+MAC can still maintain a small cross-agent tag vocabulary such as
+`external_write`, `destructive`, `memory_write`, `publish_code`, and
+`notify_human`, but native tool names in `tool_patterns` come from the adapter.
 
 MAC should support periodic extraction by default. Candidate schedules:
 
@@ -378,18 +387,18 @@ The cleanest design is hybrid: every contract has a text record and structured
 metadata; contracts that are machine-checkable additionally compile to policy
 checks.
 
-### 5.3 Adaptive Predicate Refinement
+### 5.3 Adaptive Pattern Refinement
 
-Compiled predicates will sometimes be too broad, too narrow, or under-specified.
+Rule pattern versions will sometimes be too broad, too narrow, or under-specified.
 MAC should treat repeated ambiguous action-time matches as feedback for improving
-the compiled predicates.
+the operational patterns.
 
 The action gate should record a match outcome for each evaluated contract:
 
 - `matched`: the predicate clearly applies;
 - `not_matched`: the predicate clearly does not apply;
 - `ambiguous`: the deterministic matcher cannot decide from the current
-  signature and compiled predicates.
+  signature and active rule pattern version.
 
 For each contract version, MAC should maintain a rolling ambiguity window. A
 reasonable default policy is:
@@ -404,17 +413,17 @@ This refinement is asynchronous. It should not block the current action gate.
 The background job can call an LLM with:
 
 - the original contract text and source span;
-- the current compiled predicates;
+- the current rule pattern version;
 - the adapter's available-action registry;
 - recent ambiguous action signatures;
 - receipts and user confirmations when available.
 
-The output is a new compiled-predicate version, not a silent rewrite of the
-original rule. The source contract remains stable; only its executable predicate
-projection changes. The refinement job should write a version edge such as:
+The output is a new rule pattern version, not a silent rewrite of the original
+rule. The source contract remains stable; only its executable pattern projection
+changes. The refinement job should write a version edge such as:
 
 ```text
-predicate_version PV-004 refines PV-003 for MAC-014
+rule_pattern_version PV-004 refines PV-003 for MAC-014
 ```
 
 While refinement is pending, ambiguous high-risk actions should return

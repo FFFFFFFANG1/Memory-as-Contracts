@@ -91,6 +91,8 @@ Example:
 {
   "id": "MAC-001",
   "text": "This week, do not push any code changes to Git before asking me.",
+  "effect": "deny",
+  "authority": "user_explicit",
   "kind": "prohibition",
   "modality": "MUST_NOT",
   "strength": "hard",
@@ -104,17 +106,19 @@ Example:
     "expires_at": "2026-05-30T23:59:59+08:00",
     "until_revoked": false
   },
-  "action_constraints": {
-    "host_actions": ["exec"],
-    "canonical_tags": ["external_write", "publish_code"]
+  "semantics": {
+    "actions": ["git.push"],
+    "tags": ["external_write", "publish_code"]
   },
-  "compiled_predicates": {
-    "version": "PV-001",
-    "host_action_patterns": [
-      {"action": "exec", "program": "git", "subcommand": "push"}
-    ],
-    "canonical_tags": ["external_write", "publish_code"]
-  },
+  "tool_patterns": [
+    {
+      "tool": "Bash",
+      "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}
+    }
+  ],
+  "targets": [
+    {"kind": "git_remote", "value": "*"}
+  ],
   "override": {
     "allowed": true,
     "requires": "explicit_user_confirmation"
@@ -122,6 +126,11 @@ Example:
   "status": "active"
 }
 ```
+
+`tool_patterns` and `targets` in the rule are operational seeds. The
+deterministic compiler/materializer validates those seeds against the adapter's
+available action registry and stores a separate `RulePatternVersion` for
+action-time matching.
 
 Initial contract kinds:
 
@@ -251,10 +260,10 @@ Example adapter action registries:
 MAC can still use cross-agent canonical tags such as `external_write`,
 `destructive`, `memory_write`, `publish_code`, and `notify_human`.
 
-## Predicate Refinement
+## Pattern Refinement
 
 MAC should treat repeated ambiguous action-time matches as a signal that a rule's
-compiled predicates need repair.
+active rule pattern version needs repair.
 
 Default policy:
 
@@ -264,12 +273,12 @@ and at least 60% of those evaluations are ambiguous
 then enqueue async predicate refinement
 ```
 
-The async job can call an LLM with the original rule, current predicates, adapter
-`available_actions`, recent ambiguous signatures, receipts, and user
-confirmations. It writes a new predicate version, not a silent rewrite of the
-source rule. Current gates do not wait for the job; high-risk ambiguous actions
-should return `confirm` or `defer`, while low-risk ambiguous actions can be
-allowed with a receipt according to adapter policy.
+The async job can call an LLM with the immutable rule, current rule pattern
+version, adapter `available_actions`, recent ambiguous signatures, receipts, and
+user confirmations. It writes a new rule pattern version, not a silent rewrite
+of the source rule. Current gates do not wait for the job; high-risk ambiguous
+actions should return `confirm` or `defer`, while low-risk ambiguous actions can
+be allowed with a receipt according to adapter policy.
 
 ## Storage Backends
 
@@ -346,12 +355,12 @@ The current codebase is a MAC kernel implementation:
 - `memory_as_contracts` Python package;
 - `mac` CLI with version and environment diagnostics;
 - MAC-native environment variables: `MAC_LLM_MODEL` and `MAC_DB_PATH`;
-- typed Pydantic models for contracts, sources, scope, lifecycle, action
-  constraints, compiled predicate versions, scoped edges, available actions,
-  action signatures, gate decisions, receipts, and ambiguity events;
-- validation that `fact` contracts cannot bind action constraints or compiled
-  predicates;
-- SQLite store with schema versioning, FTS, contracts, edges, predicates,
+- typed Pydantic models for rules/contracts, sources, scope, lifecycle,
+  semantics, native tool patterns, rule pattern versions, scoped edges,
+  available actions, action signatures, gate decisions, receipts, and ambiguity
+  events;
+- validation that `fact` contracts cannot bind hook enforcement patterns;
+- SQLite store with schema versioning, FTS, contracts, edges, pattern versions,
   receipts, source snapshots, ambiguity events, and refinement jobs;
 - LLM-backed candidate extraction with an explicit system prompt defining what
   counts as a MAC rule and what must not be extracted;
@@ -429,7 +438,7 @@ Status: in progress from a clean MAC scaffold.
 - Extend the schema with explicit `scope.level`, `agent_family`, and
   `lifecycle`.
 - Extend conflict/supersession edges with their own scope and lifecycle.
-- Add compiled predicate versions for each contract.
+- Add rule pattern versions for each contract.
 - Add async predicate refinement when recent action-time matches are at least
   60% ambiguous over a 10-evaluation window.
 - Separate online user-turn extraction from cold-start memory import.

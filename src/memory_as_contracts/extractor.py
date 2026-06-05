@@ -12,15 +12,18 @@ from openai import OpenAI
 
 from memory_as_contracts.config import MacConfig, load_config
 from memory_as_contracts.models import (
-    ActionConstraints,
-    CompiledPredicateVersion,
+    ArgPattern,
     Contract,
     ContractKind,
     ContractSource,
-    HostActionPattern,
+    ContractStatus,
     Modality,
+    RuleEffect,
+    RuleSemantics,
     SourceKind,
     Strength,
+    TargetPattern,
+    ToolPattern,
 )
 from memory_as_contracts.normalizers import (
     LifecycleNormalizer,
@@ -177,6 +180,9 @@ class HeuristicContractExtractor:
                 fingerprint=fingerprint,
                 created_at=context.normalization.current_time(),
             )
+            scope = self.scope_normalizer.normalize(sentence, context.normalization)
+            semantics = _infer_semantics(sentence)
+            tool_patterns = _infer_tool_patterns(sentence, scope.path_globs)
             contracts.append(
                 Contract(
                     text=sentence,
@@ -184,9 +190,12 @@ class HeuristicContractExtractor:
                     modality=modality,
                     strength=strength,
                     source=source,
-                    scope=self.scope_normalizer.normalize(sentence, context.normalization),
+                    scope=scope,
                     lifecycle=self.lifecycle_normalizer.normalize(sentence, context.normalization),
-                    action_constraints=_infer_action_constraints(sentence),
+                    semantics=semantics,
+                    tool_patterns=tool_patterns,
+                    targets=_targets_from_scope(scope.path_globs),
+                    status=_status_for_patterns(kind, tool_patterns),
                 )
             )
         return contracts
@@ -356,19 +365,44 @@ class CandidateJsonContractExtractor:
                 continue
             if source_kind == SourceKind.USER_TURN and _is_single_turn_instruction(contract_text):
                 continue
-            kind = _enum_value(ContractKind, item.get("kind"), ContractKind.PREFERENCE)
+            raw_effect = item.get("effect")
+            default_kind = _kind_from_effect(_enum_value(RuleEffect, raw_effect, RuleEffect.PREFER))
+            kind = _enum_value(
+                ContractKind,
+                item.get("kind"),
+                default_kind,
+            )
+            effect = _enum_value(RuleEffect, raw_effect, _effect_from_kind(kind))
             if kind == ContractKind.EXCEPTION and _is_meta_exception(contract_text):
                 continue
             modality = _enum_value(Modality, item.get("modality"), _default_modality(kind))
             strength = _enum_value(Strength, item.get("strength"), Strength.SOFT)
             constraints = item.get("action_constraints") or {}
-            inferred_constraints = _infer_action_constraints(contract_text)
+            inferred_semantics = _infer_semantics(contract_text)
             host_actions = _string_list(constraints.get("host_actions") or item.get("host_actions"))
             canonical_tags = _string_list(
                 constraints.get("canonical_tags") or item.get("canonical_tags")
             )
-            host_actions = sorted({*host_actions, *inferred_constraints.host_actions})
-            canonical_tags = sorted({*canonical_tags, *inferred_constraints.canonical_tags})
+            host_actions = sorted({*host_actions, *inferred_semantics.actions})
+            canonical_tags = sorted({*canonical_tags, *inferred_semantics.tags})
+            semantics_payload = item.get("semantics") or {}
+            semantic_actions = sorted(
+                {
+                    *_string_list(semantics_payload.get("actions") if isinstance(semantics_payload, dict) else None),
+                    *host_actions,
+                }
+            )
+            semantic_tags = sorted(
+                {
+                    *_string_list(semantics_payload.get("tags") if isinstance(semantics_payload, dict) else None),
+                    *canonical_tags,
+                }
+            )
+            scope = self.scope_normalizer.normalize(contract_text, context.normalization)
+            tool_patterns = _parse_tool_patterns(item.get("tool_patterns"))
+            if not tool_patterns:
+                tool_patterns = _infer_tool_patterns(contract_text, scope.path_globs)
+            targets = _parse_targets(item.get("targets")) or _targets_from_scope(scope.path_globs)
             source = ContractSource(
                 kind=source_kind,
                 conversation_id=context.conversation_id,
@@ -381,18 +415,19 @@ class CandidateJsonContractExtractor:
             contracts.append(
                 Contract(
                     text=contract_text,
+                    effect=effect,
                     kind=kind,
                     modality=modality,
                     strength=strength,
                     source=source,
-                    scope=self.scope_normalizer.normalize(contract_text, context.normalization),
+                    scope=scope,
                     lifecycle=self.lifecycle_normalizer.normalize(
                         contract_text, context.normalization
                     ),
-                    action_constraints=ActionConstraints(
-                        host_actions=host_actions,
-                        canonical_tags=canonical_tags,
-                    ),
+                    semantics=RuleSemantics(actions=semantic_actions, tags=semantic_tags),
+                    tool_patterns=tool_patterns,
+                    targets=targets,
+                    status=_status_for_patterns(kind, tool_patterns),
                 )
             )
         return contracts
@@ -465,7 +500,7 @@ def _classify_contract(text: str) -> tuple[ContractKind, Modality, Strength]:
     return ContractKind.PREFERENCE, Modality.SHOULD, Strength.SOFT
 
 
-def _infer_action_constraints(text: str) -> ActionConstraints:
+def _infer_semantics(text: str) -> RuleSemantics:
     lower = text.lower()
     host_actions: set[str] = set()
     tags: set[str] = set()
@@ -493,7 +528,153 @@ def _infer_action_constraints(text: str) -> ActionConstraints:
     if "memory" in lower:
         host_actions.add("memory.write")
         tags.add("memory_write")
-    return ActionConstraints(host_actions=sorted(host_actions), canonical_tags=sorted(tags))
+    if any(
+        token in lower
+        for token in ("report", "reporting", "summary", "summaries", "explain", "answer")
+    ):
+        host_actions.add("agent.response")
+        tags.update({"prompt_intake", "response_style"})
+    return RuleSemantics(actions=sorted(host_actions), tags=sorted(tags))
+
+
+def _status_for_patterns(kind: ContractKind, tool_patterns: list[ToolPattern]) -> ContractStatus:
+    if kind == ContractKind.PROHIBITION and not tool_patterns:
+        return ContractStatus.CANDIDATE
+    return ContractStatus.ACTIVE
+
+
+def _targets_from_scope(path_globs: list[str]) -> list[TargetPattern]:
+    return [TargetPattern(kind="path_glob", value=value) for value in path_globs]
+
+
+def _parse_targets(value) -> list[TargetPattern]:
+    if not isinstance(value, list):
+        return []
+    targets: list[TargetPattern] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            targets.append(TargetPattern.model_validate(item))
+        except ValidationError:
+            continue
+    return targets
+
+
+def _parse_tool_patterns(value) -> list[ToolPattern]:
+    if not isinstance(value, list):
+        return []
+    patterns: list[ToolPattern] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            patterns.append(ToolPattern.model_validate(item))
+        except ValidationError:
+            continue
+    return patterns
+
+
+def _infer_tool_patterns(text: str, path_globs: list[str]) -> list[ToolPattern]:
+    semantics = _infer_semantics(text)
+    patterns: list[ToolPattern] = []
+    actions = set(semantics.actions)
+    if "git.push" in actions:
+        patterns.extend(_command_tool_patterns(r"^git\s+push(\s|$)"))
+    if "git.commit" in actions:
+        patterns.extend(_command_tool_patterns(r"^git\s+commit(\s|$)"))
+    if "dependency.install" in actions:
+        patterns.extend(_command_tool_patterns(r"^(?:npm|pnpm|yarn|uv|pip|pipx)\s+(?:install|add|sync)(\s|$)"))
+    if {"file.write", "file.delete"}.intersection(actions):
+        patterns.extend(_file_tool_patterns(path_globs))
+    if "web.search" in actions:
+        patterns.extend(
+            [
+                ToolPattern(tool="WebSearch"),
+                ToolPattern(tool="web_search"),
+                ToolPattern(tool="web.search"),
+                ToolPattern(tool="search"),
+            ]
+        )
+    if "message.send" in actions:
+        patterns.extend(
+            [
+                ToolPattern(tool="message.send"),
+                ToolPattern(tool="send_message"),
+                ToolPattern(tool="message"),
+                ToolPattern(tool="sessions_send"),
+            ]
+        )
+    if "email.send" in actions:
+        patterns.extend([ToolPattern(tool="email.send"), ToolPattern(tool="send_email")])
+    if "memory.write" in actions:
+        patterns.extend([ToolPattern(tool="memory.write"), ToolPattern(tool="memory_record")])
+    if "agent.response" in actions:
+        patterns.append(ToolPattern(tool="agent.response"))
+    return _dedupe_tool_patterns(patterns)
+
+
+def _command_tool_patterns(regex: str) -> list[ToolPattern]:
+    return [
+        ToolPattern(tool="Bash", args={"command": ArgPattern(regex=regex)}),
+        ToolPattern(tool="exec", args={"command": ArgPattern(regex=regex)}),
+        ToolPattern(tool="exec", args={"cmd": ArgPattern(regex=regex)}),
+        ToolPattern(tool="exec_command", args={"cmd": ArgPattern(regex=regex)}),
+        ToolPattern(tool="shell", args={"command": ArgPattern(regex=regex)}),
+    ]
+
+
+def _file_tool_patterns(path_globs: list[str]) -> list[ToolPattern]:
+    if not path_globs:
+        return [
+            ToolPattern(tool="Write"),
+            ToolPattern(tool="Edit"),
+            ToolPattern(tool="MultiEdit"),
+            ToolPattern(tool="apply_patch"),
+            ToolPattern(tool="write"),
+            ToolPattern(tool="edit"),
+            ToolPattern(tool="file.write"),
+        ]
+    patterns: list[ToolPattern] = []
+    for glob in path_globs:
+        patterns.extend(
+            [
+                ToolPattern(tool="Write", args={"file_path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="Edit", args={"file_path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="MultiEdit", args={"file_path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="write", args={"path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="edit", args={"path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="file.write", args={"path": ArgPattern(path_glob=glob)}),
+                ToolPattern(tool="apply_patch", args={"patch": ArgPattern(mentions_path_glob=glob)}),
+            ]
+        )
+        shell_regex = _shell_path_write_regex(glob)
+        if shell_regex:
+            patterns.append(ToolPattern(tool="Bash", args={"command": ArgPattern(regex=shell_regex)}))
+            patterns.append(ToolPattern(tool="exec", args={"command": ArgPattern(regex=shell_regex)}))
+            patterns.append(ToolPattern(tool="exec", args={"cmd": ArgPattern(regex=shell_regex)}))
+    return patterns
+
+
+def _shell_path_write_regex(path_glob: str) -> str | None:
+    prefix = path_glob.split("*", 1)[0].rstrip("/")
+    if not prefix:
+        return None
+    return (
+        r"(^|\s)(sed|python|node|rm|mv|cp|touch|cat\s+>|tee|perl)"
+        rf".*{re.escape(prefix)}/?"
+    )
+
+
+def _dedupe_tool_patterns(patterns: list[ToolPattern]) -> list[ToolPattern]:
+    seen: set[str] = set()
+    result: list[ToolPattern] = []
+    for pattern in patterns:
+        key = pattern.model_dump_json()
+        if key not in seen:
+            seen.add(key)
+            result.append(pattern)
+    return result
 
 
 def _user_turn_candidate_prompt(text: str) -> str:
@@ -529,27 +710,26 @@ Extract candidate contracts that agent must obey in later actions from the sourc
 Return exactly one JSON object with a "contracts" array. Each contract object must use:
 - text: concise behavioral contract text copied or tightly paraphrased from the source
 - source_span: exact source span when possible
-- kind: one of prohibition, requirement, procedure, preference, exception, fact
-- modality: one of MUST, MUST_NOT, SHOULD, MAY
-- strength: one of hard, soft, suggestive
-- action_constraints.host_actions: adapter-native actions such as exec, file.write, file.delete, git.commit, git.push, dependency.install, email.send, message.send, memory.write
-- action_constraints.canonical_tags: tags such as external_write, publish_code, file_write, source_modification, workspace_write, dependency_change, notify_human, memory_write
-- predicate_hints.host_action_patterns: optional deterministic action-time hints.
-  Use exact string match for tool_name. If matching a tool parameter is required,
-  generate parameter_regex for that argument instead of prose.
+- effect: one of deny, allow, require, prefer
+- semantics.actions: compact semantic action labels for retrieval, dedup, and relation analysis
+- semantics.tags: compact semantic tags for retrieval, dedup, and relation analysis
+- tool_patterns: required non-empty deterministic operational patterns using native tool names and raw argument names from the provided tool capsules. Each item is {{"tool":"NativeToolName","args":{{"arg_name":{{"regex":"...", "path_glob":"...", "mentions_path_glob":"..."}}}}}}.
+- targets: first-class target resources such as {{"kind":"path_glob","value":"vendor/**"}}
 
 Rules:
 - Source kind is {source_kind.value}. {source_instruction}
 - Add durable user-turn contracts only when the text is repeated across turns/sources or clearly scopes beyond the current turn, such as task, session, project, repo, file/path, component/module, organization, or global scope.
-- Facts may support reasoning, but must not bind host_actions or canonical_tags.
-- Temporary/narrow allowance that overrides a broader rule must be kind "exception" and modality "MAY", but only when the source names a concrete allowed action and concrete scope. Do not extract meta exception language such as "unless a narrower exception says so" as its own exception.
+- Semantics is only the behavioral summary used for retrieval and relation checks. It does not replace tool_patterns.
+- For non-gated preferences or procedures about planning, explanations, reports, summaries, or final answers, use the always-available prompt-intake surface {{"tool":"agent.response"}}. Do not use agent.response for deny/allow hook enforcement.
+- Every returned contract must include at least one valid tool_patterns entry. If a deny/allow/require rule cannot be grounded to a native tool pattern from the available tool capsules, omit that item from this extraction response.
+- Temporary/narrow allowance that overrides a broader rule must use effect "allow", but only when the source names a concrete allowed action and concrete scope. Do not extract meta exception language such as "unless a narrower exception says so" as its own exception.
 - Non-obvious workflow preferences still count if they constrain future behavior.
 - Merge contradictory rules into a single contract, if all fields are the same.
-- For action predicates, tool_name is exact match. Parameter constraints use regex over the raw tool parameter string. 
-    Example: for an exec command that pushes to git, use tool_name "exec" and parameter_regex.cmd "^git\\s+push(\\s|$)".
+- For hook matching, tool is exact native tool name. Parameter constraints match raw tool argument strings.
+    Example: for Claude Code Bash git push, use {{"tool":"Bash","args":{{"command":{{"regex":"^git\\\\s+push(\\\\s|$)"}}}}}}.
 
 Return JSON shape:
-{{"contracts": [{{"text": "Do not run git push until I approve it.", "source_span": "do not run git push until I approve it", "kind": "prohibition", "modality": "MUST_NOT", "strength": "hard", "action_constraints": {{"host_actions": ["git.push"], "canonical_tags": ["publish_code"]}}, "predicate_hints": {{"host_action_patterns": [{{"host_action": "git.push", "tool_name": "exec", "parameter_regex": {{"cmd": "^git\\\\s+push(\\\\s|$)"}}}}]}}}}]}}
+{{"contracts": [{{"text": "Do not run git push until I approve it.", "source_span": "do not run git push until I approve it", "effect": "deny", "semantics": {{"actions": ["git.push"], "tags": ["publish_code", "external_write"]}}, "tool_patterns": [{{"tool": "Bash", "args": {{"command": {{"regex": "^git\\\\s+push(\\\\s|$)"}}}}}}], "targets": []}}]}}
 
 Source text:
 {text}
@@ -635,6 +815,26 @@ def _default_modality(kind: ContractKind) -> Modality:
     return Modality.SHOULD
 
 
+def _kind_from_effect(effect: RuleEffect) -> ContractKind:
+    if effect == RuleEffect.DENY:
+        return ContractKind.PROHIBITION
+    if effect == RuleEffect.ALLOW:
+        return ContractKind.EXCEPTION
+    if effect == RuleEffect.REQUIRE:
+        return ContractKind.REQUIREMENT
+    return ContractKind.PREFERENCE
+
+
+def _effect_from_kind(kind: ContractKind) -> RuleEffect:
+    if kind == ContractKind.PROHIBITION:
+        return RuleEffect.DENY
+    if kind == ContractKind.EXCEPTION:
+        return RuleEffect.ALLOW
+    if kind in {ContractKind.REQUIREMENT, ContractKind.PROCEDURE}:
+        return RuleEffect.REQUIRE
+    return RuleEffect.PREFER
+
+
 def _string_list(value) -> list[str]:
     if value is None:
         return []
@@ -643,74 +843,6 @@ def _string_list(value) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value if item]
     return []
-
-
-def _compiled_predicates_from_hints(
-    *,
-    item: dict,
-    host_actions: list[str],
-    canonical_tags: list[str],
-) -> CompiledPredicateVersion | None:
-    hints = item.get("predicate_hints") or {}
-    if not isinstance(hints, dict):
-        return None
-    patterns = hints.get("host_action_patterns") or []
-    if not isinstance(patterns, list):
-        return None
-    host_patterns: list[HostActionPattern] = []
-    for pattern in patterns:
-        if not isinstance(pattern, dict):
-            continue
-        tool_name = _optional_string(pattern.get("tool_name"))
-        action = _optional_string(pattern.get("host_action") or pattern.get("action"))
-        if action is None:
-            action = _preferred_host_action(host_actions, tool_name)
-        parameter_regex = _string_dict(pattern.get("parameter_regex"))
-        host_patterns.append(
-            HostActionPattern(
-                action=action,
-                tool_name=tool_name,
-                program=_optional_string(pattern.get("program")),
-                subcommand=_optional_string(pattern.get("subcommand")),
-                parameter_regex=parameter_regex,
-            )
-        )
-    if not host_patterns:
-        return None
-    return CompiledPredicateVersion(
-        host_action_patterns=host_patterns,
-        canonical_tags=canonical_tags,
-    )
-
-
-def _preferred_host_action(host_actions: list[str], tool_name: str | None) -> str:
-    if not host_actions:
-        return "*"
-    if tool_name == "exec":
-        for action in host_actions:
-            if action != "exec":
-                return action
-    for action in host_actions:
-        if action == tool_name:
-            return action
-    return host_actions[0]
-
-
-def _optional_string(value) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
-
-
-def _string_dict(value) -> dict[str, str]:
-    if not isinstance(value, dict):
-        return {}
-    return {
-        str(key): str(item)
-        for key, item in value.items()
-        if key is not None and item is not None and str(item)
-    }
 
 
 def _is_meta_exception(text: str) -> bool:

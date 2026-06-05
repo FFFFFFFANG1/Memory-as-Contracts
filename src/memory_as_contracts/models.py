@@ -5,7 +5,12 @@ from enum import StrEnum
 from typing import Any, Self
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from memory_as_contracts.schema_compat import (
+    normalize_rule_payload as normalize_rule_payload_compat,
+    tool_patterns_from_host_patterns,
+)
 
 
 def utc_now() -> datetime:
@@ -17,7 +22,7 @@ def prefixed_id(prefix: str) -> str:
 
 
 class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
 class ContractKind(StrEnum):
@@ -140,6 +145,33 @@ class OverrideRequirement(StrEnum):
     EXPLICIT_USER_CONFIRMATION = "explicit_user_confirmation"
 
 
+class RuleEffect(StrEnum):
+    DENY = "deny"
+    ALLOW = "allow"
+    REQUIRE = "require"
+    PREFER = "prefer"
+
+
+class RuleAuthority(StrEnum):
+    USER_EXPLICIT = "user_explicit"
+    PROJECT_INSTRUCTION = "project_instruction"
+    MEMORY_IMPORT = "memory_import"
+    USER_PROFILE = "user_profile"
+    TOOL_OBSERVATION = "tool_observation"
+    AGENT_INFERRED = "agent_inferred"
+
+
+class RuleOverrideType(StrEnum):
+    NONE = "none"
+    EXPLICIT_USER_CURRENT_TURN = "explicit_user_current_turn"
+    EXPLICIT_USER_CONFIRMATION = "explicit_user_confirmation"
+
+
+class RuleSemantics(StrictModel):
+    actions: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+
+
 class ContractSource(StrictModel):
     kind: SourceKind
     span: str
@@ -168,6 +200,28 @@ class Scope(StrictModel):
     agent_family: list[str] = Field(default_factory=list)
     organization: str | None = None
     user_id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_compact_scope(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        paths = normalized.pop("paths", None)
+        if paths is not None and "path_globs" not in normalized:
+            normalized["path_globs"] = paths
+        if "level" not in normalized:
+            if normalized.get("path_globs"):
+                normalized["level"] = ScopeLevel.PATH.value
+            elif normalized.get("task"):
+                normalized["level"] = ScopeLevel.TASK.value
+            elif normalized.get("repo"):
+                normalized["level"] = ScopeLevel.REPO.value
+            elif normalized.get("workspace"):
+                normalized["level"] = ScopeLevel.PROJECT.value
+            else:
+                normalized["level"] = ScopeLevel.GLOBAL.value
+        return normalized
 
     @model_validator(mode="after")
     def validate_scope_boundary(self) -> Self:
@@ -248,18 +302,78 @@ class TargetPattern(StrictModel):
     value: str
 
 
-class CompiledPredicateVersion(StrictModel):
+class ArgPattern(StrictModel):
+    equals: Any | None = None
+    regex: str | None = None
+    contains: str | None = None
+    path_glob: str | None = None
+    mentions_path_glob: str | None = None
+
+    def is_empty(self) -> bool:
+        return (
+            self.equals is None
+            and self.regex is None
+            and self.contains is None
+            and self.path_glob is None
+            and self.mentions_path_glob is None
+        )
+
+
+class ToolPattern(StrictModel):
+    tool: str
+    args: dict[str, ArgPattern] = Field(default_factory=dict)
+
+
+class RuleValidity(StrictModel):
+    start: datetime = Field(default_factory=utc_now, alias="from")
+    until: datetime | None = None
+
+    @field_validator("start", "until")
+    @classmethod
+    def validity_times_must_have_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return value
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("validity timestamps must be timezone-aware")
+        return value
+
+    def is_expired(self, now: datetime | None = None) -> bool:
+        if self.until is None:
+            return False
+        check_time = now or utc_now()
+        return self.until <= check_time
+
+
+class RulePatternVersion(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("PV"))
     contract_id: str | None = None
     version: str = "PV-001"
     host_action_patterns: list[HostActionPattern] = Field(default_factory=list)
-    target_patterns: list[TargetPattern] = Field(default_factory=list)
+    target_patterns: list[TargetPattern] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("target_patterns", "targets"),
+    )
+    tool_patterns: list[ToolPattern] = Field(default_factory=list)
     canonical_tags: list[str] = Field(default_factory=list)
     scope_predicate: dict[str, Any] = Field(default_factory=dict)
     lifecycle_predicate: dict[str, Any] = Field(default_factory=dict)
     refines: str | None = None
     status: PredicateStatus = PredicateStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_pattern_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        if "targets" in normalized and "target_patterns" not in normalized:
+            normalized["target_patterns"] = normalized.pop("targets")
+        if not normalized.get("tool_patterns") and normalized.get("host_action_patterns"):
+            normalized["tool_patterns"] = tool_patterns_from_host_patterns(
+                normalized.get("host_action_patterns", [])
+            )
+        return normalized
 
     @field_validator("created_at")
     @classmethod
@@ -269,30 +383,50 @@ class CompiledPredicateVersion(StrictModel):
         return value
 
     def has_binding_predicates(self) -> bool:
-        return bool(self.host_action_patterns or self.target_patterns or self.canonical_tags)
+        return bool(self.tool_patterns or self.target_patterns)
+
+    @property
+    def targets(self) -> list[TargetPattern]:
+        return self.target_patterns
+
+
+CompiledPredicateVersion = RulePatternVersion
 
 
 class OverridePolicy(StrictModel):
     allowed: bool = True
     requires: OverrideRequirement = OverrideRequirement.EXPLICIT_USER_CONFIRMATION
+    type: RuleOverrideType = RuleOverrideType.EXPLICIT_USER_CURRENT_TURN
 
 
 class Contract(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("MAC"))
     text: str
-    kind: ContractKind
-    modality: Modality
+    effect: RuleEffect = RuleEffect.PREFER
+    status: ContractStatus = ContractStatus.ACTIVE
+    authority: RuleAuthority = RuleAuthority.AGENT_INFERRED
+    scope: Scope
+    semantics: RuleSemantics = Field(default_factory=RuleSemantics)
+    tool_patterns: list[ToolPattern] = Field(default_factory=list)
+    targets: list[TargetPattern] = Field(default_factory=list)
+    override: OverridePolicy = Field(default_factory=OverridePolicy)
+    validity: RuleValidity = Field(default_factory=RuleValidity)
+
+    kind: ContractKind = ContractKind.PREFERENCE
+    modality: Modality = Modality.SHOULD
     strength: Strength = Strength.SOFT
     source: ContractSource
-    scope: Scope
     lifecycle: Lifecycle = Field(default_factory=Lifecycle)
     action_constraints: ActionConstraints = Field(default_factory=ActionConstraints)
     compiled_predicates: CompiledPredicateVersion | None = None
-    override: OverridePolicy = Field(default_factory=OverridePolicy)
-    status: ContractStatus = ContractStatus.ACTIVE
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     supersedes: list[str] = Field(default_factory=list)
     conflicts_with: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_rule_payload(cls, data: Any) -> Any:
+        return normalize_rule_payload_compat(data)
 
     @model_validator(mode="after")
     def validate_contract_semantics(self) -> Self:
@@ -301,14 +435,24 @@ class Contract(StrictModel):
         if self.kind == ContractKind.FACT:
             if self.modality in {Modality.MUST, Modality.MUST_NOT}:
                 raise ValueError("fact contracts cannot use MUST or MUST_NOT modality")
-            if self.action_constraints.host_actions or self.action_constraints.canonical_tags:
+            if (
+                self.action_constraints.host_actions
+                or self.action_constraints.canonical_tags
+                or self.semantics.actions
+                or self.semantics.tags
+            ):
                 raise ValueError("fact contracts cannot bind action constraints")
             if self.compiled_predicates and self.compiled_predicates.has_binding_predicates():
                 raise ValueError("fact contracts cannot bind compiled predicates")
+            if self.tool_patterns:
+                raise ValueError("fact contracts cannot bind tool patterns")
         return self
 
     def is_expired(self, now: datetime | None = None) -> bool:
-        return self.lifecycle.is_expired(now)
+        return self.validity.is_expired(now) or self.lifecycle.is_expired(now)
+
+
+Rule = Contract
 
 
 class ContractEdge(StrictModel):
@@ -423,6 +567,7 @@ class Receipt(StrictModel):
     host_action: str
     tool_name: str | None = None
     raw_arguments: dict[str, Any] = Field(default_factory=dict)
+    available_actions: list[AvailableAction] = Field(default_factory=list)
     canonical_tags: list[str] = Field(default_factory=list)
     match_outcome: MatchOutcome
     targets: list[str] = Field(default_factory=list)
@@ -444,11 +589,17 @@ class Receipt(StrictModel):
 class AmbiguityEvent(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("AMB"))
     contract_id: str
-    predicate_version_id: str
+    pattern_version_id: str = Field(
+        validation_alias=AliasChoices("pattern_version_id", "predicate_version_id")
+    )
     signature_id: str
     match_outcome: MatchOutcome = MatchOutcome.AMBIGUOUS
     evaluated_at: datetime = Field(default_factory=utc_now)
     reason: str | None = None
+
+    @property
+    def predicate_version_id(self) -> str:
+        return self.pattern_version_id
 
     @field_validator("evaluated_at")
     @classmethod
@@ -467,11 +618,17 @@ class AmbiguityEvent(StrictModel):
 class PredicateEvaluation(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("PE"))
     contract_id: str
-    predicate_version_id: str
+    pattern_version_id: str = Field(
+        validation_alias=AliasChoices("pattern_version_id", "predicate_version_id")
+    )
     signature_id: str
     match_outcome: MatchOutcome
     evaluated_at: datetime = Field(default_factory=utc_now)
     reason: str | None = None
+
+    @property
+    def predicate_version_id(self) -> str:
+        return self.pattern_version_id
 
     @field_validator("evaluated_at")
     @classmethod
@@ -502,13 +659,28 @@ class SourceSnapshot(StrictModel):
 class RefinementJob(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("RJ"))
     contract_id: str
-    predicate_version_id: str
+    pattern_version_id: str = Field(
+        validation_alias=AliasChoices("pattern_version_id", "predicate_version_id")
+    )
     status: JobStatus = JobStatus.PENDING
     recent_signature_ids: list[str] = Field(default_factory=list)
-    result_predicate_version_id: str | None = None
+    result_pattern_version_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "result_pattern_version_id", "result_predicate_version_id"
+        ),
+    )
     error: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    @property
+    def predicate_version_id(self) -> str:
+        return self.pattern_version_id
+
+    @property
+    def result_predicate_version_id(self) -> str | None:
+        return self.result_pattern_version_id
 
     @field_validator("created_at", "updated_at")
     @classmethod
