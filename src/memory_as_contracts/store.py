@@ -1,33 +1,65 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterable
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from memory_as_contracts.models import (
-    AmbiguityEvent,
-    CompiledPredicateVersion,
+    ActionLogEntryV1,
+    ActionOutcome,
+    AskRequest,
+    AskRequestStatus,
     Contract,
     ContractEdge,
     ContractStatus,
-    MatchOutcome,
-    PredicateEvaluation,
     PredicateStatus,
     Receipt,
-    RefinementJob,
     RulePatternVersion,
     SourceSnapshot,
+    ValidatorInstallationRecord,
+    ValidatorRuntimeErrorRecord,
+    ValidatorState,
+    ValidatorStateTransition,
+    ValidatorVersion,
     utc_now,
 )
 from memory_as_contracts.schema_compat import (
+    action_constraints_from_semantics,
     canonical_contract_payload,
     canonical_pattern_version_payload,
+    normalize_rule_payload,
 )
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 9
+ASK_RESPONSE_TTL = timedelta(minutes=30)
+ACTION_LOG_SQL_COLUMNS = {
+    "seq": "seq",
+    "timestamp": "timestamp",
+    "session_id": "session_id",
+    "task_id": "task_id",
+    "agent_id": "agent_id",
+    "adapter_id": "adapter_id",
+    "tool_call_id": "tool_call_id",
+    "tool_name": "tool_name",
+    "host_action": "host_action",
+    "outcome": "outcome",
+    "result_text": "result_text",
+    "reasoning_text": "reasoning_text",
+    "conversation_id": "conversation_id",
+    "turn_id": "turn_id",
+    "user_id": "user_id",
+    "organization": "organization",
+    "workspace": "workspace",
+    "repo": "repo",
+    "branch": "branch",
+    "risk": "risk",
+    "side_effect": "side_effect",
+}
 
 
 def _dump_model(model: Any) -> str:
@@ -51,6 +83,49 @@ def _load_json(value: str | None) -> Any:
     if not value:
         return None
     return json.loads(value)
+
+
+def _compile_action_log_sql_predicate(
+    column: str,
+    predicate: dict[str, Any],
+) -> tuple[str, list[Any]] | None:
+    clauses: list[str] = []
+    params: list[Any] = []
+    for operator, expected in predicate.items():
+        if operator == "eq":
+            clauses.append(f"{column} = ?")
+            params.append(expected)
+        elif operator == "ne":
+            clauses.append(f"{column} != ?")
+            params.append(expected)
+        elif operator == "in":
+            if not isinstance(expected, list) or not expected:
+                return None
+            placeholders = ", ".join("?" for _ in expected)
+            clauses.append(f"{column} IN ({placeholders})")
+            params.extend(expected)
+        elif operator == "gt":
+            clauses.append(f"{column} > ?")
+            params.append(expected)
+        elif operator == "gte":
+            clauses.append(f"{column} >= ?")
+            params.append(expected)
+        elif operator == "lt":
+            clauses.append(f"{column} < ?")
+            params.append(expected)
+        elif operator == "lte":
+            clauses.append(f"{column} <= ?")
+            params.append(expected)
+        elif operator == "exists" and bool(expected):
+            clauses.append(f"{column} IS NOT NULL")
+        elif operator == "missing" and bool(expected):
+            clauses.append(f"{column} IS NULL")
+        elif operator == "contains":
+            clauses.append(f"{column} LIKE ?")
+            params.append(f"%{expected}%")
+        else:
+            return None
+    return " AND ".join(clauses), params
 
 
 class ContractStore:
@@ -90,7 +165,6 @@ class ContractStore:
                 action_constraints_json TEXT NOT NULL,
                 semantics_json TEXT,
                 tool_patterns_json TEXT,
-                targets_json TEXT,
                 validity_json TEXT,
                 compiled_predicates_json TEXT,
                 override_json TEXT NOT NULL,
@@ -151,34 +225,108 @@ class ContractStore:
                 payload_json TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS predicate_evaluations (
-                id TEXT PRIMARY KEY,
-                contract_id TEXT NOT NULL,
-                predicate_version_id TEXT NOT NULL,
-                signature_id TEXT NOT NULL,
-                match_outcome TEXT NOT NULL,
+            CREATE TABLE IF NOT EXISTS action_log (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                adapter_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                task_id TEXT,
+                agent_id TEXT NOT NULL,
+                tool_call_id TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                host_action TEXT NOT NULL,
+                arguments_json TEXT NOT NULL,
+                result_json TEXT,
+                result_text TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                reasoning_text TEXT,
+                conversation_id TEXT,
+                turn_id TEXT,
+                user_id TEXT,
+                organization TEXT,
+                workspace TEXT,
+                repo TEXT,
+                branch TEXT,
+                targets_json TEXT NOT NULL DEFAULT '[]',
+                risk TEXT NOT NULL DEFAULT 'medium',
+                side_effect TEXT NOT NULL DEFAULT 'none',
+                timestamp TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
-                evaluated_at TEXT NOT NULL
+                UNIQUE(adapter_id, session_id, tool_call_id)
             );
 
-            CREATE TABLE IF NOT EXISTS ambiguity_events (
+            CREATE TABLE IF NOT EXISTS validator_versions (
                 id TEXT PRIMARY KEY,
                 contract_id TEXT NOT NULL,
-                predicate_version_id TEXT NOT NULL,
-                signature_id TEXT NOT NULL,
-                match_outcome TEXT NOT NULL,
+                enforcement_shape TEXT NOT NULL,
+                status TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
-                evaluated_at TEXT NOT NULL
+                created_at TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS refinement_jobs (
-                id TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS validator_states (
+                validator_version_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
                 contract_id TEXT NOT NULL,
-                predicate_version_id TEXT NOT NULL,
+                state_json TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                last_applied_seq INTEGER,
+                degraded INTEGER NOT NULL,
+                payload_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (validator_version_id, scope_key)
+            );
+
+            CREATE TABLE IF NOT EXISTS ask_requests (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                task_id TEXT,
+                adapter_id TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
                 status TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS validator_installations (
+                id TEXT PRIMARY KEY,
+                contract_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                validator_version_id TEXT,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS validator_state_transitions (
+                id TEXT PRIMARY KEY,
+                validator_version_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
+                action_log_seq INTEGER NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS validator_runtime_errors (
+                id TEXT PRIMARY KEY,
+                validator_version_id TEXT NOT NULL,
+                contract_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
+                phase TEXT NOT NULL,
+                replay_required INTEGER NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS user_turns (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                adapter_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                task_id TEXT,
+                conversation_id TEXT,
+                turn_id TEXT,
+                text TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                extracted_at TEXT
             );
             """
         )
@@ -192,8 +340,10 @@ class ContractStore:
         self.conn.commit()
 
     def _migrate_schema(self, version: int) -> None:
-        if version in {1, 2}:
+        if version in {1, 2, 3, 4, 5, 6, 7, 8}:
             self._ensure_contract_columns()
+            self._ensure_action_log_columns()
+            self._ensure_validator_state_schema()
             self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS rule_pattern_versions (
@@ -217,6 +367,14 @@ class ContractStore:
                     FROM predicate_versions
                     """
                 )
+            for table in ("predicate_evaluations", "ambiguity_events", "refinement_jobs"):
+                self.conn.execute(f"DROP TABLE IF EXISTS {table}")
+            columns = {
+                row["name"]
+                for row in self.conn.execute("PRAGMA table_info(contracts)").fetchall()
+            }
+            if "targets_json" in columns:
+                self.conn.execute("ALTER TABLE contracts DROP COLUMN targets_json")
             self.conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
             return
         raise RuntimeError(f"unsupported MAC schema version: {version}")
@@ -239,12 +397,94 @@ class ContractStore:
             "authority": "TEXT",
             "semantics_json": "TEXT",
             "tool_patterns_json": "TEXT",
-            "targets_json": "TEXT",
             "validity_json": "TEXT",
         }
         for name, column_type in additions.items():
             if name not in columns:
                 self.conn.execute(f"ALTER TABLE contracts ADD COLUMN {name} {column_type}")
+
+    def _ensure_action_log_columns(self) -> None:
+        if not self._table_exists("action_log"):
+            return
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(action_log)").fetchall()
+        }
+        additions = {
+            "conversation_id": "TEXT",
+            "turn_id": "TEXT",
+            "user_id": "TEXT",
+            "organization": "TEXT",
+            "workspace": "TEXT",
+            "repo": "TEXT",
+            "branch": "TEXT",
+            "targets_json": "TEXT NOT NULL DEFAULT '[]'",
+            "risk": "TEXT NOT NULL DEFAULT 'medium'",
+            "side_effect": "TEXT NOT NULL DEFAULT 'none'",
+        }
+        for name, column_type in additions.items():
+            if name not in columns:
+                self.conn.execute(f"ALTER TABLE action_log ADD COLUMN {name} {column_type}")
+
+    def _ensure_validator_state_schema(self) -> None:
+        if not self._table_exists("validator_states"):
+            return
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(validator_states)").fetchall()
+        }
+        if "scope_key" in columns:
+            return
+        self.conn.execute("ALTER TABLE validator_states RENAME TO validator_states_legacy")
+        self.conn.execute(
+            """
+            CREATE TABLE validator_states (
+                validator_version_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
+                contract_id TEXT NOT NULL,
+                state_json TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                last_applied_seq INTEGER,
+                degraded INTEGER NOT NULL,
+                payload_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (validator_version_id, scope_key)
+            )
+            """
+        )
+        rows = self.conn.execute(
+            "SELECT * FROM validator_states_legacy"
+        ).fetchall()
+        for row in rows:
+            payload = _load_json(row["payload_json"]) or {}
+            payload.update(
+                {
+                    "scope_key": "legacy",
+                    "revision": 0,
+                    "last_applied_seq": None,
+                    "degraded": False,
+                }
+            )
+            self.conn.execute(
+                """
+                INSERT INTO validator_states (
+                    validator_version_id, scope_key, contract_id, state_json,
+                    revision, last_applied_seq, degraded, payload_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["validator_version_id"],
+                    "legacy",
+                    row["contract_id"],
+                    row["state_json"],
+                    0,
+                    None,
+                    0,
+                    _dump_json(payload),
+                    row["updated_at"],
+                ),
+            )
+        self.conn.execute("DROP TABLE validator_states_legacy")
 
     def add_contract(self, contract: Contract) -> Contract:
         now = utc_now().isoformat()
@@ -254,10 +494,10 @@ class ContractStore:
                 INSERT OR REPLACE INTO contracts (
                     id, text, kind, modality, strength, status, confidence,
                     effect, authority, source_json, scope_json, lifecycle_json, action_constraints_json,
-                    semantics_json, tool_patterns_json, targets_json, validity_json,
+                    semantics_json, tool_patterns_json, validity_json,
                     compiled_predicates_json, override_json, supersedes_json,
                     conflicts_with_json, payload_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     contract.id,
@@ -272,14 +512,15 @@ class ContractStore:
                     _dump_model(contract.source),
                     _dump_model(contract.scope),
                     _dump_model(contract.lifecycle),
-                    _dump_model(contract.action_constraints),
+                    _dump_json(
+                        action_constraints_from_semantics(
+                            contract.semantics.model_dump(mode="json")
+                        )
+                    ),
                     _dump_model(contract.semantics),
                     _dump_json([pattern.model_dump(mode="json") for pattern in contract.tool_patterns]),
-                    _dump_json([target.model_dump(mode="json") for target in contract.targets]),
                     _dump_model(contract.validity),
-                    _dump_model(contract.compiled_predicates)
-                    if contract.compiled_predicates
-                    else None,
+                    None,
                     _dump_model(contract.override),
                     _dump_json(contract.supersedes),
                     _dump_json(contract.conflicts_with),
@@ -293,9 +534,6 @@ class ContractStore:
                 "INSERT INTO contracts_fts(contract_id, text, source_span) VALUES (?, ?, ?)",
                 (contract.id, contract.text, contract.source.span),
             )
-            if contract.compiled_predicates is not None:
-                predicate = contract.compiled_predicates.model_copy(update={"contract_id": contract.id})
-                self.add_rule_pattern_version(predicate)
         return contract
 
     def get_contract(self, contract_id: str) -> Contract | None:
@@ -414,10 +652,52 @@ class ContractStore:
             )
         return pattern_version
 
-    def add_predicate_version(
-        self, predicate: CompiledPredicateVersion
-    ) -> CompiledPredicateVersion:
-        return self.add_rule_pattern_version(predicate)
+    def install_rule_pattern_version(
+        self,
+        pattern_version: RulePatternVersion,
+    ) -> RulePatternVersion:
+        if pattern_version.contract_id is None:
+            raise ValueError("pattern version requires contract_id before installation")
+        if pattern_version.status != PredicateStatus.ACTIVE:
+            raise ValueError("installed pattern version must be active")
+        with self.conn:
+            active = self.list_rule_pattern_versions(
+                contract_id=pattern_version.contract_id,
+                status=PredicateStatus.ACTIVE,
+            )
+            for current in active:
+                superseded = current.model_copy(
+                    update={"status": PredicateStatus.SUPERSEDED}
+                )
+                self.conn.execute(
+                    """
+                    UPDATE rule_pattern_versions
+                    SET status = ?, payload_json = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        PredicateStatus.SUPERSEDED.value,
+                        _dump_pattern_version_payload(superseded),
+                        current.id,
+                    ),
+                )
+            self.conn.execute(
+                """
+                INSERT INTO rule_pattern_versions (
+                    id, contract_id, version, status, refines, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    pattern_version.id,
+                    pattern_version.contract_id,
+                    pattern_version.version,
+                    pattern_version.status.value,
+                    pattern_version.refines,
+                    _dump_pattern_version_payload(pattern_version),
+                    pattern_version.created_at.isoformat(),
+                ),
+            )
+        return pattern_version
 
     def list_rule_pattern_versions(
         self,
@@ -437,18 +717,16 @@ class ContractStore:
             f"SELECT payload_json FROM rule_pattern_versions {where} ORDER BY created_at, id",
             params,
         )
-        return [RulePatternVersion.model_validate_json(row["payload_json"]) for row in rows]
+        return [
+            RulePatternVersion.model_validate(
+                canonical_pattern_version_payload(_load_json(row["payload_json"]))
+            )
+            for row in rows
+        ]
 
     def get_active_rule_pattern_version(self, contract_id: str) -> RulePatternVersion | None:
         rows = self.list_rule_pattern_versions(contract_id, PredicateStatus.ACTIVE)
         return rows[-1] if rows else None
-
-    def list_predicate_versions(
-        self,
-        contract_id: str | None = None,
-        status: PredicateStatus | None = None,
-    ) -> list[CompiledPredicateVersion]:
-        return self.list_rule_pattern_versions(contract_id=contract_id, status=status)
 
     def add_receipt(self, receipt: Receipt) -> Receipt:
         with self.conn:
@@ -522,179 +800,733 @@ class ContractStore:
         rows = self.conn.execute("SELECT payload_json FROM source_snapshots ORDER BY observed_at")
         return [SourceSnapshot.model_validate_json(row["payload_json"]) for row in rows]
 
-    def add_pattern_evaluation(self, evaluation: PredicateEvaluation) -> PredicateEvaluation:
+    def add_action_log_entry(self, entry: ActionLogEntryV1) -> ActionLogEntryV1:
+        stored, _ = self.append_action_log_entry(entry)
+        return stored
+
+    def append_user_turn(
+        self,
+        *,
+        adapter_id: str,
+        session_id: str,
+        task_id: str | None,
+        conversation_id: str | None,
+        turn_id: str | None,
+        text: str,
+        observed_at,
+    ) -> int:
         with self.conn:
-            self.conn.execute(
+            cursor = self.conn.execute(
                 """
-                INSERT OR REPLACE INTO predicate_evaluations (
-                    id, contract_id, predicate_version_id, signature_id,
-                    match_outcome, payload_json, evaluated_at
+                INSERT INTO user_turns (
+                    adapter_id, session_id, task_id, conversation_id,
+                    turn_id, text, observed_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    evaluation.id,
-                    evaluation.contract_id,
-                    evaluation.pattern_version_id,
-                    evaluation.signature_id,
-                    evaluation.match_outcome.value,
-                    _dump_model(evaluation),
-                    evaluation.evaluated_at.isoformat(),
+                    adapter_id,
+                    session_id,
+                    task_id,
+                    conversation_id,
+                    turn_id,
+                    text,
+                    observed_at.isoformat(),
                 ),
             )
-        if evaluation.match_outcome == MatchOutcome.AMBIGUOUS:
-            self.add_ambiguity_event(
-                AmbiguityEvent(
-                    contract_id=evaluation.contract_id,
-                    pattern_version_id=evaluation.pattern_version_id,
-                    signature_id=evaluation.signature_id,
-                    reason=evaluation.reason,
-                )
-            )
-        return evaluation
+        return int(cursor.lastrowid)
 
-    def add_predicate_evaluation(
-        self, evaluation: PredicateEvaluation
-    ) -> PredicateEvaluation:
-        return self.add_pattern_evaluation(evaluation)
-
-    def recent_pattern_evaluations(
+    def pending_user_turns(
         self,
-        contract_id: str,
-        pattern_version_id: str,
         *,
-        limit: int = 10,
-    ) -> list[PredicateEvaluation]:
+        adapter_id: str,
+        session_id: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             """
-            SELECT payload_json FROM predicate_evaluations
-            WHERE contract_id = ? AND predicate_version_id = ?
-            ORDER BY evaluated_at DESC, id DESC
+            SELECT seq, task_id, conversation_id, turn_id, text, observed_at
+            FROM user_turns
+            WHERE adapter_id = ? AND session_id = ? AND extracted_at IS NULL
+            ORDER BY seq
             LIMIT ?
             """,
-            (contract_id, pattern_version_id, limit),
+            (adapter_id, session_id, limit),
         ).fetchall()
-        return [PredicateEvaluation.model_validate_json(row["payload_json"]) for row in rows]
+        return [dict(row) for row in rows]
 
-    def recent_predicate_evaluations(
+    def mark_user_turns_extracted(self, sequences: Iterable[int]) -> None:
+        seqs = list(sequences)
+        if not seqs:
+            return
+        placeholders = ", ".join("?" for _ in seqs)
+        with self.conn:
+            self.conn.execute(
+                f"""
+                UPDATE user_turns
+                SET extracted_at = ?
+                WHERE seq IN ({placeholders})
+                """,
+                (utc_now().isoformat(), *seqs),
+            )
+
+    def append_action_log_entry(
         self,
-        contract_id: str,
-        predicate_version_id: str,
+        entry: ActionLogEntryV1,
+    ) -> tuple[ActionLogEntryV1, bool]:
+        existing_row = self.conn.execute(
+            """
+            SELECT * FROM action_log
+            WHERE adapter_id = ? AND session_id = ? AND tool_call_id = ?
+            """,
+            (entry.adapter_id, entry.session_id, entry.tool_call_id),
+        ).fetchone()
+        if existing_row is not None:
+            existing = self._row_to_action_log_entry(existing_row)
+            if _action_log_identity_payload(existing) != _action_log_identity_payload(entry):
+                raise ValueError("action log idempotency key reused with different payload")
+            return existing, False
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO action_log (
+                    adapter_id, session_id, task_id, agent_id, tool_call_id,
+                    tool_name, host_action, arguments_json, result_json, result_text,
+                    outcome, reasoning_text, conversation_id, turn_id, user_id,
+                    organization, workspace, repo, branch, targets_json, risk,
+                    side_effect, timestamp, payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entry.adapter_id,
+                    entry.session_id,
+                    entry.task_id,
+                    entry.agent_id,
+                    entry.tool_call_id,
+                    entry.tool_name,
+                    entry.host_action,
+                    _dump_json(entry.arguments),
+                    _dump_json(entry.result) if entry.result is not None else None,
+                    entry.result_text,
+                    entry.outcome.value,
+                    entry.reasoning_text,
+                    entry.conversation_id,
+                    entry.turn_id,
+                    entry.user_id,
+                    entry.organization,
+                    entry.workspace,
+                    entry.repo,
+                    entry.branch,
+                    _dump_json(entry.targets),
+                    entry.risk.value,
+                    entry.side_effect.value,
+                    entry.timestamp.isoformat(),
+                    entry.model_dump_json(),
+                ),
+            )
+        row = self.conn.execute(
+            """
+            SELECT * FROM action_log
+            WHERE adapter_id = ? AND session_id = ? AND tool_call_id = ?
+            """,
+            (entry.adapter_id, entry.session_id, entry.tool_call_id),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError("failed to append action log entry")
+        return self._row_to_action_log_entry(row), True
+
+    def list_action_log_entries(self) -> list[ActionLogEntryV1]:
+        rows = self.conn.execute("SELECT * FROM action_log ORDER BY seq").fetchall()
+        return [self._row_to_action_log_entry(row) for row in rows]
+
+    def search_action_log_candidates(
+        self,
         *,
-        limit: int = 10,
-    ) -> list[PredicateEvaluation]:
-        return self.recent_pattern_evaluations(contract_id, predicate_version_id, limit=limit)
-
-    def pattern_evaluations_by_signature_ids(
-        self,
-        contract_id: str,
-        pattern_version_id: str,
-        signature_ids: Iterable[str],
-    ) -> list[PredicateEvaluation]:
-        ordered_ids = list(signature_ids)
-        if not ordered_ids:
-            return []
-        placeholders = ",".join("?" for _ in ordered_ids)
+        session_id: str,
+        task_id: str | None,
+        where: dict[str, dict[str, Any]],
+        limit: int,
+    ) -> list[ActionLogEntryV1]:
+        clauses = ["session_id = ?"]
+        params: list[Any] = [session_id]
+        if task_id is not None:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        for field, predicate in where.items():
+            column = ACTION_LOG_SQL_COLUMNS.get(field)
+            if column is None or "regex" in predicate:
+                continue
+            compiled = _compile_action_log_sql_predicate(column, predicate)
+            if compiled is None:
+                continue
+            clause, values = compiled
+            clauses.append(clause)
+            params.extend(values)
+        params.append(limit)
         rows = self.conn.execute(
             f"""
-            SELECT payload_json FROM predicate_evaluations
-            WHERE contract_id = ?
-            AND predicate_version_id = ?
-            AND signature_id IN ({placeholders})
-            """,
-            [contract_id, pattern_version_id, *ordered_ids],
-        ).fetchall()
-        by_id = {
-            evaluation.signature_id: evaluation
-            for evaluation in (
-                PredicateEvaluation.model_validate_json(row["payload_json"]) for row in rows
-            )
-        }
-        return [by_id[signature_id] for signature_id in ordered_ids if signature_id in by_id]
-
-    def predicate_evaluations_by_signature_ids(
-        self,
-        contract_id: str,
-        predicate_version_id: str,
-        signature_ids: Iterable[str],
-    ) -> list[PredicateEvaluation]:
-        return self.pattern_evaluations_by_signature_ids(
-            contract_id, predicate_version_id, signature_ids
-        )
-
-    def add_ambiguity_event(self, event: AmbiguityEvent) -> AmbiguityEvent:
-        with self.conn:
-            self.conn.execute(
-                """
-                INSERT OR REPLACE INTO ambiguity_events (
-                    id, contract_id, predicate_version_id, signature_id,
-                    match_outcome, payload_json, evaluated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    event.id,
-                    event.contract_id,
-                    event.pattern_version_id,
-                    event.signature_id,
-                    event.match_outcome.value,
-                    _dump_model(event),
-                    event.evaluated_at.isoformat(),
-                ),
-            )
-        return event
-
-    def recent_ambiguity_events(
-        self, contract_id: str, pattern_version_id: str, *, limit: int = 10
-    ) -> list[AmbiguityEvent]:
-        rows = self.conn.execute(
-            """
-            SELECT payload_json FROM ambiguity_events
-            WHERE contract_id = ? AND predicate_version_id = ?
-            ORDER BY evaluated_at DESC, id DESC
+            SELECT *
+            FROM action_log
+            WHERE {' AND '.join(clauses)}
+            ORDER BY timestamp DESC, seq DESC
             LIMIT ?
             """,
-            (contract_id, pattern_version_id, limit),
-        )
-        return [AmbiguityEvent.model_validate_json(row["payload_json"]) for row in rows]
+            params,
+        ).fetchall()
+        return [self._row_to_action_log_entry(row) for row in rows]
 
-    def add_refinement_job(self, job: RefinementJob) -> RefinementJob:
+    def add_validator_version(self, version: ValidatorVersion) -> ValidatorVersion:
+        if version.status == PredicateStatus.ACTIVE and not version.verification_hash:
+            raise ValueError("active validator versions must be installed from verified output")
         with self.conn:
             self.conn.execute(
                 """
-                INSERT OR REPLACE INTO refinement_jobs (
-                    id, contract_id, predicate_version_id, status,
-                    payload_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO validator_versions (
+                    id, contract_id, enforcement_shape, status, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    job.id,
-                    job.contract_id,
-                    job.pattern_version_id,
-                    job.status.value,
-                    _dump_model(job),
-                    job.created_at.isoformat(),
-                    job.updated_at.isoformat(),
+                    version.id,
+                    version.contract_id,
+                    version.enforcement_shape.value,
+                    version.status.value,
+                    version.model_dump_json(),
+                    version.created_at.isoformat(),
                 ),
             )
-        return job
+        return version
 
-    def list_refinement_jobs(self, status: str | None = None) -> list[RefinementJob]:
+    def install_verified_validator_version(
+        self,
+        version: ValidatorVersion,
+        *,
+        initial_state: dict[str, Any],
+        scope_key: str,
+    ) -> ValidatorVersion:
+        expected_hash = hashlib.sha256(version.snippet.encode("utf-8")).hexdigest()
+        if not version.verification_hash or version.snippet_hash != expected_hash:
+            raise ValueError("validator version is missing valid verification metadata")
+        if version.status != PredicateStatus.ACTIVE:
+            raise ValueError("installed validator version must be active")
+        with self.conn:
+            active = self.list_validator_versions(
+                contract_id=version.contract_id,
+                status=PredicateStatus.ACTIVE,
+            )
+            for current in active:
+                superseded = current.model_copy(update={"status": PredicateStatus.SUPERSEDED})
+                self.conn.execute(
+                    """
+                    UPDATE validator_versions
+                    SET status = ?, payload_json = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        PredicateStatus.SUPERSEDED.value,
+                        superseded.model_dump_json(),
+                        current.id,
+                    ),
+                )
+            self.conn.execute(
+                """
+                INSERT INTO validator_versions (
+                    id, contract_id, enforcement_shape, status, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    version.id,
+                    version.contract_id,
+                    version.enforcement_shape.value,
+                    version.status.value,
+                    version.model_dump_json(),
+                    version.created_at.isoformat(),
+                ),
+            )
+            if version.enforcement_shape.value == "check_update":
+                state = ValidatorState(
+                    validator_version_id=version.id,
+                    scope_key=scope_key,
+                    contract_id=version.contract_id,
+                    state=initial_state,
+                )
+                self.conn.execute(
+                    """
+                    INSERT INTO validator_states (
+                        validator_version_id, scope_key, contract_id, state_json,
+                        revision, last_applied_seq, degraded, payload_json, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    _validator_state_params(state),
+                )
+        return version
+
+    def add_validator_installation(
+        self,
+        installation: ValidatorInstallationRecord,
+    ) -> ValidatorInstallationRecord:
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO validator_installations (
+                    id, contract_id, status, validator_version_id, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    installation.id,
+                    installation.contract_id,
+                    installation.status.value,
+                    installation.validator_version_id,
+                    installation.model_dump_json(),
+                    installation.created_at.isoformat(),
+                ),
+            )
+        return installation
+
+    def list_validator_installations(
+        self,
+        contract_id: str | None = None,
+    ) -> list[ValidatorInstallationRecord]:
+        if contract_id is None:
+            rows = self.conn.execute(
+                "SELECT payload_json FROM validator_installations ORDER BY created_at, id"
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                """
+                SELECT payload_json FROM validator_installations
+                WHERE contract_id = ?
+                ORDER BY created_at, id
+                """,
+                (contract_id,),
+            ).fetchall()
+        return [
+            ValidatorInstallationRecord.model_validate_json(row["payload_json"])
+            for row in rows
+        ]
+
+    def list_validator_versions(
+        self,
+        contract_id: str | None = None,
+        status: PredicateStatus | None = None,
+    ) -> list[ValidatorVersion]:
+        clauses: list[str] = []
         params: list[Any] = []
-        where = ""
+        if contract_id is not None:
+            clauses.append("contract_id = ?")
+            params.append(contract_id)
         if status is not None:
-            where = "WHERE status = ?"
-            params.append(status)
+            clauses.append("status = ?")
+            params.append(status.value)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = self.conn.execute(
-            f"SELECT payload_json FROM refinement_jobs {where} ORDER BY created_at, id",
+            f"SELECT payload_json FROM validator_versions {where} ORDER BY created_at, id",
             params,
+        ).fetchall()
+        return [ValidatorVersion.model_validate_json(row["payload_json"]) for row in rows]
+
+    def get_active_validator_version(self, contract_id: str) -> ValidatorVersion | None:
+        rows = self.list_validator_versions(contract_id=contract_id, status=PredicateStatus.ACTIVE)
+        return rows[-1] if rows else None
+
+    def get_validator_version(self, validator_version_id: str) -> ValidatorVersion | None:
+        row = self.conn.execute(
+            "SELECT payload_json FROM validator_versions WHERE id = ?",
+            (validator_version_id,),
+        ).fetchone()
+        return ValidatorVersion.model_validate_json(row["payload_json"]) if row else None
+
+    def put_validator_state(
+        self,
+        state: ValidatorState,
+        *,
+        expected_revision: int | None = None,
+    ) -> ValidatorState:
+        with self.conn:
+            if expected_revision is None:
+                self.conn.execute(
+                    """
+                    INSERT INTO validator_states (
+                        validator_version_id, scope_key, contract_id, state_json,
+                        revision, last_applied_seq, degraded, payload_json, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(validator_version_id, scope_key) DO UPDATE SET
+                        contract_id = excluded.contract_id,
+                        state_json = excluded.state_json,
+                        revision = excluded.revision,
+                        last_applied_seq = excluded.last_applied_seq,
+                        degraded = excluded.degraded,
+                        payload_json = excluded.payload_json,
+                        updated_at = excluded.updated_at
+                    """,
+                    _validator_state_params(state),
+                )
+            else:
+                cursor = self.conn.execute(
+                    """
+                    UPDATE validator_states
+                    SET state_json = ?, revision = ?, last_applied_seq = ?,
+                        degraded = ?, payload_json = ?, updated_at = ?
+                    WHERE validator_version_id = ? AND scope_key = ? AND revision = ?
+                    """,
+                    (
+                        _dump_json(state.state),
+                        state.revision,
+                        state.last_applied_seq,
+                        int(state.degraded),
+                        state.model_dump_json(),
+                        state.updated_at.isoformat(),
+                        state.validator_version_id,
+                        state.scope_key,
+                        expected_revision,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("validator state revision conflict")
+        return state
+
+    def get_validator_state(
+        self,
+        validator_version_id: str,
+        scope_key: str | None = None,
+    ) -> ValidatorState | None:
+        if scope_key is None:
+            rows = self.list_validator_states(validator_version_id)
+            return rows[0] if len(rows) == 1 else None
+        row = self.conn.execute(
+            """
+            SELECT payload_json FROM validator_states
+            WHERE validator_version_id = ? AND scope_key = ?
+            """,
+            (validator_version_id, scope_key),
+        ).fetchone()
+        return ValidatorState.model_validate_json(row["payload_json"]) if row else None
+
+    def list_validator_states(self, validator_version_id: str) -> list[ValidatorState]:
+        rows = self.conn.execute(
+            """
+            SELECT payload_json FROM validator_states
+            WHERE validator_version_id = ?
+            ORDER BY scope_key
+            """,
+            (validator_version_id,),
+        ).fetchall()
+        return [ValidatorState.model_validate_json(row["payload_json"]) for row in rows]
+
+    def delete_validator_state(
+        self,
+        validator_version_id: str,
+        scope_key: str | None = None,
+    ) -> None:
+        with self.conn:
+            if scope_key is None:
+                self.conn.execute(
+                    "DELETE FROM validator_states WHERE validator_version_id = ?",
+                    (validator_version_id,),
+                )
+            else:
+                self.conn.execute(
+                    """
+                    DELETE FROM validator_states
+                    WHERE validator_version_id = ? AND scope_key = ?
+                    """,
+                    (validator_version_id, scope_key),
+                )
+
+    def add_validator_state_transition(
+        self,
+        transition: ValidatorStateTransition,
+    ) -> ValidatorStateTransition:
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO validator_state_transitions (
+                    id, validator_version_id, scope_key, action_log_seq,
+                    payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    transition.id,
+                    transition.validator_version_id,
+                    transition.scope_key,
+                    transition.action_log_seq,
+                    transition.model_dump_json(),
+                    transition.created_at.isoformat(),
+                ),
+            )
+        return transition
+
+    def add_validator_runtime_error(
+        self,
+        error: ValidatorRuntimeErrorRecord,
+    ) -> ValidatorRuntimeErrorRecord:
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO validator_runtime_errors (
+                    id, validator_version_id, contract_id, scope_key, phase,
+                    replay_required, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    error.id,
+                    error.validator_version_id,
+                    error.contract_id,
+                    error.scope_key,
+                    error.phase,
+                    int(error.replay_required),
+                    error.model_dump_json(),
+                    error.created_at.isoformat(),
+                ),
+            )
+        return error
+
+    def list_validator_state_transitions(
+        self,
+        validator_version_id: str | None = None,
+    ) -> list[ValidatorStateTransition]:
+        if validator_version_id is None:
+            rows = self.conn.execute(
+                """
+                SELECT payload_json FROM validator_state_transitions
+                ORDER BY created_at, id
+                """
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                """
+                SELECT payload_json FROM validator_state_transitions
+                WHERE validator_version_id = ?
+                ORDER BY created_at, id
+                """,
+                (validator_version_id,),
+            ).fetchall()
+        return [
+            ValidatorStateTransition.model_validate_json(row["payload_json"])
+            for row in rows
+        ]
+
+    def list_validator_runtime_errors(
+        self,
+        validator_version_id: str | None = None,
+    ) -> list[ValidatorRuntimeErrorRecord]:
+        if validator_version_id is None:
+            rows = self.conn.execute(
+                """
+                SELECT payload_json FROM validator_runtime_errors
+                ORDER BY created_at, id
+                """
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                """
+                SELECT payload_json FROM validator_runtime_errors
+                WHERE validator_version_id = ?
+                ORDER BY created_at, id
+                """,
+                (validator_version_id,),
+            ).fetchall()
+        return [
+            ValidatorRuntimeErrorRecord.model_validate_json(row["payload_json"])
+            for row in rows
+        ]
+
+    def add_ask_request(self, request: AskRequest) -> AskRequest:
+        existing = self.list_ask_requests(
+            status=AskRequestStatus.REQUIRED,
+            session_id=request.session_id,
+            adapter_id=request.adapter_id,
         )
-        return [RefinementJob.model_validate_json(row["payload_json"]) for row in rows]
+        for stale in existing:
+            if stale.task_id != request.task_id:
+                continue
+            self._replace_ask_request(
+                stale.model_copy(update={"status": AskRequestStatus.CANCELLED})
+            )
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO ask_requests (
+                    id, session_id, task_id, adapter_id, tool_name,
+                    status, payload_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    request.id,
+                    request.session_id,
+                    request.task_id,
+                    request.adapter_id,
+                    request.tool_name,
+                    request.status.value,
+                    request.model_dump_json(),
+                    request.created_at.isoformat(),
+                    request.created_at.isoformat(),
+                ),
+            )
+        return request
+
+    def get_ask_request(self, request_id: str) -> AskRequest | None:
+        row = self.conn.execute(
+            "SELECT payload_json FROM ask_requests WHERE id = ?",
+            (request_id,),
+        ).fetchone()
+        return AskRequest.model_validate_json(row["payload_json"]) if row else None
+
+    def list_ask_requests(
+        self,
+        *,
+        status: AskRequestStatus | None = None,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        adapter_id: str | None = None,
+    ) -> list[AskRequest]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        for column, value in (
+            ("status", status.value if status is not None else None),
+            ("session_id", session_id),
+            ("task_id", task_id),
+            ("adapter_id", adapter_id),
+        ):
+            if value is not None:
+                clauses.append(f"{column} = ?")
+                params.append(value)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = self.conn.execute(
+            f"SELECT payload_json FROM ask_requests {where} ORDER BY created_at, id",
+            params,
+        ).fetchall()
+        return [AskRequest.model_validate_json(row["payload_json"]) for row in rows]
+
+    def mark_user_input_observed(
+        self,
+        *,
+        session_id: str,
+        task_id: str | None,
+        adapter_id: str,
+        turn_id: str | None,
+        observed_at: datetime,
+    ) -> AskRequest | None:
+        task_clause = "task_id IS NULL" if task_id is None else "task_id = ?"
+        params: list[Any] = [
+            AskRequestStatus.REQUIRED.value,
+            session_id,
+            adapter_id,
+        ]
+        if task_id is not None:
+            params.append(task_id)
+        rows = self.conn.execute(
+            f"""
+            SELECT payload_json FROM ask_requests
+            WHERE status = ? AND session_id = ? AND adapter_id = ? AND {task_clause}
+            ORDER BY created_at, id
+            """,
+            params,
+        ).fetchall()
+        required = [AskRequest.model_validate_json(row["payload_json"]) for row in rows]
+        if not required:
+            return None
+        selected = required[-1]
+        for stale in required[:-1]:
+            self._replace_ask_request(
+                stale.model_copy(update={"status": AskRequestStatus.CANCELLED})
+            )
+        return self._replace_ask_request(
+            selected.model_copy(
+                update={
+                    "status": AskRequestStatus.RESPONDED,
+                    "responded_at": observed_at,
+                    "responded_turn_id": turn_id,
+                    "expires_at": observed_at + ASK_RESPONSE_TTL,
+                }
+            )
+        )
+
+    def matching_ask_response(
+        self,
+        *,
+        session_id: str,
+        task_id: str | None,
+        adapter_id: str,
+        tool_names: Iterable[str],
+        turn_id: str | None,
+        now: datetime,
+    ) -> AskRequest | None:
+        task_clause = "task_id IS NULL" if task_id is None else "task_id = ?"
+        params: list[Any] = [
+            AskRequestStatus.RESPONDED.value,
+            session_id,
+            adapter_id,
+        ]
+        if task_id is not None:
+            params.append(task_id)
+        rows = self.conn.execute(
+            f"""
+            SELECT payload_json FROM ask_requests
+            WHERE status = ? AND session_id = ? AND adapter_id = ? AND {task_clause}
+            ORDER BY created_at, id
+            """,
+            params,
+        ).fetchall()
+        responded = [AskRequest.model_validate_json(row["payload_json"]) for row in rows]
+        allowed_tools = set(tool_names)
+        eligible: list[AskRequest] = []
+        for request in responded:
+            expired = request.expires_at is not None and now > request.expires_at
+            wrong_turn = (
+                request.responded_turn_id is not None
+                and turn_id is not None
+                and request.responded_turn_id != turn_id
+            )
+            wrong_tool = request.tool_name not in allowed_tools
+            if expired or wrong_turn or wrong_tool:
+                self._replace_ask_request(
+                    request.model_copy(update={"status": AskRequestStatus.CANCELLED})
+                )
+                continue
+            eligible.append(request)
+        selected = eligible[-1] if eligible else None
+        for request in eligible:
+            if selected is not None and request.id == selected.id:
+                continue
+            self._replace_ask_request(
+                request.model_copy(update={"status": AskRequestStatus.CANCELLED})
+            )
+        return selected
+
+    def consume_ask_response(self, request_id: str) -> AskRequest:
+        request = self.get_ask_request(request_id)
+        if request is None:
+            raise ValueError(f"unknown ask request: {request_id}")
+        if request.status != AskRequestStatus.RESPONDED:
+            raise ValueError("only responded ask requests can be consumed")
+        return self._replace_ask_request(
+            request.model_copy(
+                update={"status": AskRequestStatus.CONSUMED, "consumed_at": utc_now()}
+            )
+        )
+
+    def _replace_ask_request(self, request: AskRequest) -> AskRequest:
+        with self.conn:
+            self.conn.execute(
+                """
+                UPDATE ask_requests
+                SET status = ?, payload_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    request.status.value,
+                    request.model_dump_json(),
+                    utc_now().isoformat(),
+                    request.id,
+                ),
+            )
+        return request
 
     def _row_to_contract(self, row: sqlite3.Row) -> Contract:
         if "payload_json" in row.keys() and row["payload_json"]:
             payload = _load_json(row["payload_json"])
             if isinstance(payload, dict):
                 payload["status"] = row["status"]
-                return Contract.model_validate(payload)
+                return Contract.model_validate(normalize_rule_payload(payload))
         payload = {
             "id": row["id"],
             "text": row["text"],
@@ -721,11 +1553,9 @@ class ContractStore:
             payload["semantics"] = _load_json(row["semantics_json"])
         if "tool_patterns_json" in row_keys and row["tool_patterns_json"]:
             payload["tool_patterns"] = _load_json(row["tool_patterns_json"]) or []
-        if "targets_json" in row_keys and row["targets_json"]:
-            payload["targets"] = _load_json(row["targets_json"]) or []
         if "validity_json" in row_keys and row["validity_json"]:
             payload["validity"] = _load_json(row["validity_json"])
-        return Contract.model_validate(payload)
+        return Contract.model_validate(normalize_rule_payload(payload))
 
     def _row_to_edge(self, row: sqlite3.Row) -> ContractEdge:
         payload = {
@@ -741,3 +1571,52 @@ class ContractStore:
             "created_at": row["created_at"],
         }
         return ContractEdge.model_validate(payload)
+
+    def _row_to_action_log_entry(self, row: sqlite3.Row) -> ActionLogEntryV1:
+        return ActionLogEntryV1(
+            seq=row["seq"],
+            timestamp=row["timestamp"],
+            session_id=row["session_id"],
+            task_id=row["task_id"],
+            agent_id=row["agent_id"],
+            adapter_id=row["adapter_id"],
+            tool_call_id=row["tool_call_id"],
+            tool_name=row["tool_name"],
+            host_action=row["host_action"],
+            arguments=_load_json(row["arguments_json"]),
+            result=_load_json(row["result_json"]),
+            result_text=row["result_text"],
+            outcome=ActionOutcome(row["outcome"]),
+            reasoning_text=row["reasoning_text"],
+            conversation_id=row["conversation_id"],
+            turn_id=row["turn_id"],
+            user_id=row["user_id"],
+            organization=row["organization"],
+            workspace=row["workspace"],
+            repo=row["repo"],
+            branch=row["branch"],
+            targets=_load_json(row["targets_json"]) or [],
+            risk=row["risk"],
+            side_effect=row["side_effect"],
+        )
+
+
+def _action_log_identity_payload(entry: ActionLogEntryV1) -> dict[str, Any]:
+    payload = entry.model_dump(mode="json")
+    payload.pop("seq", None)
+    payload.pop("timestamp", None)
+    return payload
+
+
+def _validator_state_params(state: ValidatorState) -> tuple[Any, ...]:
+    return (
+        state.validator_version_id,
+        state.scope_key,
+        state.contract_id,
+        _dump_json(state.state),
+        state.revision,
+        state.last_applied_seq,
+        int(state.degraded),
+        state.model_dump_json(),
+        state.updated_at.isoformat(),
+    )

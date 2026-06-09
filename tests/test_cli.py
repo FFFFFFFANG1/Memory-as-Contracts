@@ -7,7 +7,6 @@ from typer.testing import CliRunner
 
 from memory_as_contracts.cli import app
 from memory_as_contracts.models import (
-    ActionConstraints,
     Contract,
     ContractKind,
     ContractSource,
@@ -15,6 +14,7 @@ from memory_as_contracts.models import (
     Lifecycle,
     LifecycleType,
     Modality,
+    RuleSemantics,
     Scope,
     ScopeLevel,
     SourceKind,
@@ -27,6 +27,24 @@ def test_mac_help_uses_new_package_identity() -> None:
 
     assert result.exit_code == 0
     assert "Memory-as-Contracts" in result.output
+
+
+def test_diagnostic_commands_are_registered() -> None:
+    result = CliRunner().invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    for command in (
+        "action-log",
+        "search-actions",
+        "validators",
+        "validator-state",
+        "asks",
+        "validator-errors",
+        "verify-validator",
+        "install-validator",
+        "replay-validator",
+    ):
+        assert command in result.stdout
 
 
 def test_env_reads_mac_variables(monkeypatch) -> None:
@@ -56,9 +74,16 @@ def test_mac_rule_override_creates_override_edge(monkeypatch, tmp_path) -> None:
                 span="Do not push code.",
                 created_at=datetime(2026, 5, 23, tzinfo=timezone.utc),
             ),
-            scope=Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project", repo="project"),
-            lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            action_constraints=ActionConstraints(host_actions=["git.push"]),
+            scope=Scope(
+                level=ScopeLevel.PROJECT,
+                workspace="/workspace/project",
+                repo="project",
+            ),
+            lifecycle=Lifecycle(
+                type=LifecycleType.UNTIL_REVOKED,
+                until_revoked=True,
+            ),
+            semantics=RuleSemantics(actions=["git.push"]),
         )
     )
 

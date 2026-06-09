@@ -21,8 +21,31 @@ The canonical envelope for one committed tool action in the Action Log. It is th
 _Avoid_: SQLite row, proposed action
 
 **Ask Response Flag**:
-A single-use, pending-action-scoped runtime flag indicating that an ask-before rule made the agent ask the user and that a user input was observed afterward. It does not encode whether the user approved or rejected the action.
+A single-use, pending-action-scoped runtime flag indicating that the gate returned
+`ask` and MAC observed the immediately following user input. MAC does not decide
+what the user's instruction means; interpreting that instruction and deciding
+what action to propose is the main agent's responsibility. When the immediately
+following Pending Action matches the same rule in the same session/task and
+native tool family, MAC assumes the main agent performed the required ask and
+skips only that rule once. The flag does not encode whether the user approved or
+rejected the action, and all other rules are still evaluated.
 _Avoid_: approval evidence, approval state
+
+**AskRequest**:
+The persisted lifecycle record for an `ask` decision: `required`, `responded`,
+`consumed`, or `cancelled`. `UserPromptSubmit` moves the latest same-scope
+`required` request directly to `responded`. It stores scope, exact native tool
+name, related rules, response turn, and TTL, but never the user's response
+content. MAC intentionally does not require a separate observable assistant-ask
+event: the adjacent user turn followed by a same-rule retry is the operational
+evidence used at this boundary.
+_Avoid_: approval record, user response memory
+
+**Gate Decision**:
+The final action-time result after exception/override handling and local verdict
+aggregation. The only values are `allow`, `reject`, and `ask`, ordered
+`reject > ask > allow`.
+_Avoid_: block, confirm, revise, defer
 
 **Pending Action**:
 A proposed tool action currently being checked by MAC before execution. It may become an Action Log entry only after the host executes it and reports a tool result.
@@ -71,6 +94,54 @@ _Avoid_: separate query API, raw SQL string
 **ActionLogSearch Translator**:
 The internal layer that compiles an ActionLog Search Spec into concrete SQLite operations over the current action-log table.
 _Avoid_: raw SQL from validator snippets, physical table coupling
+
+**Validator Scope Key**:
+A deterministic key whose dimensions are selected by the contract scope level:
+per-turn uses session/task/turn, task uses session/task, session uses session,
+project uses workspace, repo/path use workspace/repo, organization uses
+organization, and global uses user identity. Validator state is keyed by
+validator version plus this scope key and updated with a revision check.
+_Avoid_: global validator state, contract-id-only state
+
+**Periodic User-Turn Extraction**:
+The online ingestion policy that persists user turns and sends each batch of ten
+unprocessed turns to the Rule Extractor. Successful candidates pass through the
+Conflict Resolver into the Contract Store; the Action Gate never calls the
+extractor.
+_Avoid_: action-time extraction, assistant-turn extraction
+
+**Tool Pattern**:
+An adapter-native operational matcher over an exact tool name and raw argument
+fields. Rule schemas do not have a separate `targets` field; paths, URLs,
+resources, and other enforceable operands belong in tool argument matchers.
+Observed targets may still appear in Action Signatures, Action Log entries, and
+receipts as audit/scope metadata.
+_Avoid_: semantic action, declarative target pattern
+
+**Pattern Verifier**:
+The deterministic ingestion-time check applied to extractor-proposed
+`tool_patterns`, `check_patterns`, and `update_patterns`. It verifies that each
+native tool and argument exists in the adapter capsules, text matchers are
+compatible with the argument schema, and every regex compiles. A failed proposal
+may receive at most one synchronous LLM refinement and is then reverified.
+Rules that still fail remain `candidate` and cannot install an active pattern
+version.
+_Avoid_: ambiguity monitor, refinement queue, action-time LLM repair
+
+**Pattern Compiler**:
+The deterministic materializer that turns verified rule fields into a
+`RulePatternVersion`. It depends on `tool_patterns`, semantics, scope, lifecycle,
+and optional workspace grounding, not on the adapter `available_actions` registry.
+Native tool/argument validity is enforced earlier by the Pattern Verifier using
+Tool Capsules. `available_actions` remains ActionSignature/receipt context.
+_Avoid_: available-actions matcher, tool-schema verifier
+
+**Pattern Match Outcome**:
+The deterministic action-time result of a verified Tool Pattern. The only values
+are `matched` and `not_matched`. Missing arguments and nonmatching values are
+`not_matched`; invalid regexes never reach the gate because the Pattern Verifier
+rejects them during ingestion.
+_Avoid_: ambiguous
 
 **Check Pattern**:
 A validator binding pattern used before action execution to decide whether a Pending Action should run `validator.check`.

@@ -20,11 +20,12 @@ def lifecycle_is_active(lifecycle: Lifecycle, signature: ActionSignature | None 
 
 
 def scope_matches(scope: Scope, signature: ActionSignature) -> bool:
+    workspace_root = signature.workspace.root or signature.workspace.cwd
     if scope.agent_family and signature.agent_family not in scope.agent_family:
         return False
     if scope.user_id and signature.session.user_id and scope.user_id != signature.session.user_id:
         return False
-    if scope.workspace and scope.workspace != signature.workspace.cwd:
+    if scope.workspace and scope.workspace != workspace_root:
         return False
     if scope.repo and signature.workspace.repo and scope.repo != signature.workspace.repo:
         return False
@@ -38,11 +39,11 @@ def scope_matches(scope: Scope, signature: ActionSignature) -> bool:
     if scope.level == ScopeLevel.AGENT_FAMILY:
         return signature.agent_family in scope.agent_family
     if scope.level == ScopeLevel.PROJECT:
-        return bool(scope.workspace and scope.workspace == signature.workspace.cwd)
+        return bool(scope.workspace and scope.workspace == workspace_root)
     if scope.level == ScopeLevel.REPO:
         if scope.repo and signature.workspace.repo:
             return scope.repo == signature.workspace.repo
-        return bool(scope.workspace and scope.workspace == signature.workspace.cwd)
+        return bool(scope.workspace and scope.workspace == workspace_root)
     if scope.level == ScopeLevel.COMPONENT:
         if not scope.component:
             return False

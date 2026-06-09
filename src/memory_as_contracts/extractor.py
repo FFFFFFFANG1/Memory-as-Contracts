@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import json
 import inspect
+import logging
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import ValidationError
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 from memory_as_contracts.config import MacConfig, load_config
+from memory_as_contracts.logging_config import log_event
 from memory_as_contracts.models import (
     ArgPattern,
     Contract,
@@ -22,14 +25,17 @@ from memory_as_contracts.models import (
     RuleSemantics,
     SourceKind,
     Strength,
-    TargetPattern,
     ToolPattern,
+    ValidatorEnforcementShape,
 )
 from memory_as_contracts.normalizers import (
     LifecycleNormalizer,
     NormalizationContext,
     ScopeNormalizer,
 )
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 CONTRACT_TRIGGERS = (
@@ -46,12 +52,36 @@ CONTRACT_TRIGGERS = (
     "use ",
     "prefer",
     "ask me",
+    "before ",
     "before asking",
     "without asking",
 )
 
 
 PERIODIC_EXTRACTION_USER_TURN_INTERVAL = 10
+LLM_MAX_ATTEMPTS = 3
+
+
+class LLMCallError(RuntimeError):
+    def __init__(self, *, code: str, message: str, attempts: int) -> None:
+        super().__init__(message)
+        self.code = code
+        self.attempts = attempts
+
+    @classmethod
+    def timeout(cls, *, attempts: int = LLM_MAX_ATTEMPTS) -> "LLMCallError":
+        return cls(
+            code="llm_timeout",
+            message=f"LLM request timed out after {attempts} attempts",
+            attempts=attempts,
+        )
+
+    def as_dict(self) -> dict[str, str | int]:
+        return {
+            "code": self.code,
+            "message": str(self),
+            "attempts": self.attempts,
+        }
 
 
 CONTRACT_EXTRACTION_SYSTEM_PROMPT = """
@@ -90,8 +120,14 @@ Do not extract:
   the same scope; choose the clearest wording and preserve the duplicate source
   span if useful.
 
-Do extract separate contracts for genuine contradictions or narrower exceptions;
-conflict resolution will handle them later. Return only valid JSON, no markdown.
+Before returning, produce the final internally consistent contract set for this
+source only. Merge duplicate restatements. When the source gives incompatible
+instructions for the same scope and semantic action, treat the later explicit
+instruction as the final version and do not emit the superseded version. A
+concrete narrower allowance is an exception, not an unresolved conflict, so emit
+both the broader rule and the narrower exception. Do not compare against stored
+similar rules; cross-source and historical relations are handled after extraction.
+Return only valid JSON, no markdown.
 """.strip()
 
 
@@ -183,6 +219,7 @@ class HeuristicContractExtractor:
             scope = self.scope_normalizer.normalize(sentence, context.normalization)
             semantics = _infer_semantics(sentence)
             tool_patterns = _infer_tool_patterns(sentence, scope.path_globs)
+            validator_shape = _infer_validator_enforcement_shape(sentence)
             contracts.append(
                 Contract(
                     text=sentence,
@@ -194,7 +231,10 @@ class HeuristicContractExtractor:
                     lifecycle=self.lifecycle_normalizer.normalize(sentence, context.normalization),
                     semantics=semantics,
                     tool_patterns=tool_patterns,
-                    targets=_targets_from_scope(scope.path_globs),
+                    validator_enforcement_shape=validator_shape,
+                    check_patterns=_infer_check_patterns(sentence, validator_shape),
+                    update_patterns=_infer_update_patterns(sentence, validator_shape),
+                    state_fields=_infer_state_fields(sentence, validator_shape),
                     status=_status_for_patterns(kind, tool_patterns),
                 )
             )
@@ -261,7 +301,10 @@ class OpenAIChatResponseProvider:
         self.client = OpenAI(
             api_key=self.config.openai_api_key,
             base_url=self.config.openai_base_url or None,
+            max_retries=0,
+            timeout=self.config.llm_timeout_seconds,
         )
+        self._sleep = time.sleep
 
     @classmethod
     def from_env(
@@ -273,18 +316,31 @@ class OpenAIChatResponseProvider:
         return cls(load_config(env_file), system_prompt=system_prompt)
 
     def __call__(self, prompt: str, *, system_prompt: str | None = None) -> str:
-        response = self.client.chat.completions.create(
-            model=self.config.llm_model or "",
-            temperature=0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt or self.system_prompt,
-                },
-                {"role": "user", "content": prompt},
-            ],
-        )
-        return response.choices[0].message.content or ""
+        for attempt in range(1, LLM_MAX_ATTEMPTS + 1):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.config.llm_model or "",
+                    temperature=0,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt or self.system_prompt,
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                return response.choices[0].message.content or ""
+            except (APITimeoutError, TimeoutError) as exc:
+                log_event(
+                    LOGGER,
+                    "llm.timeout",
+                    attempt=attempt,
+                    max_attempts=LLM_MAX_ATTEMPTS,
+                )
+                if attempt == LLM_MAX_ATTEMPTS:
+                    raise LLMCallError.timeout(attempts=attempt) from exc
+                self._sleep(0.25 * (2 ** (attempt - 1)))
+        raise AssertionError("unreachable")
 
 
 class CandidateJsonContractExtractor:
@@ -377,32 +433,48 @@ class CandidateJsonContractExtractor:
                 continue
             modality = _enum_value(Modality, item.get("modality"), _default_modality(kind))
             strength = _enum_value(Strength, item.get("strength"), Strength.SOFT)
-            constraints = item.get("action_constraints") or {}
             inferred_semantics = _infer_semantics(contract_text)
-            host_actions = _string_list(constraints.get("host_actions") or item.get("host_actions"))
-            canonical_tags = _string_list(
-                constraints.get("canonical_tags") or item.get("canonical_tags")
-            )
-            host_actions = sorted({*host_actions, *inferred_semantics.actions})
-            canonical_tags = sorted({*canonical_tags, *inferred_semantics.tags})
             semantics_payload = item.get("semantics") or {}
             semantic_actions = sorted(
                 {
                     *_string_list(semantics_payload.get("actions") if isinstance(semantics_payload, dict) else None),
-                    *host_actions,
+                    *inferred_semantics.actions,
                 }
             )
             semantic_tags = sorted(
                 {
                     *_string_list(semantics_payload.get("tags") if isinstance(semantics_payload, dict) else None),
-                    *canonical_tags,
+                    *inferred_semantics.tags,
                 }
             )
             scope = self.scope_normalizer.normalize(contract_text, context.normalization)
             tool_patterns = _parse_tool_patterns(item.get("tool_patterns"))
             if not tool_patterns:
                 tool_patterns = _infer_tool_patterns(contract_text, scope.path_globs)
-            targets = _parse_targets(item.get("targets")) or _targets_from_scope(scope.path_globs)
+            proposed_validator_shape = _parse_validator_shape(
+                item.get("validator_enforcement_shape") or item.get("enforcement_shape")
+            )
+            validator_shape = _reconcile_validator_enforcement_shape(
+                contract_text,
+                proposed_validator_shape,
+            )
+            check_patterns = _parse_tool_patterns(item.get("check_patterns"))
+            update_patterns = _parse_tool_patterns(item.get("update_patterns"))
+            if validator_shape != ValidatorEnforcementShape.NO_VALIDATOR and not check_patterns:
+                check_patterns = _infer_check_patterns(contract_text, validator_shape)
+            if validator_shape == ValidatorEnforcementShape.CHECK_UPDATE and not update_patterns:
+                update_patterns = _infer_update_patterns(contract_text, validator_shape)
+            state_fields = _string_list(item.get("state_fields")) or _infer_state_fields(
+                contract_text,
+                validator_shape,
+            )
+            if validator_shape == ValidatorEnforcementShape.NO_VALIDATOR:
+                check_patterns = []
+                update_patterns = []
+                state_fields = []
+            elif validator_shape == ValidatorEnforcementShape.CHECK_ONLY:
+                update_patterns = []
+                state_fields = []
             source = ContractSource(
                 kind=source_kind,
                 conversation_id=context.conversation_id,
@@ -426,7 +498,10 @@ class CandidateJsonContractExtractor:
                     ),
                     semantics=RuleSemantics(actions=semantic_actions, tags=semantic_tags),
                     tool_patterns=tool_patterns,
-                    targets=targets,
+                    validator_enforcement_shape=validator_shape,
+                    check_patterns=check_patterns,
+                    update_patterns=update_patterns,
+                    state_fields=state_fields,
                     status=_status_for_patterns(kind, tool_patterns),
                 )
             )
@@ -522,6 +597,12 @@ def _infer_semantics(text: str) -> RuleSemantics:
     if any(token in lower for token in ("install", "dependency", "npm", "pnpm", "uv")):
         host_actions.update({"exec", "dependency.install"})
         tags.update({"dependency_change", "shell"})
+    if any(token in lower for token in ("budget", "cost", "purchase", "checkout", "booking", "spend")):
+        host_actions.add("purchase")
+        tags.update({"spend", "budget"})
+    if any(token in lower for token in ("test", "tests", "pytest")):
+        host_actions.add("exec")
+        tags.add("test")
     if any(token in lower for token in ("email", "message", "messages", "slack", "send", "notify")):
         host_actions.update({"email.send", "message.send"})
         tags.update({"external_write", "notify_human"})
@@ -543,22 +624,101 @@ def _status_for_patterns(kind: ContractKind, tool_patterns: list[ToolPattern]) -
     return ContractStatus.ACTIVE
 
 
-def _targets_from_scope(path_globs: list[str]) -> list[TargetPattern]:
-    return [TargetPattern(kind="path_glob", value=value) for value in path_globs]
+def _parse_validator_shape(value) -> ValidatorEnforcementShape | None:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower().replace("-", "_")
+    try:
+        return ValidatorEnforcementShape(normalized)
+    except ValueError:
+        return None
 
 
-def _parse_targets(value) -> list[TargetPattern]:
-    if not isinstance(value, list):
+def _infer_validator_enforcement_shape(text: str) -> ValidatorEnforcementShape:
+    lower = text.lower()
+    if _looks_like_budget_rule(lower):
+        return ValidatorEnforcementShape.CHECK_UPDATE
+    if _depends_on_prior_action_or_user_response(lower):
+        return ValidatorEnforcementShape.CHECK_ONLY
+    return ValidatorEnforcementShape.NO_VALIDATOR
+
+
+def _reconcile_validator_enforcement_shape(
+    text: str,
+    proposed: ValidatorEnforcementShape | None,
+) -> ValidatorEnforcementShape:
+    inferred = _infer_validator_enforcement_shape(text)
+    if proposed is None:
+        return inferred
+    if proposed == ValidatorEnforcementShape.CHECK_UPDATE:
+        return proposed
+    if proposed == ValidatorEnforcementShape.CHECK_ONLY:
+        return proposed if _depends_on_prior_action_or_user_response(text.lower()) else inferred
+    return inferred
+
+
+def _depends_on_prior_action_or_user_response(lower: str) -> bool:
+    history_cues = (
+        "before ",
+        "after ",
+        "prior ",
+        "previous ",
+        "already ",
+        "until ",
+        "per day",
+        "per week",
+        "ask me",
+        "asking me",
+        "approve",
+        "approval",
+        "confirm",
+        "explicitly say",
+    )
+    return any(cue in lower for cue in history_cues)
+
+
+def _infer_check_patterns(
+    text: str,
+    shape: ValidatorEnforcementShape,
+) -> list[ToolPattern]:
+    if shape == ValidatorEnforcementShape.NO_VALIDATOR:
         return []
-    targets: list[TargetPattern] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        try:
-            targets.append(TargetPattern.model_validate(item))
-        except ValidationError:
-            continue
-    return targets
+    lower = text.lower()
+    if _looks_like_budget_rule(lower):
+        return _purchase_tool_patterns()
+    if "push" in lower:
+        return _command_tool_patterns(r"^git\s+push(\s|$)")
+    return _infer_tool_patterns(text, [])
+
+
+def _infer_update_patterns(
+    text: str,
+    shape: ValidatorEnforcementShape,
+) -> list[ToolPattern]:
+    if shape != ValidatorEnforcementShape.CHECK_UPDATE:
+        return []
+    if _looks_like_budget_rule(text.lower()):
+        return _purchase_tool_patterns()
+    return []
+
+
+def _infer_state_fields(text: str, shape: ValidatorEnforcementShape) -> list[str]:
+    if shape != ValidatorEnforcementShape.CHECK_UPDATE:
+        return []
+    if _looks_like_budget_rule(text.lower()):
+        return [
+            "spent_cents",
+            "seen_entry_seqs",
+            "unknown_spend_entry_seqs",
+            "last_seen_seq",
+        ]
+    return []
+
+
+def _looks_like_budget_rule(lower: str) -> bool:
+    return any(token in lower for token in ("budget", "total cost", "cost", "spend")) and any(
+        token in lower for token in ("exceed", "under", "less than", "not exceed", "$")
+    )
 
 
 def _parse_tool_patterns(value) -> list[ToolPattern]:
@@ -585,6 +745,8 @@ def _infer_tool_patterns(text: str, path_globs: list[str]) -> list[ToolPattern]:
         patterns.extend(_command_tool_patterns(r"^git\s+commit(\s|$)"))
     if "dependency.install" in actions:
         patterns.extend(_command_tool_patterns(r"^(?:npm|pnpm|yarn|uv|pip|pipx)\s+(?:install|add|sync)(\s|$)"))
+    if "purchase" in actions:
+        patterns.extend(_purchase_tool_patterns())
     if {"file.write", "file.delete"}.intersection(actions):
         patterns.extend(_file_tool_patterns(path_globs))
     if "web.search" in actions:
@@ -612,6 +774,14 @@ def _infer_tool_patterns(text: str, path_globs: list[str]) -> list[ToolPattern]:
     if "agent.response" in actions:
         patterns.append(ToolPattern(tool="agent.response"))
     return _dedupe_tool_patterns(patterns)
+
+
+def _purchase_tool_patterns() -> list[ToolPattern]:
+    return [
+        ToolPattern(tool="purchase"),
+        ToolPattern(tool="checkout"),
+        ToolPattern(tool="booking"),
+    ]
 
 
 def _command_tool_patterns(regex: str) -> list[ToolPattern]:
@@ -714,22 +884,37 @@ Return exactly one JSON object with a "contracts" array. Each contract object mu
 - semantics.actions: compact semantic action labels for retrieval, dedup, and relation analysis
 - semantics.tags: compact semantic tags for retrieval, dedup, and relation analysis
 - tool_patterns: required non-empty deterministic operational patterns using native tool names and raw argument names from the provided tool capsules. Each item is {{"tool":"NativeToolName","args":{{"arg_name":{{"regex":"...", "path_glob":"...", "mentions_path_glob":"..."}}}}}}.
-- targets: first-class target resources such as {{"kind":"path_glob","value":"vendor/**"}}
+- validator_enforcement_shape: one of no_validator, check_only, check_update
+- check_patterns: native tool patterns for pending actions that require validator check
+- update_patterns: native tool patterns for committed actions that update materialized state
+- state_fields: state keys maintained by check_update validators
 
 Rules:
 - Source kind is {source_kind.value}. {source_instruction}
 - Add durable user-turn contracts only when the text is repeated across turns/sources or clearly scopes beyond the current turn, such as task, session, project, repo, file/path, component/module, organization, or global scope.
 - Semantics is only the behavioral summary used for retrieval and relation checks. It does not replace tool_patterns.
-- For non-gated preferences or procedures about planning, explanations, reports, summaries, or final answers, use the always-available prompt-intake surface {{"tool":"agent.response"}}. Do not use agent.response for deny/allow hook enforcement.
+- For non-gated preferences or procedures about planning, explanations, reports, summaries, or final answers, use the reserved MAC prompt-intake surface {{"tool":"agent.response"}}. `agent.response` is the only valid pattern surface that does not need to appear in host tool capsules. Do not omit a durable response/planning preference merely because it has no host tool, and do not use agent.response for deny/allow hook enforcement.
 - Every returned contract must include at least one valid tool_patterns entry. If a deny/allow/require rule cannot be grounded to a native tool pattern from the available tool capsules, omit that item from this extraction response.
+- Extractor proposes patterns and enforcement shape only; it never writes Python.
+- Use check_only when enforcement needs only the Pending Action plus a bounded Action Log search.
+- Use check_update only when enforcement needs an incrementally maintained numeric or symbolic state. A simple prior-action query such as "run tests before push" must not use update_patterns.
+- For no_validator, return empty check_patterns, update_patterns, and state_fields.
+- For check_only, return non-empty check_patterns and empty update_patterns/state_fields.
+- For check_update, return non-empty check_patterns/update_patterns and explicit state_fields.
+- Tool names and argument fields in all patterns must come from the provided adapter tool capsules.
 - Temporary/narrow allowance that overrides a broader rule must use effect "allow", but only when the source names a concrete allowed action and concrete scope. Do not extract meta exception language such as "unless a narrower exception says so" as its own exception.
 - Non-obvious workflow preferences still count if they constrain future behavior.
-- Merge contradictory rules into a single contract, if all fields are the same.
+- Represent every explicit durable rule in the source that can be grounded to a valid tool pattern. For bullet lists, inspect every bullet independently before returning.
+- Return the final internally consistent contract set for this source. Merge duplicate restatements that impose the same behavior and scope, keeping the clearest and most complete version.
+- When this source contains incompatible instructions for the same scope and semantic action, treat the later explicit instruction as the final version and emit only the final effective version. Do not keep the superseded local version.
+- A concrete narrower allowance is an exception rather than an unresolved conflict. Emit both the broader rule and the narrower exception so the Conflict Resolver can create the scoped edge.
+- Do not compare against stored similar rules. They are intentionally absent from this extractor prompt; cross-source and historical deduplication/conflict resolution happens after extraction.
+- Before returning, perform a source-coverage check: every explicit durable prohibition, requirement, concrete exception, and future-facing preference must either appear in the contracts array or be intentionally omitted because it cannot be grounded to an available tool surface.
 - For hook matching, tool is exact native tool name. Parameter constraints match raw tool argument strings.
     Example: for Claude Code Bash git push, use {{"tool":"Bash","args":{{"command":{{"regex":"^git\\\\s+push(\\\\s|$)"}}}}}}.
 
 Return JSON shape:
-{{"contracts": [{{"text": "Do not run git push until I approve it.", "source_span": "do not run git push until I approve it", "effect": "deny", "semantics": {{"actions": ["git.push"], "tags": ["publish_code", "external_write"]}}, "tool_patterns": [{{"tool": "Bash", "args": {{"command": {{"regex": "^git\\\\s+push(\\\\s|$)"}}}}}}], "targets": []}}]}}
+{{"contracts": [{{"text": "Do not run git push until I approve it.", "source_span": "do not run git push until I approve it", "effect": "deny", "semantics": {{"actions": ["git.push"], "tags": ["publish_code", "external_write"]}}, "tool_patterns": [{{"tool": "Bash", "args": {{"command": {{"regex": "^git\\\\s+push(\\\\s|$)"}}}}}}], "validator_enforcement_shape": "check_only", "check_patterns": [{{"tool": "Bash", "args": {{"command": {{"regex": "^git\\\\s+push(\\\\s|$)"}}}}}}], "update_patterns": [], "state_fields": []}}]}}
 
 Source text:
 {text}

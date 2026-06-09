@@ -5,13 +5,7 @@ from enum import StrEnum
 from typing import Any, Self
 from uuid import uuid4
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
-
-from memory_as_contracts.schema_compat import (
-    normalize_rule_payload as normalize_rule_payload_compat,
-    tool_patterns_from_host_patterns,
-)
-
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -105,25 +99,28 @@ class PredicateStatus(StrEnum):
     REJECTED = "rejected"
 
 
-class JobStatus(StrEnum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
 class GateDecisionType(StrEnum):
     ALLOW = "allow"
-    REVISE = "revise"
-    CONFIRM = "confirm"
-    BLOCK = "block"
-    DEFER = "defer"
+    REJECT = "reject"
+    ASK = "ask"
 
 
 class MatchOutcome(StrEnum):
     MATCHED = "matched"
     NOT_MATCHED = "not_matched"
-    AMBIGUOUS = "ambiguous"
+
+
+class ActionOutcome(StrEnum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+    UNKNOWN = "unknown"
+
+
+class AskRequestStatus(StrEnum):
+    REQUIRED = "required"
+    RESPONDED = "responded"
+    CONSUMED = "consumed"
+    CANCELLED = "cancelled"
 
 
 class RiskLevel(StrEnum):
@@ -165,6 +162,12 @@ class RuleOverrideType(StrEnum):
     NONE = "none"
     EXPLICIT_USER_CURRENT_TURN = "explicit_user_current_turn"
     EXPLICIT_USER_CONFIRMATION = "explicit_user_confirmation"
+
+
+class ValidatorEnforcementShape(StrEnum):
+    NO_VALIDATOR = "no_validator"
+    CHECK_ONLY = "check_only"
+    CHECK_UPDATE = "check_update"
 
 
 class RuleSemantics(StrictModel):
@@ -283,23 +286,38 @@ class Lifecycle(StrictModel):
         return self.expires_at <= check_time
 
 
-class ActionConstraints(StrictModel):
-    host_actions: list[str] = Field(default_factory=list)
-    canonical_tags: list[str] = Field(default_factory=list)
+class ActionLogEntryV1(StrictModel):
+    seq: int | None = None
+    timestamp: datetime = Field(default_factory=utc_now)
+    session_id: str
+    task_id: str | None = None
+    agent_id: str
+    adapter_id: str
+    tool_call_id: str
+    tool_name: str
+    host_action: str
+    arguments: Any = Field(default_factory=dict)
+    result: Any | None = None
+    result_text: str = ""
+    outcome: ActionOutcome = ActionOutcome.UNKNOWN
+    reasoning_text: str | None = None
+    conversation_id: str | None = None
+    turn_id: str | None = None
+    user_id: str | None = None
+    organization: str | None = None
+    workspace: str | None = None
+    repo: str | None = None
+    branch: str | None = None
+    targets: list[str] = Field(default_factory=list)
+    risk: RiskLevel = RiskLevel.MEDIUM
+    side_effect: SideEffect = SideEffect.NONE
 
-
-class HostActionPattern(StrictModel):
-    action: str
-    tool_name: str | None = None
-    program: str | None = None
-    subcommand: str | None = None
-    arguments: dict[str, Any] = Field(default_factory=dict)
-    parameter_regex: dict[str, str] = Field(default_factory=dict)
-
-
-class TargetPattern(StrictModel):
-    kind: str
-    value: str
+    @field_validator("timestamp")
+    @classmethod
+    def timestamp_must_have_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("action log timestamp must be timezone-aware")
+        return value
 
 
 class ArgPattern(StrictModel):
@@ -348,11 +366,6 @@ class RulePatternVersion(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("PV"))
     contract_id: str | None = None
     version: str = "PV-001"
-    host_action_patterns: list[HostActionPattern] = Field(default_factory=list)
-    target_patterns: list[TargetPattern] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices("target_patterns", "targets"),
-    )
     tool_patterns: list[ToolPattern] = Field(default_factory=list)
     canonical_tags: list[str] = Field(default_factory=list)
     scope_predicate: dict[str, Any] = Field(default_factory=dict)
@@ -360,20 +373,6 @@ class RulePatternVersion(StrictModel):
     refines: str | None = None
     status: PredicateStatus = PredicateStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_legacy_pattern_payload(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        normalized = dict(data)
-        if "targets" in normalized and "target_patterns" not in normalized:
-            normalized["target_patterns"] = normalized.pop("targets")
-        if not normalized.get("tool_patterns") and normalized.get("host_action_patterns"):
-            normalized["tool_patterns"] = tool_patterns_from_host_patterns(
-                normalized.get("host_action_patterns", [])
-            )
-        return normalized
 
     @field_validator("created_at")
     @classmethod
@@ -383,14 +382,7 @@ class RulePatternVersion(StrictModel):
         return value
 
     def has_binding_predicates(self) -> bool:
-        return bool(self.tool_patterns or self.target_patterns)
-
-    @property
-    def targets(self) -> list[TargetPattern]:
-        return self.target_patterns
-
-
-CompiledPredicateVersion = RulePatternVersion
+        return bool(self.tool_patterns)
 
 
 class OverridePolicy(StrictModel):
@@ -408,25 +400,85 @@ class Contract(StrictModel):
     scope: Scope
     semantics: RuleSemantics = Field(default_factory=RuleSemantics)
     tool_patterns: list[ToolPattern] = Field(default_factory=list)
-    targets: list[TargetPattern] = Field(default_factory=list)
     override: OverridePolicy = Field(default_factory=OverridePolicy)
     validity: RuleValidity = Field(default_factory=RuleValidity)
+    validator_enforcement_shape: ValidatorEnforcementShape = ValidatorEnforcementShape.NO_VALIDATOR
+    check_patterns: list[ToolPattern] = Field(default_factory=list)
+    update_patterns: list[ToolPattern] = Field(default_factory=list)
+    state_fields: list[str] = Field(default_factory=list)
 
     kind: ContractKind = ContractKind.PREFERENCE
     modality: Modality = Modality.SHOULD
     strength: Strength = Strength.SOFT
     source: ContractSource
     lifecycle: Lifecycle = Field(default_factory=Lifecycle)
-    action_constraints: ActionConstraints = Field(default_factory=ActionConstraints)
-    compiled_predicates: CompiledPredicateVersion | None = None
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     supersedes: list[str] = Field(default_factory=list)
     conflicts_with: list[str] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
-    def normalize_rule_payload(cls, data: Any) -> Any:
-        return normalize_rule_payload_compat(data)
+    def populate_internal_rule_metadata(cls, data: Any) -> Any:
+        """Derive internal audit metadata from canonical Rule fields.
+
+        This intentionally does not translate legacy operational fields. Old
+        payloads must pass through schema_compat.normalize_rule_payload first.
+        """
+
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        effect = _raw_enum_value(normalized.get("effect"))
+        kind = _raw_enum_value(normalized.get("kind"))
+        modality = _raw_enum_value(normalized.get("modality"))
+        if effect is None:
+            normalized["effect"] = _effect_for_internal_shape(kind, modality)
+            effect = normalized["effect"]
+        if kind is None or modality is None:
+            derived_kind, derived_modality, derived_strength = _internal_shape_for_effect(effect)
+            normalized.setdefault("kind", derived_kind)
+            normalized.setdefault("modality", derived_modality)
+            normalized.setdefault("strength", derived_strength)
+
+        source = normalized.get("source")
+        source_payload = (
+            source.model_dump(mode="json") if hasattr(source, "model_dump") else source
+        )
+        authority = _raw_enum_value(normalized.get("authority"))
+        if authority is None and isinstance(source_payload, dict):
+            normalized["authority"] = _authority_for_source_kind(
+                _raw_enum_value(source_payload.get("kind"))
+            )
+            authority = normalized["authority"]
+        if source is None:
+            normalized["source"] = {
+                "kind": _source_kind_for_authority(authority),
+                "span": normalized.get("text", ""),
+            }
+
+        lifecycle = normalized.get("lifecycle")
+        lifecycle_payload = (
+            lifecycle.model_dump(mode="json") if hasattr(lifecycle, "model_dump") else lifecycle
+        )
+        validity = normalized.get("validity")
+        validity_payload = (
+            validity.model_dump(mode="json") if hasattr(validity, "model_dump") else validity
+        )
+        if validity is None and isinstance(lifecycle_payload, dict):
+            normalized["validity"] = {
+                "from": lifecycle_payload.get("effective_from"),
+                "until": lifecycle_payload.get("expires_at"),
+            }
+        if lifecycle is None and isinstance(validity_payload, dict):
+            until = validity_payload.get("until")
+            normalized["lifecycle"] = {
+                "type": "bounded_time" if until else "until_revoked",
+                "effective_from": validity_payload.get("from")
+                or validity_payload.get("start"),
+                "expires_at": until,
+                "until_revoked": until is None,
+            }
+        return normalized
 
     @model_validator(mode="after")
     def validate_contract_semantics(self) -> Self:
@@ -435,15 +487,8 @@ class Contract(StrictModel):
         if self.kind == ContractKind.FACT:
             if self.modality in {Modality.MUST, Modality.MUST_NOT}:
                 raise ValueError("fact contracts cannot use MUST or MUST_NOT modality")
-            if (
-                self.action_constraints.host_actions
-                or self.action_constraints.canonical_tags
-                or self.semantics.actions
-                or self.semantics.tags
-            ):
-                raise ValueError("fact contracts cannot bind action constraints")
-            if self.compiled_predicates and self.compiled_predicates.has_binding_predicates():
-                raise ValueError("fact contracts cannot bind compiled predicates")
+            if self.semantics.actions or self.semantics.tags:
+                raise ValueError("fact contracts cannot bind rule semantics")
             if self.tool_patterns:
                 raise ValueError("fact contracts cannot bind tool patterns")
         return self
@@ -453,6 +498,60 @@ class Contract(StrictModel):
 
 
 Rule = Contract
+
+
+def _raw_enum_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    return str(value.value) if hasattr(value, "value") else str(value)
+
+
+def _effect_for_internal_shape(kind: str | None, modality: str | None) -> str:
+    if kind == ContractKind.PROHIBITION.value or modality == Modality.MUST_NOT.value:
+        return RuleEffect.DENY.value
+    if kind == ContractKind.EXCEPTION.value or modality == Modality.MAY.value:
+        return RuleEffect.ALLOW.value
+    if kind in {ContractKind.REQUIREMENT.value, ContractKind.PROCEDURE.value}:
+        return RuleEffect.REQUIRE.value
+    if modality == Modality.MUST.value:
+        return RuleEffect.REQUIRE.value
+    return RuleEffect.PREFER.value
+
+
+def _internal_shape_for_effect(effect: str | None) -> tuple[str, str, str]:
+    if effect == RuleEffect.DENY.value:
+        return (
+            ContractKind.PROHIBITION.value,
+            Modality.MUST_NOT.value,
+            Strength.HARD.value,
+        )
+    if effect == RuleEffect.REQUIRE.value:
+        return ContractKind.REQUIREMENT.value, Modality.MUST.value, Strength.HARD.value
+    if effect == RuleEffect.ALLOW.value:
+        return ContractKind.EXCEPTION.value, Modality.MAY.value, Strength.SOFT.value
+    return ContractKind.PREFERENCE.value, Modality.SHOULD.value, Strength.SOFT.value
+
+
+def _authority_for_source_kind(source_kind: str | None) -> str:
+    mapping = {
+        SourceKind.USER_TURN.value: RuleAuthority.USER_EXPLICIT.value,
+        SourceKind.PROJECT_DOC.value: RuleAuthority.PROJECT_INSTRUCTION.value,
+        SourceKind.MEMORY_FILE.value: RuleAuthority.MEMORY_IMPORT.value,
+        SourceKind.USER_PROFILE.value: RuleAuthority.USER_PROFILE.value,
+        SourceKind.TOOL_OBSERVATION.value: RuleAuthority.TOOL_OBSERVATION.value,
+    }
+    return mapping.get(source_kind, RuleAuthority.AGENT_INFERRED.value)
+
+
+def _source_kind_for_authority(authority: str | None) -> str:
+    mapping = {
+        RuleAuthority.USER_EXPLICIT.value: SourceKind.USER_TURN.value,
+        RuleAuthority.PROJECT_INSTRUCTION.value: SourceKind.PROJECT_DOC.value,
+        RuleAuthority.MEMORY_IMPORT.value: SourceKind.MEMORY_FILE.value,
+        RuleAuthority.USER_PROFILE.value: SourceKind.USER_PROFILE.value,
+        RuleAuthority.TOOL_OBSERVATION.value: SourceKind.TOOL_OBSERVATION.value,
+    }
+    return mapping.get(authority, SourceKind.AGENT_INFERRED.value)
 
 
 class ContractEdge(StrictModel):
@@ -511,6 +610,7 @@ class TimeContext(StrictModel):
 
 class WorkspaceContext(StrictModel):
     cwd: str
+    root: str | None = None
     repo: str | None = None
     branch: str | None = None
 
@@ -575,6 +675,8 @@ class Receipt(StrictModel):
     contracts_used: list[str] = Field(default_factory=list)
     edges_applied: list[str] = Field(default_factory=list)
     contracts_ignored: list[IgnoredContract] = Field(default_factory=list)
+    validator_verdicts: list[dict[str, Any]] = Field(default_factory=list)
+    ask_request_id: str | None = None
     result: str
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -583,58 +685,6 @@ class Receipt(StrictModel):
     def created_at_must_have_timezone(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("created_at must be timezone-aware")
-        return value
-
-
-class AmbiguityEvent(StrictModel):
-    id: str = Field(default_factory=lambda: prefixed_id("AMB"))
-    contract_id: str
-    pattern_version_id: str = Field(
-        validation_alias=AliasChoices("pattern_version_id", "predicate_version_id")
-    )
-    signature_id: str
-    match_outcome: MatchOutcome = MatchOutcome.AMBIGUOUS
-    evaluated_at: datetime = Field(default_factory=utc_now)
-    reason: str | None = None
-
-    @property
-    def predicate_version_id(self) -> str:
-        return self.pattern_version_id
-
-    @field_validator("evaluated_at")
-    @classmethod
-    def evaluated_at_must_have_timezone(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("evaluated_at must be timezone-aware")
-        return value
-
-    @model_validator(mode="after")
-    def ambiguity_event_must_be_ambiguous(self) -> Self:
-        if self.match_outcome != MatchOutcome.AMBIGUOUS:
-            raise ValueError("ambiguity events must use ambiguous match_outcome")
-        return self
-
-
-class PredicateEvaluation(StrictModel):
-    id: str = Field(default_factory=lambda: prefixed_id("PE"))
-    contract_id: str
-    pattern_version_id: str = Field(
-        validation_alias=AliasChoices("pattern_version_id", "predicate_version_id")
-    )
-    signature_id: str
-    match_outcome: MatchOutcome
-    evaluated_at: datetime = Field(default_factory=utc_now)
-    reason: str | None = None
-
-    @property
-    def predicate_version_id(self) -> str:
-        return self.pattern_version_id
-
-    @field_validator("evaluated_at")
-    @classmethod
-    def evaluated_at_must_have_timezone(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("evaluated_at must be timezone-aware")
         return value
 
 
@@ -656,35 +706,124 @@ class SourceSnapshot(StrictModel):
         return value
 
 
-class RefinementJob(StrictModel):
-    id: str = Field(default_factory=lambda: prefixed_id("RJ"))
+class ValidatorVersion(StrictModel):
+    id: str = Field(default_factory=lambda: prefixed_id("VV"))
     contract_id: str
-    pattern_version_id: str = Field(
-        validation_alias=AliasChoices("pattern_version_id", "predicate_version_id")
-    )
-    status: JobStatus = JobStatus.PENDING
-    recent_signature_ids: list[str] = Field(default_factory=list)
-    result_pattern_version_id: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "result_pattern_version_id", "result_predicate_version_id"
-        ),
-    )
-    error: str | None = None
+    enforcement_shape: ValidatorEnforcementShape
+    snippet: str
+    check_patterns: list[ToolPattern] = Field(default_factory=list)
+    update_patterns: list[ToolPattern] = Field(default_factory=list)
+    state_schema_version: str = "state-v1"
+    state_fields: list[str] = Field(default_factory=list)
+    initial_state: dict[str, Any] = Field(default_factory=dict)
+    sandbox_policy_version: str = "subprocess-v1"
+    action_log_search_spec_version: str = "ActionLogSearchSpecV1"
+    snippet_hash: str = ""
+    verification_hash: str = ""
+    verified_at: datetime | None = None
+    status: PredicateStatus = PredicateStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
+
+    @field_validator("created_at", "verified_at")
+    @classmethod
+    def validator_created_at_must_have_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return value
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("validator version timestamp must be timezone-aware")
+        return value
+
+
+class ValidatorState(StrictModel):
+    validator_version_id: str
+    scope_key: str
+    contract_id: str
+    state: dict[str, Any] = Field(default_factory=dict)
+    revision: int = Field(default=0, ge=0)
+    last_applied_seq: int | None = None
+    degraded: bool = False
     updated_at: datetime = Field(default_factory=utc_now)
 
-    @property
-    def predicate_version_id(self) -> str:
-        return self.pattern_version_id
-
-    @property
-    def result_predicate_version_id(self) -> str | None:
-        return self.result_pattern_version_id
-
-    @field_validator("created_at", "updated_at")
+    @field_validator("updated_at")
     @classmethod
-    def timestamps_must_have_timezone(cls, value: datetime) -> datetime:
+    def validator_state_updated_at_must_have_timezone(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("refinement job timestamps must be timezone-aware")
+            raise ValueError("validator state timestamp must be timezone-aware")
         return value
+
+
+class ValidatorVerdict(StrictModel):
+    decision: GateDecisionType
+    reason: str
+    evidence_refs: list[dict[str, Any]] = Field(default_factory=list)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
+class AskRequest(StrictModel):
+    id: str = Field(default_factory=lambda: prefixed_id("ASK"))
+    session_id: str
+    task_id: str | None = None
+    adapter_id: str
+    tool_name: str
+    rule_ids: list[str] = Field(default_factory=list)
+    status: AskRequestStatus = AskRequestStatus.REQUIRED
+    created_at: datetime = Field(default_factory=utc_now)
+    responded_at: datetime | None = None
+    responded_turn_id: str | None = None
+    expires_at: datetime | None = None
+    consumed_at: datetime | None = None
+
+    @field_validator("created_at", "responded_at", "expires_at", "consumed_at")
+    @classmethod
+    def ask_request_times_must_have_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return value
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("ask request timestamps must be timezone-aware")
+        return value
+
+
+class ValidatorInstallationStatus(StrEnum):
+    INSTALLED = "installed"
+    NEEDS_REFINEMENT = "needs_refinement"
+    MANUAL_REVIEW = "manual_review"
+
+
+class ValidatorInstallationRecord(StrictModel):
+    id: str = Field(default_factory=lambda: prefixed_id("VI"))
+    contract_id: str
+    status: ValidatorInstallationStatus
+    validator_version_id: str | None = None
+    errors: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @field_validator("created_at")
+    @classmethod
+    def installation_time_must_have_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("validator installation timestamp must be timezone-aware")
+        return value
+
+
+class ValidatorStateTransition(StrictModel):
+    id: str = Field(default_factory=lambda: prefixed_id("VST"))
+    validator_version_id: str
+    scope_key: str
+    action_log_seq: int
+    from_revision: int
+    to_revision: int
+    state_hash: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ValidatorRuntimeErrorRecord(StrictModel):
+    id: str = Field(default_factory=lambda: prefixed_id("VRE"))
+    validator_version_id: str
+    contract_id: str
+    scope_key: str
+    phase: str
+    action_log_seq: int | None = None
+    error_type: str
+    message: str
+    replay_required: bool = False
+    created_at: datetime = Field(default_factory=utc_now)

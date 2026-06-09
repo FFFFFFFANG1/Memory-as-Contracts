@@ -2,33 +2,30 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from memory_as_contracts.ambiguity import AmbiguityMonitor, LLMPredicateRefiner
 from memory_as_contracts.compiler import PolicyCompiler
 from memory_as_contracts.gate import ActionGate, ExcludedActionPattern
 from memory_as_contracts.models import (
-    ActionConstraints,
     ArgPattern,
-    CompiledPredicateVersion,
     Contract,
     ContractEdge,
     ContractKind,
     ContractSource,
     ContractStatus,
     EdgeRelation,
-    HostActionPattern,
-    JobStatus,
     Lifecycle,
     LifecycleType,
     MatchOutcome,
     Modality,
-    PredicateEvaluation,
-    PredicateStatus,
     Scope,
     ScopeLevel,
     RuleAuthority,
+    RuleEffect,
+    RulePatternVersion,
+    RuleSemantics,
     SourceKind,
     Strength,
     ToolPattern,
+    ValidatorEnforcementShape,
 )
 from memory_as_contracts.resolver import ConflictResolver
 from memory_as_contracts.retrieval import (
@@ -36,7 +33,7 @@ from memory_as_contracts.retrieval import (
     PromptIntakeRetriever,
     PromptRetrievalContext,
 )
-from memory_as_contracts.signatures import ActionSignatureBuilder, SignatureContext, coding_available_actions
+from memory_as_contracts.signatures import ActionSignatureBuilder, SignatureContext
 from memory_as_contracts.store import ContractStore
 
 
@@ -44,6 +41,13 @@ def make_store() -> ContractStore:
     store = ContractStore(":memory:")
     store.init_db()
     return store
+
+
+def install_pattern_contract(store: ContractStore, contract: Contract) -> Contract:
+    stored = store.add_contract(contract)
+    if stored.tool_patterns:
+        store.install_rule_pattern_version(PolicyCompiler().compile(stored))
+    return stored
 
 
 def project_scope(workspace: str = "/workspace/project") -> Scope:
@@ -77,9 +81,9 @@ def push_prohibition(contract_id: str = "MAC-push") -> Contract:
         source=source(),
         scope=project_scope(),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(
-            host_actions=["git.push"],
-            canonical_tags=["external_write", "publish_code"],
+        semantics=RuleSemantics(
+            actions=["git.push"],
+            tags=["external_write", "publish_code"],
         ),
         tool_patterns=git_push_tool_patterns(),
     )
@@ -148,9 +152,9 @@ def file_rule(
             type=lifecycle_type,
             until_revoked=lifecycle_type == LifecycleType.UNTIL_REVOKED,
         ),
-        action_constraints=ActionConstraints(
-            host_actions=[host_action],
-            canonical_tags=[tag],
+        semantics=RuleSemantics(
+            actions=[host_action],
+            tags=[tag],
         ),
         tool_patterns=_file_tool_patterns(path_glob)
         if host_action in {"file.write", "file.delete"}
@@ -186,7 +190,7 @@ def git_push_signature():
 def test_signature_builder_and_policy_compiler_match_git_push() -> None:
     signature = git_push_signature()
     contract = push_prohibition()
-    predicate = PolicyCompiler().compile(contract, signature.available_actions)
+    predicate = PolicyCompiler().compile(contract)
 
     assert signature.host_action == "git.push"
     assert "publish_code" in signature.canonical_tags
@@ -195,13 +199,12 @@ def test_signature_builder_and_policy_compiler_match_git_push() -> None:
 
 def test_policy_compiler_evaluates_exact_tool_name_and_parameter_regex() -> None:
     compiler = PolicyCompiler()
-    predicate = CompiledPredicateVersion(
-        host_action_patterns=[
-            HostActionPattern(
-                action="git.push",
-                tool_name="exec",
-                parameter_regex={"cmd": r"^git\s+push(\s|$)"},
-            )
+    predicate = RulePatternVersion(
+        tool_patterns=[
+            ToolPattern(
+                tool="exec",
+                args={"cmd": ArgPattern(regex=r"^git\s+push(\s|$)")},
+            ),
         ]
     )
     push_signature = git_push_signature()
@@ -220,7 +223,7 @@ def test_policy_compiler_evaluates_exact_tool_name_and_parameter_regex() -> None
     assert compiler.evaluate(predicate, status_signature) == MatchOutcome.NOT_MATCHED
 
 
-def test_policy_compiler_materializes_seeded_git_push_pattern_to_exec_cmd() -> None:
+def test_policy_compiler_preserves_native_git_push_pattern() -> None:
     compiler = PolicyCompiler()
     contract = Contract(
         id="MAC-seeded-push",
@@ -231,29 +234,37 @@ def test_policy_compiler_materializes_seeded_git_push_pattern_to_exec_cmd() -> N
         source=source(),
         scope=project_scope(),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(
-            host_actions=["git.push"],
-            canonical_tags=["external_write", "publish_code"],
+        semantics=RuleSemantics(
+            actions=["git.push"],
+            tags=["external_write", "publish_code"],
         ),
         tool_patterns=[
             ToolPattern(tool="Bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
         ],
     )
-    push_signature = git_push_signature()
+    push_signature = ActionSignatureBuilder().build(
+        tool_name="Bash",
+        raw_arguments={"command": "git push origin main"},
+        context=SignatureContext(
+            session_id="sess-1",
+            cwd="/workspace/project",
+            repo="project",
+        ),
+    )
     status_signature = ActionSignatureBuilder().build(
         tool_name="exec",
         raw_arguments={"cmd": "git status --short"},
         context=SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project"),
     )
 
-    predicate = compiler.compile(contract, push_signature.available_actions)
+    predicate = compiler.compile(contract)
 
-    assert any(pattern.tool == "exec" and "cmd" in pattern.args for pattern in predicate.tool_patterns)
+    assert contract.tool_patterns[0] in predicate.tool_patterns
     assert compiler.evaluate(predicate, push_signature) == MatchOutcome.MATCHED
     assert compiler.evaluate(predicate, status_signature) == MatchOutcome.NOT_MATCHED
 
 
-def test_policy_compiler_materializes_seeded_path_pattern_to_file_write_tool() -> None:
+def test_policy_compiler_preserves_native_path_pattern() -> None:
     compiler = PolicyCompiler()
     contract = Contract(
         id="MAC-seeded-generated",
@@ -269,9 +280,9 @@ def test_policy_compiler_materializes_seeded_path_pattern_to_file_write_tool() -
             path_globs=["generated/**"],
         ),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(
-            host_actions=["file.write"],
-            canonical_tags=["file_write", "workspace_write"],
+        semantics=RuleSemantics(
+            actions=["file.write"],
+            tags=["file_write", "workspace_write"],
         ),
         tool_patterns=[
             ToolPattern(tool="Edit", args={"file_path": ArgPattern(path_glob="generated/**")})
@@ -279,22 +290,19 @@ def test_policy_compiler_materializes_seeded_path_pattern_to_file_write_tool() -
     )
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
     generated_write = ActionSignatureBuilder().build(
-        tool_name="file.write",
-        raw_arguments={"path": "generated/core.py"},
+        tool_name="Edit",
+        raw_arguments={"file_path": "generated/core.py"},
         context=context,
     )
     source_write = ActionSignatureBuilder().build(
-        tool_name="file.write",
-        raw_arguments={"path": "src/core.py"},
+        tool_name="Edit",
+        raw_arguments={"file_path": "src/core.py"},
         context=context,
     )
 
-    predicate = compiler.compile(contract, generated_write.available_actions)
+    predicate = compiler.compile(contract)
 
-    assert any(
-        pattern.tool == "file.write" and pattern.args["path"].path_glob == "generated/**"
-        for pattern in predicate.tool_patterns
-    )
+    assert contract.tool_patterns[0] in predicate.tool_patterns
     assert compiler.evaluate(predicate, generated_write) == MatchOutcome.MATCHED
     assert compiler.evaluate(predicate, source_write) == MatchOutcome.NOT_MATCHED
 
@@ -305,11 +313,7 @@ def test_policy_compiler_does_not_overblock_generic_exec_for_git_push_rule() -> 
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
 
-    predicate = compiler.compile(contract, builder.build(
-        tool_name="exec",
-        raw_arguments={"cmd": "git push origin main"},
-        context=context,
-    ).available_actions)
+    predicate = compiler.compile(contract)
     status_signature = builder.build(
         tool_name="exec",
         raw_arguments={"cmd": "git status --short"},
@@ -335,15 +339,15 @@ def test_policy_compiler_targets_bare_filename_rules() -> None:
         source=source(),
         scope=path_scope("package-lock.json"),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(
-            host_actions=["file.write"],
-            canonical_tags=["file_write"],
+        semantics=RuleSemantics(
+            actions=["file.write"],
+            tags=["file_write"],
         ),
         tool_patterns=_file_tool_patterns("package-lock.json"),
     )
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
-    predicate = PolicyCompiler().compile(contract, context.available_actions)
+    predicate = PolicyCompiler().compile(contract)
     package_json = builder.build(
         tool_name="file.write",
         raw_arguments={"path": "package.json"},
@@ -369,15 +373,15 @@ def test_policy_compiler_prefers_negated_bare_filename_target() -> None:
         source=source(),
         scope=path_scope("package-lock.json"),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(
-            host_actions=["file.write"],
-            canonical_tags=["file_write"],
+        semantics=RuleSemantics(
+            actions=["file.write"],
+            tags=["file_write"],
         ),
         tool_patterns=_file_tool_patterns("package-lock.json"),
     )
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
-    predicate = PolicyCompiler().compile(contract, context.available_actions)
+    predicate = PolicyCompiler().compile(contract)
 
     assert PolicyCompiler().evaluate(
         predicate,
@@ -408,11 +412,15 @@ def test_policy_compiler_grounds_bare_filename_to_workspace_path(tmp_path) -> No
         modality=Modality.MUST_NOT,
         path_glob="archive.md",
     ).model_copy(update={"scope": path_scope("archive.md", str(workspace))})
-    predicate = PolicyCompiler().compile(contract, coding_available_actions())
+    predicate = PolicyCompiler().compile(contract)
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd=str(workspace), repo="repo")
 
-    assert [target.value for target in predicate.target_patterns] == ["docs/archive.md"]
+    assert {
+        pattern.args["path"].path_glob
+        for pattern in predicate.tool_patterns
+        if pattern.tool == "file.write" and "path" in pattern.args
+    } == {"docs/archive.md"}
     assert PolicyCompiler().evaluate(
         predicate,
         builder.build(
@@ -436,17 +444,21 @@ def test_policy_compiler_expands_lockfile_category_without_blocking_manifest(tmp
         source=source(),
         scope=project_scope(str(workspace)),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(
-            host_actions=["file.write"],
-            canonical_tags=["file_write"],
+        semantics=RuleSemantics(
+            actions=["file.write"],
+            tags=["file_write"],
         ),
         tool_patterns=[ToolPattern(tool="file.write")],
     )
-    predicate = PolicyCompiler().compile(contract, coding_available_actions())
+    predicate = PolicyCompiler().compile(contract)
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd=str(workspace), repo="repo")
 
-    assert "package-lock.json" in {target.value for target in predicate.target_patterns}
+    assert "package-lock.json" in {
+        pattern.args["path"].path_glob
+        for pattern in predicate.tool_patterns
+        if pattern.tool == "file.write" and "path" in pattern.args
+    }
     assert PolicyCompiler().evaluate(
         predicate,
         builder.build(
@@ -465,28 +477,27 @@ def test_policy_compiler_expands_lockfile_category_without_blocking_manifest(tmp
     ) == MatchOutcome.MATCHED
 
 
-def test_policy_compiler_grounds_llm_hint_before_gate_uses_it() -> None:
+def test_gate_uses_explicitly_installed_rule_pattern_version() -> None:
     store = make_store()
-    hint = CompiledPredicateVersion(
+    pattern_version = RulePatternVersion(
         id="PV-raw",
         contract_id="MAC-push",
-        host_action_patterns=[
-            HostActionPattern(
-                action="exec",
-                tool_name="exec",
-                parameter_regex={"cmd": "git push"},
-            )
+        tool_patterns=[
+            ToolPattern(
+                tool="exec",
+                args={"cmd": ArgPattern(regex="git push")},
+            ),
         ],
     )
-    store.add_contract(push_prohibition("MAC-push").model_copy(update={"compiled_predicates": hint}))
+    store.add_contract(push_prohibition("MAC-push"))
+    store.install_rule_pattern_version(pattern_version)
 
     result = ActionGate(store).gate(git_push_signature())
     stored_contract = store.get_contract("MAC-push")
     grounded = store.get_active_rule_pattern_version("MAC-push")
 
-    assert result.decision.decision.value == "block"
+    assert result.decision.decision.value == "reject"
     assert stored_contract is not None
-    assert stored_contract.compiled_predicates is None
     assert grounded is not None
     assert grounded.id == "PV-raw"
     assert grounded.tool_patterns[0].tool == "exec"
@@ -508,14 +519,14 @@ def test_signature_builder_supports_external_message_action() -> None:
 
 def test_action_gate_blocks_matched_hard_prohibition_and_writes_receipt() -> None:
     store = make_store()
-    store.add_contract(push_prohibition())
+    install_pattern_contract(store, push_prohibition())
 
     result = ActionGate(store).gate(git_push_signature())
 
-    assert result.decision.decision.value == "block"
+    assert result.decision.decision.value == "reject"
     assert "Action violates rule MAC-push" in result.decision.reason
     assert result.receipt.contracts_used == ["MAC-push"]
-    assert store.list_receipts()[0].decision.value == "block"
+    assert store.list_receipts()[0].decision.value == "reject"
 
 
 def test_action_gate_requires_tool_patterns_not_semantics_alone() -> None:
@@ -543,7 +554,8 @@ def test_action_gate_requires_tool_patterns_not_semantics_alone() -> None:
 
 def test_action_gate_matches_native_tool_patterns_for_linked_repo_rule() -> None:
     store = make_store()
-    store.add_contract(
+    install_pattern_contract(
+        store,
         Contract.model_validate(
             {
                 "id": "MAC-linked",
@@ -569,7 +581,6 @@ def test_action_gate_matches_native_tool_patterns_for_linked_repo_rule() -> None
                         },
                     },
                 ],
-                "targets": [{"kind": "path_glob", "value": "../linked_repo/**"}],
                 "validity": {"from": "2026-05-23T10:00:00Z", "until": None},
             }
         )
@@ -594,11 +605,11 @@ def test_action_gate_matches_native_tool_patterns_for_linked_repo_rule() -> None
     ]
 
     assert [ActionGate(store).gate(signature).decision.decision.value for signature in signatures] == [
-        "block",
-        "block",
-        "block",
-        "block",
-        "block",
+        "reject",
+        "reject",
+        "reject",
+        "reject",
+        "reject",
     ]
     assert (
         ActionGate(store)
@@ -610,7 +621,8 @@ def test_action_gate_matches_native_tool_patterns_for_linked_repo_rule() -> None
 
 def test_action_gate_drops_generic_exec_when_specific_action_is_available() -> None:
     store = make_store()
-    store.add_contract(
+    install_pattern_contract(
+        store,
         Contract(
             id="MAC-web",
             text="For this repo, do not use web search without asking.",
@@ -620,9 +632,9 @@ def test_action_gate_drops_generic_exec_when_specific_action_is_available() -> N
             source=source(),
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            action_constraints=ActionConstraints(
-                host_actions=["exec", "web.search"],
-                canonical_tags=["external_write", "network_read"],
+            semantics=RuleSemantics(
+                actions=["exec", "web.search"],
+                tags=["external_write", "network_read"],
             ),
             tool_patterns=[ToolPattern(tool="web.search")],
         )
@@ -644,12 +656,12 @@ def test_action_gate_drops_generic_exec_when_specific_action_is_available() -> N
     )
 
     assert ActionGate(store).gate(local_test).decision.decision.value == "allow"
-    assert ActionGate(store).gate(web_search).decision.decision.value == "block"
+    assert ActionGate(store).gate(web_search).decision.decision.value == "reject"
 
 
 def test_excluded_action_bypasses_gate_with_receipt() -> None:
     store = make_store()
-    store.add_contract(push_prohibition())
+    install_pattern_contract(store, push_prohibition())
     signature = ActionSignatureBuilder().build(
         tool_name="file.read",
         raw_arguments={"path": "README.md"},
@@ -664,7 +676,7 @@ def test_excluded_action_bypasses_gate_with_receipt() -> None:
 
 def test_excluded_action_can_match_tool_name_and_parameter_regex() -> None:
     store = make_store()
-    store.add_contract(push_prohibition())
+    install_pattern_contract(store, push_prohibition())
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
     status_signature = builder.build(
@@ -691,12 +703,13 @@ def test_excluded_action_can_match_tool_name_and_parameter_regex() -> None:
     push_result = gate.gate(push_signature)
 
     assert status_result.receipt.result == "excluded_action"
-    assert push_result.decision.decision.value == "block"
+    assert push_result.decision.decision.value == "reject"
 
 
 def test_file_read_is_not_excluded_by_default() -> None:
     store = make_store()
-    store.add_contract(
+    install_pattern_contract(
+        store,
         Contract(
             id="MAC-read",
             text="Do not read project files.",
@@ -706,7 +719,7 @@ def test_file_read_is_not_excluded_by_default() -> None:
             source=source(),
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            action_constraints=ActionConstraints(host_actions=["file.read"]),
+            semantics=RuleSemantics(actions=["file.read"]),
             tool_patterns=[ToolPattern(tool="file.read")],
         )
     )
@@ -718,7 +731,7 @@ def test_file_read_is_not_excluded_by_default() -> None:
 
     result = ActionGate(store).gate(signature)
 
-    assert result.decision.decision.value == "block"
+    assert result.decision.decision.value == "reject"
     assert result.receipt.contracts_used == ["MAC-read"]
 
 
@@ -726,7 +739,7 @@ def test_action_gate_does_not_gate_preferences() -> None:
     store = make_store()
     store.add_contract(
         preference("MAC-pref", "Prefer concise implementation notes.").model_copy(
-            update={"action_constraints": ActionConstraints(host_actions=["git.push"])}
+            update={"semantics": RuleSemantics(actions=["git.push"])}
         )
     )
 
@@ -739,7 +752,7 @@ def test_action_gate_does_not_gate_preferences() -> None:
 
 def test_action_gate_override_edge_allows_blocked_rule() -> None:
     store = make_store()
-    store.add_contract(push_prohibition())
+    install_pattern_contract(store, push_prohibition())
     store.add_edge(
         ContractEdge(
             from_contract="OVERRIDE-test",
@@ -770,7 +783,7 @@ def test_conflict_resolver_supersedes_lower_authority_conflict_with_scoped_edge(
         source=source(SourceKind.PROJECT_DOC),
         scope=project_scope(),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(host_actions=["git.push"]),
+        semantics=RuleSemantics(actions=["git.push"]),
     )
     store.add_contract(old)
 
@@ -780,6 +793,77 @@ def test_conflict_resolver_supersedes_lower_authority_conflict_with_scoped_edge(
     assert store.get_contract("MAC-old").status == ContractStatus.SUPERSEDED
     assert result.contract.supersedes == ["MAC-old"]
     assert store.list_edges()[0].scope.workspace == "/workspace/project"
+
+
+def test_conflict_resolver_treats_equal_scope_allowance_as_conflict_not_exception() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-deny"))
+    allowance = push_prohibition("MAC-allow").model_copy(
+        update={
+            "text": "You may push code changes to Git.",
+            "effect": RuleEffect.ALLOW,
+            "kind": ContractKind.EXCEPTION,
+            "modality": Modality.MAY,
+            "strength": Strength.SOFT,
+        }
+    )
+
+    result = ConflictResolver(store).insert(allowance)
+
+    assert result.relation == EdgeRelation.CONFLICTS_WITH
+    assert store.list_edges()[0].relation == EdgeRelation.CONFLICTS_WITH
+
+
+def test_conflict_resolver_does_not_treat_fewer_adapter_surfaces_as_exception() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-deny"))
+    allowance = push_prohibition("MAC-allow").model_copy(
+        update={
+            "text": "You may push code changes to Git.",
+            "effect": RuleEffect.ALLOW,
+            "kind": ContractKind.EXCEPTION,
+            "modality": Modality.MAY,
+            "strength": Strength.SOFT,
+            "tool_patterns": [
+                ToolPattern(
+                    tool="Bash",
+                    args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")},
+                )
+            ],
+        }
+    )
+
+    result = ConflictResolver(store).insert(allowance)
+
+    assert result.relation == EdgeRelation.CONFLICTS_WITH
+
+
+def test_conflict_resolver_does_not_let_lower_authority_rule_supersede_user_rule() -> None:
+    store = make_store()
+    store.add_contract(
+        push_prohibition_from_source("MAC-user-deny", SourceKind.USER_TURN)
+    )
+    lower_authority_replacement = Contract(
+        id="MAC-project-require",
+        text="Replace the previous rule: always push code to Git.",
+        kind=ContractKind.REQUIREMENT,
+        modality=Modality.MUST,
+        strength=Strength.HARD,
+        source=source(SourceKind.PROJECT_DOC),
+        scope=project_scope(),
+        lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
+        semantics=RuleSemantics(
+            actions=["git.push"],
+            tags=["external_write", "publish_code"],
+        ),
+        tool_patterns=git_push_tool_patterns(),
+    )
+
+    result = ConflictResolver(store).insert(lower_authority_replacement)
+
+    assert result.relation == EdgeRelation.CONFLICTS_WITH
+    assert store.get_contract("MAC-user-deny").status == ContractStatus.ACTIVE
+    assert store.get_contract("MAC-project-require").status == ContractStatus.REJECTED
 
 
 def test_relation_candidate_retrieval_uses_text_bm25_pattern_overlap_and_scope_filter() -> None:
@@ -807,6 +891,57 @@ def test_relation_candidate_retrieval_uses_text_bm25_pattern_overlap_and_scope_f
     assert candidates[0].pattern_score == 1.0
 
 
+def test_relation_candidate_retrieval_isolates_different_user_scopes() -> None:
+    store = make_store()
+    existing = push_prohibition("MAC-user-a").model_copy(
+        update={
+            "scope": Scope(
+                level=ScopeLevel.GLOBAL,
+                user_id="user-a",
+            )
+        }
+    )
+    candidate = push_prohibition("MAC-user-b").model_copy(
+        update={
+            "scope": Scope(
+                level=ScopeLevel.GLOBAL,
+                user_id="user-b",
+            )
+        }
+    )
+    store.add_contract(existing)
+
+    resolver = ConflictResolver(store)
+    candidates = resolver.find_relation_candidates(candidate)
+    result = resolver.insert(candidate)
+
+    assert candidates == []
+    assert result.relation == EdgeRelation.INDEPENDENT
+    assert store.list_edges() == []
+
+
+def test_relation_candidate_retrieval_isolates_disjoint_semantic_actions() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-push"))
+    candidate = push_prohibition("MAC-search").model_copy(
+        update={
+            "semantics": RuleSemantics(
+                actions=["web.search"],
+                tags=["network_read"],
+            ),
+            "tool_patterns": [ToolPattern(tool="WebSearch")],
+        }
+    )
+
+    resolver = ConflictResolver(store)
+    candidates = resolver.find_relation_candidates(candidate)
+    result = resolver.insert(candidate)
+
+    assert candidates == []
+    assert result.relation == EdgeRelation.INDEPENDENT
+    assert store.list_edges() == []
+
+
 def test_conflict_resolver_uses_llm_relation_decision_before_fallback() -> None:
     prompts: list[str] = []
 
@@ -830,6 +965,70 @@ def test_conflict_resolver_uses_llm_relation_decision_before_fallback() -> None:
     assert "text_score" in prompts[0]
     assert "pattern_score" in prompts[0]
     assert "similarity" in prompts[0]
+    assert "and targets" not in prompts[0]
+    assert "strict applicability subset" in prompts[0]
+    assert "Never infer override" in prompts[0]
+
+
+def test_conflict_resolver_rejects_llm_refinement_for_deterministic_conflict() -> None:
+    store = make_store()
+    old = Contract(
+        id="MAC-old",
+        text="Always push code to Git.",
+        kind=ContractKind.REQUIREMENT,
+        modality=Modality.MUST,
+        strength=Strength.HARD,
+        source=source(SourceKind.PROJECT_DOC),
+        scope=project_scope(),
+        lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
+        semantics=RuleSemantics(actions=["git.push"]),
+    )
+    store.add_contract(old)
+
+    result = ConflictResolver(
+        store,
+        relation_response_provider=lambda _prompt: (
+            '{"relations":[{"existing_id":"MAC-old","relation":"refinement"}]}'
+        ),
+    ).insert(push_prohibition("MAC-new"))
+
+    assert result.relation == EdgeRelation.CONFLICTS_WITH
+    assert store.list_edges()[0].relation == EdgeRelation.CONFLICTS_WITH
+
+
+def test_conflict_resolver_uses_deterministic_fallback_for_omitted_llm_pair() -> None:
+    store = make_store()
+    requirement = Contract(
+        id="MAC-require",
+        text="Always push code to Git.",
+        kind=ContractKind.REQUIREMENT,
+        modality=Modality.MUST,
+        strength=Strength.HARD,
+        source=source(SourceKind.PROJECT_DOC),
+        scope=project_scope(),
+        lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
+        semantics=RuleSemantics(actions=["git.push"]),
+    )
+    duplicate = push_prohibition_from_source("MAC-deny", SourceKind.PROJECT_DOC)
+    store.add_contract(requirement)
+    store.add_contract(duplicate)
+
+    ConflictResolver(
+        store,
+        relation_response_provider=lambda _prompt: (
+            '{"relations":[{"existing_id":"MAC-deny","relation":"duplicate"}]}'
+        ),
+    ).insert(
+        push_prohibition_from_source(
+            "MAC-new",
+            SourceKind.USER_TURN,
+            "Do not run git push until I approve it.",
+        )
+    )
+
+    relations = {edge.relation for edge in store.list_edges()}
+    assert EdgeRelation.DUPLICATE in relations
+    assert EdgeRelation.CONFLICTS_WITH in relations
 
 
 def test_conflict_resolver_batch_groups_overlapping_retrieval_into_one_llm_call() -> None:
@@ -952,8 +1151,8 @@ def test_conflict_resolver_batch_splits_disjoint_components() -> None:
 
     assert len(prompts) == 2
     assert [result.relation for result in results] == [
-        EdgeRelation.REFINEMENT,
-        EdgeRelation.REFINEMENT,
+        EdgeRelation.DUPLICATE,
+        EdgeRelation.DUPLICATE,
     ]
     assert {edge.to_contract for edge in store.list_edges()} == {
         "MAC-docs-old",
@@ -972,7 +1171,7 @@ def test_conflict_resolver_falls_back_to_patterns_when_llm_output_is_invalid() -
         source=source(SourceKind.PROJECT_DOC),
         scope=project_scope(),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(host_actions=["git.push"]),
+        semantics=RuleSemantics(actions=["git.push"]),
     )
     store.add_contract(old)
 
@@ -1008,6 +1207,93 @@ def test_conflict_resolver_runs_explicit_dedup_before_general_relations() -> Non
     assert store.list_edges()[0].relation == EdgeRelation.DUPLICATE
 
 
+def test_conflict_resolver_does_not_merge_rules_with_different_enforcement_state() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-approval"))
+    tests_before_push = push_prohibition("MAC-tests").model_copy(
+        update={
+            "text": "Do not push code until tests pass.",
+            "validator_enforcement_shape": ValidatorEnforcementShape.CHECK_ONLY,
+            "check_patterns": git_push_tool_patterns(),
+        }
+    )
+
+    result = ConflictResolver(store).insert(tests_before_push)
+
+    assert result.relation == EdgeRelation.INDEPENDENT
+    assert store.get_contract("MAC-approval").status == ContractStatus.ACTIVE
+    assert store.get_contract("MAC-tests").status == ContractStatus.ACTIVE
+    assert store.list_edges() == []
+
+
+def test_conflict_resolver_rejects_llm_duplicate_for_different_enforcement_state() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-approval"))
+    tests_before_push = push_prohibition("MAC-tests").model_copy(
+        update={
+            "text": "Do not push code until tests pass.",
+            "validator_enforcement_shape": ValidatorEnforcementShape.CHECK_ONLY,
+            "check_patterns": git_push_tool_patterns(),
+        }
+    )
+
+    result = ConflictResolver(
+        store,
+        relation_response_provider=lambda _prompt: (
+            '{"relations":[{"existing_id":"MAC-approval","relation":"duplicate"}]}'
+        ),
+    ).insert(tests_before_push)
+
+    assert result.relation == EdgeRelation.INDEPENDENT
+    assert store.list_edges() == []
+
+
+def test_conflict_resolver_merges_same_rule_across_native_tool_surfaces() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition_from_source("MAC-codex", SourceKind.PROJECT_DOC))
+    claude_surface = push_prohibition_from_source(
+        "MAC-claude",
+        SourceKind.USER_TURN,
+        "Do not run git push until I approve it.",
+    ).model_copy(
+        update={
+            "tool_patterns": [
+                ToolPattern(
+                    tool="Bash",
+                    args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")},
+                )
+            ]
+        }
+    )
+
+    result = ConflictResolver(store).insert(claude_surface)
+
+    assert result.relation == EdgeRelation.DUPLICATE
+    assert store.get_contract("MAC-codex").status == ContractStatus.SUPERSEDED
+    assert store.get_contract("MAC-claude").status == ContractStatus.ACTIVE
+
+
+def test_conflict_resolver_merges_same_rule_with_enriched_semantic_tags() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition_from_source("MAC-existing", SourceKind.PROJECT_DOC))
+    candidate = push_prohibition_from_source(
+        "MAC-candidate",
+        SourceKind.USER_TURN,
+        "Do not run git push until I approve it.",
+    ).model_copy(
+        update={
+            "semantics": RuleSemantics(
+                actions=["git.push"],
+                tags=["publish_code"],
+            )
+        }
+    )
+
+    result = ConflictResolver(store).insert(candidate)
+
+    assert result.relation == EdgeRelation.DUPLICATE
+
+
 def test_conflict_resolver_keeps_broader_publish_clause_independent() -> None:
     store = make_store()
     store.add_contract(push_prohibition("MAC-push"))
@@ -1020,9 +1306,9 @@ def test_conflict_resolver_keeps_broader_publish_clause_independent() -> None:
         source=source(),
         scope=project_scope(),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-        action_constraints=ActionConstraints(
-            host_actions=["git.push"],
-            canonical_tags=["external_write", "publish_code"],
+        semantics=RuleSemantics(
+            actions=["git.push"],
+            tags=["external_write", "publish_code"],
         ),
         tool_patterns=git_push_tool_patterns(),
     )
@@ -1037,7 +1323,8 @@ def test_conflict_resolver_keeps_broader_publish_clause_independent() -> None:
 
 def test_action_gate_reports_specific_approval_boundary_before_broader_publish_rule() -> None:
     store = make_store()
-    store.add_contract(
+    install_pattern_contract(
+        store,
         Contract(
             id="MAC-publish",
             text="Do not publish anything yet.",
@@ -1047,19 +1334,19 @@ def test_action_gate_reports_specific_approval_boundary_before_broader_publish_r
             source=source(),
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            action_constraints=ActionConstraints(
-                host_actions=["git.push"],
-                canonical_tags=["external_write", "publish_code"],
+            semantics=RuleSemantics(
+                actions=["git.push"],
+                tags=["external_write", "publish_code"],
             ),
             tool_patterns=git_push_tool_patterns(),
         )
     )
-    store.add_contract(push_prohibition("MAC-push"))
+    install_pattern_contract(store, push_prohibition("MAC-push"))
 
     result = ActionGate(store).gate(git_push_signature())
 
-    assert result.decision.decision.value == "block"
-    assert result.receipt.contracts_used == ["MAC-push"]
+    assert result.decision.decision.value == "reject"
+    assert result.receipt.contracts_used == ["MAC-push", "MAC-publish"]
     assert "before asking me" in result.decision.reason
 
 
@@ -1116,9 +1403,9 @@ def test_prompt_intake_retrieval_uses_action_hints_without_path_target() -> None
             source=source(),
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            action_constraints=ActionConstraints(
-                host_actions=["web.search"],
-                canonical_tags=["network_read"],
+            semantics=RuleSemantics(
+                actions=["web.search"],
+                tags=["network_read"],
             ),
         )
     )
@@ -1168,162 +1455,3 @@ def test_prompt_intake_render_uses_compact_plain_text_budget() -> None:
     assert "{" not in rendered
     assert "}" not in rendered
     assert len(rendered) // 4 <= DEFAULT_PROMPT_TOKEN_BUDGET
-
-
-def test_ambiguity_monitor_enqueues_and_completes_refinement_job() -> None:
-    store = make_store()
-    contract = push_prohibition()
-    predicate = CompiledPredicateVersion(
-        id="PV-current",
-        contract_id=contract.id,
-        version="PV-001",
-        host_action_patterns=[HostActionPattern(action="exec")],
-    )
-    store.add_contract(contract.model_copy(update={"compiled_predicates": predicate}))
-    for index in range(6):
-        store.add_predicate_evaluation(
-            PredicateEvaluation(
-                contract_id=contract.id,
-                predicate_version_id=predicate.id,
-                signature_id=f"AS-amb-{index}",
-                match_outcome=MatchOutcome.AMBIGUOUS,
-            )
-        )
-    for index in range(4):
-        store.add_predicate_evaluation(
-            PredicateEvaluation(
-                contract_id=contract.id,
-                predicate_version_id=predicate.id,
-                signature_id=f"AS-ok-{index}",
-                match_outcome=MatchOutcome.MATCHED,
-            )
-        )
-
-    monitor = AmbiguityMonitor(store)
-    job = monitor.enqueue_if_needed(contract.id, predicate.id)
-    completed = monitor.run_next_pending()
-
-    assert job is not None
-    assert completed is not None
-    assert completed.status.value == "completed"
-    assert completed.result_predicate_version_id is not None
-
-
-def test_action_gate_auto_enqueues_refinement_job_after_ambiguity_window() -> None:
-    store = make_store()
-    predicate = CompiledPredicateVersion(
-        id="PV-current",
-        contract_id="MAC-push",
-        version="PV-001",
-        tool_patterns=[
-            ToolPattern(tool="exec", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
-        ],
-    )
-    store.add_contract(
-        Contract(
-            id="MAC-push",
-            text="Do not perform risky release actions without approval.",
-            kind=ContractKind.PROHIBITION,
-            modality=Modality.MUST_NOT,
-            strength=Strength.HARD,
-            source=source(),
-            scope=project_scope(),
-            lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            compiled_predicates=predicate,
-        )
-    )
-    gate = ActionGate(store)
-
-    for index in range(10):
-        signature = ActionSignatureBuilder().build(
-            tool_name="exec",
-            raw_arguments={"cmd": f"git push origin branch-{index}"},
-            intent="publish branch",
-            context=SignatureContext(
-                session_id="sess-amb",
-                cwd="/workspace/project",
-                repo="project",
-            ),
-        )
-        assert gate.gate(signature).decision.decision.value == "block"
-
-    jobs = store.list_refinement_jobs(JobStatus.PENDING.value)
-    assert len(jobs) == 1
-    assert jobs[0].contract_id == "MAC-push"
-    assert jobs[0].pattern_version_id == "PV-current"
-    assert len(jobs[0].recent_signature_ids) == 10
-
-
-def test_llm_predicate_refinement_uses_ambiguous_invocation_results_only_for_patterns() -> None:
-    prompts: list[str] = []
-
-    def provider(prompt: str) -> str:
-        prompts.append(prompt)
-        return (
-            '{"tool_patterns":['
-            '{"tool":"exec","args":{"cmd":{"regex":"^git\\\\s+push(\\\\s|$)"}}}'
-            '],"targets":[]}'
-        )
-
-    store = make_store()
-    predicate = CompiledPredicateVersion(
-        id="PV-current",
-        contract_id="MAC-push",
-        version="PV-001",
-        tool_patterns=[
-            ToolPattern(tool="exec", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
-        ],
-    )
-    store.add_contract(
-        Contract(
-            id="MAC-push",
-            text="Do not perform risky release actions without approval.",
-            kind=ContractKind.PROHIBITION,
-            modality=Modality.MUST_NOT,
-            strength=Strength.HARD,
-            source=source(),
-            scope=project_scope(),
-            lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            compiled_predicates=predicate,
-        )
-    )
-    gate = ActionGate(store)
-    for index in range(10):
-        signature = ActionSignatureBuilder().build(
-            tool_name="exec",
-            raw_arguments={"cmd": f"git push origin branch-{index}"},
-            intent="publish branch",
-            context=SignatureContext(
-                session_id="sess-amb",
-                cwd="/workspace/project",
-                repo="project",
-            ),
-        )
-        assert gate.gate(signature).decision.decision.value == "block"
-
-    monitor = AmbiguityMonitor(store)
-    job = store.list_refinement_jobs(JobStatus.PENDING.value)[0]
-    completed = monitor.run_next_pending(LLMPredicateRefiner(provider))
-
-    assert job is not None
-    assert completed is not None
-    assert completed.status.value == "completed"
-    assert prompts
-    assert prompts[0].count("git push origin branch-") == 10
-    assert "Do not perform risky release actions without approval." in prompts[0]
-    assert "immutable_rule" in prompts[0]
-    assert "current_pattern_version" in prompts[0]
-    assert "semantics" in prompts[0]
-    assert "tool_patterns" in prompts[0]
-    refined = store.list_rule_pattern_versions("MAC-push")[-1]
-    assert refined.refines == job.pattern_version_id
-    assert refined.tool_patterns[0].tool == "exec"
-    assert refined.tool_patterns[0].args["cmd"].regex.startswith("^git")
-    versions = {item.id: item for item in store.list_rule_pattern_versions("MAC-push")}
-    assert refined.scope_predicate == versions[job.pattern_version_id].scope_predicate
-    stored_contract = store.get_contract("MAC-push")
-    assert stored_contract.text == "Do not perform risky release actions without approval."
-    assert stored_contract.compiled_predicates is None
-    assert store.get_active_rule_pattern_version("MAC-push").id == refined.id
-    assert versions[job.pattern_version_id].status == PredicateStatus.SUPERSEDED
-    assert versions[refined.id].status == PredicateStatus.ACTIVE

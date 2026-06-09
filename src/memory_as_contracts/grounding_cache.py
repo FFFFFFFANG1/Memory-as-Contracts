@@ -4,9 +4,6 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from memory_as_contracts.models import TargetPattern
-
-
 IGNORED_DIRS = {
     ".git",
     ".hg",
@@ -112,26 +109,23 @@ class GroundingCache:
             return cls()
         return cls(workspace=Path(workspace).expanduser().resolve(strict=False))
 
-    def ground_targets(
+    def ground_paths(
         self,
         *,
         text: str,
-        hint_targets: list[TargetPattern],
+        hint_paths: list[str],
         scope_globs: list[str],
-    ) -> list[TargetPattern]:
+    ) -> list[str]:
         values: list[str] = []
-        for pattern in hint_targets:
-            if pattern.kind == "path_glob":
-                values.extend(self.ground_path(pattern.value))
-            else:
-                values.append(pattern.value)
+        for value in hint_paths:
+            values.extend(self.ground_path(value))
         for value in scope_globs:
             values.extend(self.ground_path(value))
         values.extend(_relative_paths(text))
         category = self.category_patterns(text)
         if category:
             values.extend(category)
-        return [TargetPattern(kind="path_glob", value=value) for value in _dedupe(values)]
+        return _dedupe(values)
 
     def ground_path(self, value: str) -> list[str]:
         clean = value.strip().strip("`'\"").rstrip(".,;:")

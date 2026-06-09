@@ -1,0 +1,48 @@
+{
+  "schema_version": "MACBenchFixtureV1",
+  "cases": [
+    {
+      "id": "direct-path-deny-component",
+      "scenario": "direct_path_deny",
+      "evidence_tier": "component",
+      "driver": "ActionGate.gate",
+      "expected_decision": "reject"
+    },
+    {
+      "id": "test-before-push-component",
+      "scenario": "test_before_push",
+      "evidence_tier": "component",
+      "driver": "ValidatorRuntime.check",
+      "expected_decision": "ask_then_allow"
+    },
+    {
+      "id": "budget-component",
+      "scenario": "accumulated_budget",
+      "evidence_tier": "component",
+      "driver": "ValidatorRuntime.update_check",
+      "expected_decision": "reject"
+    },
+    {
+      "id": "ask-before-send-adapter",
+      "scenario": "ask_before_send",
+      "evidence_tier": "adapter_shim",
+      "driver": "BaseAdapter.pre_ask_user_pre",
+      "expected_decision": "ask_then_allow_once"
+    },
+    {
+      "id": "runtime-failure-adapter",
+      "scenario": "validator_runtime_failure",
+      "evidence_tier": "adapter_shim",
+      "driver": "CodexAdapter.handle_pre_tool_use",
+      "expected_decision": "ask"
+    },
+    {
+      "id": "codex-real-host-trace",
+      "scenario": "real_host_hook_chain",
+      "evidence_tier": "real_host_trace",
+      "driver": "external_trace_required",
+      "expected_decision": "unverified",
+      "status": "fixture_placeholder"
+    }
+  ]
+}

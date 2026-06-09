@@ -11,7 +11,7 @@ from memory_as_contracts.adapters.base import (
     dedupe_specs,
     source_spec,
 )
-from memory_as_contracts.gate import ActionGate
+from memory_as_contracts.hook_runtime import default_pattern_refiner_factory
 from memory_as_contracts.models import ActionSignature, GateDecisionType, SourceKind
 from memory_as_contracts.store import ContractStore
 from memory_as_contracts.tool_capsules import ToolCapabilityCapsule, object_schema
@@ -203,18 +203,17 @@ class OpenClawAdapter(BaseAdapter):
         event: Mapping[str, Any] | Any,
         context: AdapterContext,
     ) -> dict[str, Any]:
-        signature = self.build_action_signature(event, context)
-        result = ActionGate(store, exclude_actions=self.exclude_actions).gate(signature)
-        mac_payload = {
-            "receipt_id": result.receipt.id,
-            "signature_id": result.receipt.signature_id,
-            "decision": result.decision.decision.value,
-            "reason": result.decision.reason,
-            "contracts_used": result.decision.contracts_used,
-            "edges_applied": result.decision.edges_applied,
-        }
-        if result.decision.decision == GateDecisionType.BLOCK:
-            return {"block": True, "reason": result.decision.reason, "mac": mac_payload}
+        self.configure_runtime(context)
+        result = self.evaluate_action(store, event, context)
+        mac_payload = self.decision_metadata(result)
+        if result.decision.decision != GateDecisionType.ALLOW:
+            return {
+                "block": True,
+                "decision": result.decision.decision.value,
+                "reason": result.decision.reason,
+                "requires_user_input": result.decision.decision == GateDecisionType.ASK,
+                "mac": mac_payload,
+            }
         return {"block": False, "mac": mac_payload}
 
     def bridge_before_prompt_build(
@@ -222,10 +221,22 @@ class OpenClawAdapter(BaseAdapter):
         store: ContractStore,
         payload: Mapping[str, Any],
         context: AdapterContext,
+        *,
+        extractor_factory=None,
     ) -> dict[str, Any]:
         user_turn = str(payload.get("prompt") or payload.get("user_turn") or "")
-        prompt_text = self.render_prompt_context(store, user_turn, context)
-        return {"additionalContext": prompt_text} if prompt_text else {}
+        result = self.process_user_prompt_submit(
+            store,
+            user_turn,
+            context,
+            extractor_factory=extractor_factory,
+        )
+        output: dict[str, Any] = {}
+        if result.prompt_text:
+            output["additionalContext"] = result.prompt_text
+        if result.error is not None:
+            output["mac"] = {"error": result.error}
+        return output
 
     def bridge_before_tool_call(
         self,
@@ -241,6 +252,7 @@ class OpenClawAdapter(BaseAdapter):
                 "hooks": {
                     "before_prompt_build": "memory_as_contracts.adapters.openclaw:bridge_before_prompt_build",
                     "before_tool_call": "memory_as_contracts.adapters.openclaw:bridge_before_tool_call",
+                    "after_tool_call": "memory_as_contracts.adapters.openclaw:bridge_after_tool_call",
                 }
             },
             "note": "Function bridge only; Step 11 does not auto-install OpenClaw plugins.",
@@ -260,7 +272,7 @@ def _value(event: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any
     return getattr(event, key, default)
 
 
-_ADAPTER = OpenClawAdapter()
+_ADAPTER = OpenClawAdapter(pattern_refiner_factory=default_pattern_refiner_factory)
 
 
 def discover_sources(context: AdapterContext) -> list[MemorySourceSpec]:
@@ -300,8 +312,15 @@ def hook_config_snippet():
 
 
 def bridge_before_prompt_build(store: ContractStore, payload: Mapping[str, Any], context: AdapterContext):
+    _ADAPTER.configure_runtime(context)
     return _ADAPTER.bridge_before_prompt_build(store, payload, context)
 
 
 def bridge_before_tool_call(store: ContractStore, payload: Mapping[str, Any], context: AdapterContext):
+    _ADAPTER.configure_runtime(context)
     return _ADAPTER.bridge_before_tool_call(store, payload, context)
+
+
+def bridge_after_tool_call(store: ContractStore, payload: Mapping[str, Any], context: AdapterContext):
+    _ADAPTER.configure_runtime(context)
+    return _ADAPTER.handle_post_tool_use(store, payload, context)

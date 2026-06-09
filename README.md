@@ -32,10 +32,10 @@ MAC owns:
 - storing active, superseded, expired, rejected, and conflicting contracts plus
   scoped/lifecycle-aware edges between them;
 - mapping host tool calls into action signatures through adapter hook rules;
-- compiling natural-language rules into bounded predicates using the adapter's
-  current available-action registry;
-- asynchronously refining predicates when action-time matching is repeatedly
-  ambiguous;
+- compiling verified `tool_patterns`, semantics, and scope into bounded
+  predicates;
+- verifying extractor-proposed patterns against native tool schemas and
+  synchronously repairing an invalid proposal at most once;
 - checking applicable contracts before prompt planning and non-excluded actions;
 - recording receipts explaining which contracts affected an action.
 
@@ -57,7 +57,9 @@ user turns / memory files / project docs
   -> similarity + conflict check
   -> contract store and scoped edge graph
   -> prompt-intake retrieval
-  -> hook-based action gate
+  -> pre-action pattern/validator gate
+  -> post-action committed Action Log
+  -> scoped validator state update
   -> receipt log
 ```
 
@@ -116,9 +118,6 @@ Example:
       "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}
     }
   ],
-  "targets": [
-    {"kind": "git_remote", "value": "*"}
-  ],
   "override": {
     "allowed": true,
     "requires": "explicit_user_confirmation"
@@ -127,10 +126,11 @@ Example:
 }
 ```
 
-`tool_patterns` and `targets` in the rule are operational seeds. The
-deterministic compiler/materializer validates those seeds against the adapter's
-available action registry and stores a separate `RulePatternVersion` for
-action-time matching.
+`tool_patterns` in the rule are operational seeds. Paths and other operands are
+encoded in raw tool argument matchers rather than a separate rule-level
+`targets` field. The deterministic compiler/materializer validates those seeds
+against the adapter's tool capsules and stores a separate
+`RulePatternVersion` for action-time matching.
 
 Initial contract kinds:
 
@@ -158,6 +158,11 @@ MAC can also cold-start from existing memory and instruction sources:
 Cold-start items must preserve source provenance and should usually have lower
 freshness than current user-turn contracts.
 
+Current adapters perform cold-start import once per adapter/workspace when a
+first `UserPromptSubmit` observes existing source files. File-diff source refresh
+is intentionally disabled for now and marked as future work; durable user-turn
+contracts still enter through the ten-turn online extraction path.
+
 ## Restriction Points
 
 MAC checks behavior at two points.
@@ -174,13 +179,35 @@ Hook-based action gate:
 
 - uses adapter-specific rules to map host tool calls into normalized action
   signatures;
-- receives the adapter's current `available_actions` registry instead of relying
-  on a fixed global action-class enum;
+- receives native tool metadata plus semantic `host_action` in each action
+  signature; `available_actions` is retained as signature/receipt context, not
+  as compiler input;
 - includes current session, time, workspace, tool, target, and intent metadata in
   the signature;
 - gates every action except those explicitly listed in `exclude_action`;
-- returns `allow`, `revise`, `confirm`, `block`, or `defer`;
+- returns exactly `allow`, `reject`, or `ask`;
 - records a receipt after the decision.
+
+`reject` and `ask` both stop the current host tool call. `ask` additionally
+returns an `ask_id` and `requires_user_input=true`. The next `UserPromptSubmit`
+in the same session/task moves that request from `required` to `responded`.
+The single-use response flag only skips the related ask-before rule on the next
+Pending Action in the same response turn and exact native tool family. Adapters
+may declare explicit alias families; MAC never uses fuzzy tool-name matching.
+The flag expires after 30 minutes and never interprets the user's reply.
+
+MAC v4 records only committed post-action tool calls in the Action Log. Installed
+validators are immutable, verifier-approved versions. `check_only` validators
+read the Pending Action plus bounded `log.search(spec)` results; `check_update`
+validators additionally maintain revisioned state keyed by validator version and
+scope. The sandbox worker receives an RPC log proxy, never the full Action Log or
+a SQLite connection.
+
+Online contract ingestion is separate from the action gate. Adapters persist
+user turns and, after each ten unprocessed turns in a session, send that batch to
+the Rule Extractor. Extracted candidates pass through the Conflict Resolver into
+the Contract Store before prompt retrieval. Gate evaluation never invokes the
+extractor.
 
 Example action signature:
 
@@ -262,23 +289,16 @@ MAC can still use cross-agent canonical tags such as `external_write`,
 
 ## Pattern Refinement
 
-MAC should treat repeated ambiguous action-time matches as a signal that a rule's
-active rule pattern version needs repair.
+Pattern refinement is an ingestion-time correctness repair, not an adaptive
+quality loop. The extractor proposes `tool_patterns`, `check_patterns`, and
+`update_patterns`; a deterministic verifier checks native tool names, raw
+argument names, argument types, and regex syntax against adapter capsules. On
+failure MAC may call the pattern refiner once, then reruns the same verifier.
+Patterns that still fail remain non-hookable candidates.
 
-Default policy:
-
-```text
-if a contract is evaluated at least 10 times
-and at least 60% of those evaluations are ambiguous
-then enqueue async predicate refinement
-```
-
-The async job can call an LLM with the immutable rule, current rule pattern
-version, adapter `available_actions`, recent ambiguous signatures, receipts, and
-user confirmations. It writes a new rule pattern version, not a silent rewrite
-of the source rule. Current gates do not wait for the job; high-risk ambiguous
-actions should return `confirm` or `defer`, while low-risk ambiguous actions can
-be allowed with a receipt according to adapter policy.
+The action-time matcher has only `matched` and `not_matched`. MAC does not infer
+that a syntactically valid but ineffective pattern should be improved from
+runtime outcomes; that is currently treated as model capability.
 
 ## Storage Backends
 
@@ -354,14 +374,13 @@ The current codebase is a MAC kernel implementation:
 
 - `memory_as_contracts` Python package;
 - `mac` CLI with version and environment diagnostics;
-- MAC-native environment variables: `MAC_LLM_MODEL` and `MAC_DB_PATH`;
+- MAC-native environment variables for the model, timeout, database, and logs;
 - typed Pydantic models for rules/contracts, sources, scope, lifecycle,
   semantics, native tool patterns, rule pattern versions, scoped edges,
-  available actions, action signatures, gate decisions, receipts, and ambiguity
-  events;
+  available actions, action signatures, gate decisions, and receipts;
 - validation that `fact` contracts cannot bind hook enforcement patterns;
 - SQLite store with schema versioning, FTS, contracts, edges, pattern versions,
-  receipts, source snapshots, ambiguity events, and refinement jobs;
+  receipts, source snapshots, and periodic user-turn batches;
 - LLM-backed candidate extraction with an explicit system prompt defining what
   counts as a MAC rule and what must not be extracted;
 - scope and lifecycle normalization for user turns and cold-start sources;
@@ -369,9 +388,9 @@ The current codebase is a MAC kernel implementation:
 - synchronous dedup, refinement, conflict, exception, and precedence handling
   with scoped edges;
 - prompt-intake retrieval, action signature construction, deterministic gate
-  decisions, receipt logging, and ambiguity-triggered predicate refinement jobs;
+  decisions, receipt logging, and synchronous pattern verification/refinement;
 - pytest coverage for package, CLI, core models, store, extraction,
-  normalization, resolver, retrieval, gate, receipts, and ambiguity monitoring.
+  normalization, resolver, retrieval, gate, receipts, and pattern verification.
 
 It does not yet implement real host-agent hooks for Codex, Claude Code, Nanobot,
 or OpenClaw; current enforcement evidence is kernel/shim-level unless a test
@@ -380,25 +399,34 @@ explicitly calls the live LLM extractor.
 ## Setup
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv sync --dev --no-editable
+UV_CACHE_DIR=.uv-cache uv sync --dev --reinstall-package memory-as-contracts
 cp .env.example .env
 ```
 
-Edit `.env` with an OpenAI-compatible API key, optional base URL, model, and
-database path:
+Edit `.env` with an OpenAI-compatible API key, optional base URL, model,
+request timeout, database path, and structured log path:
 
 ```env
 OPENAI_API_KEY=
 OPENAI_BASE_URL=
 MAC_LLM_MODEL=
+MAC_LLM_TIMEOUT_SECONDS=60
 MAC_DB_PATH=.mac/contracts.sqlite
+MAC_LOG_PATH=.mac/mac.log
+MAC_LOG_LEVEL=INFO
 ```
+
+MAC retries timed-out LLM calls up to three total attempts. After the third
+timeout, hook-facing online extraction returns a structured `mac.error` and
+keeps the unprocessed user-turn batch for a later retry. Runtime events are
+written as JSON Lines; prompt text, raw tool arguments, and tool results are not
+included in operational log events.
 
 For sandboxed environments where `uv` cannot use its default cache, keep the
 cache inside the repo:
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv sync --dev --no-editable
+UV_CACHE_DIR=.uv-cache uv sync --dev --reinstall-package memory-as-contracts
 ```
 
 ## CLI
@@ -406,17 +434,17 @@ UV_CACHE_DIR=.uv-cache uv sync --dev --no-editable
 Inspect the current package and configuration:
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv run --no-editable mac --help
-UV_CACHE_DIR=.uv-cache uv run --no-editable mac version
-UV_CACHE_DIR=.uv-cache uv run --no-editable mac env
-UV_CACHE_DIR=.uv-cache uv run --no-editable mac env --json
+UV_CACHE_DIR=.uv-cache uv run mac --help
+UV_CACHE_DIR=.uv-cache uv run mac version
+UV_CACHE_DIR=.uv-cache uv run mac env
+UV_CACHE_DIR=.uv-cache uv run mac env --json
 ```
 
 Run tests:
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv run --no-editable pytest
-UV_CACHE_DIR=.uv-cache uv run --no-editable ruff check .
+UV_CACHE_DIR=.uv-cache uv run pytest
+UV_CACHE_DIR=.uv-cache uv run ruff check .
 ```
 
 ## Roadmap
@@ -439,23 +467,26 @@ Status: in progress from a clean MAC scaffold.
   `lifecycle`.
 - Extend conflict/supersession edges with their own scope and lifecycle.
 - Add rule pattern versions for each contract.
-- Add async predicate refinement when recent action-time matches are at least
-  60% ambiguous over a 10-evaluation window.
+- Add ingestion-time tool-schema and regex verification with at most one
+  synchronous LLM pattern repair.
 - Separate online user-turn extraction from cold-start memory import.
+- Run cold-start memory import once per adapter/workspace; keep file-diff source
+  refresh as future work rather than an automatic adapter path.
 
 ### v1: Agent Adapters
 
 - Add adapters for `cc`, `codex`, `openclaw`, and `nanobot`.
 - Add adapter-specific hook rule bases that map host-agent tool calls into MAC
   action signatures.
-- Pass each adapter's current `available_actions` registry into MAC.
+- Preserve each adapter's current `available_actions` registry as
+  ActionSignature/receipt context.
 - Include session, turn, task, time, workspace, tool, target, and intent metadata
   in each action signature.
 - Define an `exclude_action` list per adapter; all other actions go through MAC.
 - Add prompt-intake retrieval before planning.
 - Gate every non-excluded action before execution.
 - Write receipts back to host-agent logs when possible.
-- Support cold-start extraction from each host agent's memory files.
+- Support one-time cold-start extraction from each host agent's memory files.
 
 ### v2: Evaluation
 
@@ -464,7 +495,11 @@ Status: in progress from a clean MAC scaffold.
 - Build `MACBench-General` from MEMTRACK-like or other general-agent tasks plus
   generated rules.
 - Track hard contract violation rate, scope accuracy, lifecycle accuracy,
-  edge-scope/lifecycle activation, predicate match precision/recall, ambiguity
-  rate before and after refinement, conflict resolution, task success, unsafe
-  bypass caused by `exclude_action`, false blocks/confirmations, receipt
+  edge-scope/lifecycle activation, predicate match precision/recall, pattern
+  verification pass rate, conflict resolution, task success, unsafe
+  bypass caused by `exclude_action`, false rejects/asks, receipt
   correctness, token overhead, latency, and extra LLM calls.
+
+The minimal fixture at `tests/fixtures/macbench_v4_minimal.json` labels every
+case as `component`, `adapter_shim`, or `real_host_trace`. Placeholder host traces
+are not counted as verified host integration.

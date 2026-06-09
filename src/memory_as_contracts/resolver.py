@@ -10,6 +10,7 @@ from fnmatch import fnmatch
 
 from memory_as_contracts.matching import scope_specificity
 from memory_as_contracts.models import (
+    ArgPattern,
     Contract,
     ContractEdge,
     ContractKind,
@@ -18,8 +19,10 @@ from memory_as_contracts.models import (
     Modality,
     RuleAuthority,
     RuleEffect,
+    Scope,
     SourceKind,
     Strength,
+    ToolPattern,
 )
 from memory_as_contracts.store import ContractStore
 
@@ -38,13 +41,24 @@ Allowed relations:
 
 Use the provided similarity scores only as retrieval evidence, not as the final
 label. Prefer independent when uncertain.
+An exception_to edge requires the new allow rule to be a strict applicability subset
+of the broader deny rule through scope, semantic action binding, argument matcher,
+or validity. Equal-scope opposite outcomes are conflicts, not exceptions.
+Use supersedes only when the new text explicitly replaces the old rule, the new
+authority is not lower, and the new applicability covers the old rule.
+An overlapping requirement/procedure and prohibition for the same semantic
+action are opposite-direction rules. Classify them as conflicts_with, or as
+supersedes when the new text explicitly replaces/corrects the old rule. Never
+classify such a pair as duplicate, refinement, or independent.
 
 Classify semantic rule relations from text, effect, authority, scope, validity,
-semantics.actions, semantics.tags, and targets. tool_patterns are operational
+semantics.actions, and semantics.tags. tool_patterns are operational
 hook matchers; use them only as weak auxiliary evidence about the same target or
 invocation surface. Different native tool patterns do not make overlapping
 rules independent, and similar tool patterns do not by themselves prove a
 duplicate or conflict when the semantics differ.
+Never infer override. Override edges are created by explicit runtime/user events,
+not by semantic relation classification.
 
 Return relation edges only. Do not decide final active/rejected/superseded or
 pending-conflict status; the deterministic apply phase handles precedence and
@@ -268,7 +282,11 @@ class ConflictResolver:
         scoped_pool = [
             existing
             for existing in pool
-            if existing.id != candidate.id and _scope_lifecycle_overlaps(candidate, existing)
+            if (
+                existing.id != candidate.id
+                and _scope_lifecycle_overlaps(candidate, existing)
+                and _semantic_surface_compatible(candidate, existing)
+            )
         ]
         if not scoped_pool:
             return []
@@ -293,7 +311,10 @@ class ConflictResolver:
                 + SEMANTIC_SIMILARITY_WEIGHT * semantic_score
                 + OPERATIONAL_PATTERN_SIMILARITY_WEIGHT * pattern_score
             )
-            if similarity < threshold:
+            if similarity < threshold and not _requires_relation_consideration(
+                candidate,
+                existing,
+            ):
                 continue
             matches.append(
                 RelationCandidate(
@@ -304,27 +325,33 @@ class ConflictResolver:
                     pattern_score=pattern_score,
                 )
             )
-        ranked = sorted(matches, key=lambda item: item.similarity, reverse=True)
+        ranked = sorted(
+            matches,
+            key=lambda item: (
+                0
+                if _requires_relation_consideration(candidate, item.existing)
+                else 1,
+                -item.similarity,
+            ),
+        )
         limit = self.top_k if top_k == DEFAULT_RELATION_TOP_K else top_k
         if limit is None:
             return ranked
         return ranked[:limit]
 
     def classify_relation(self, candidate: Contract, existing: Contract) -> EdgeRelation:
-        if _normalize(candidate.text) == _normalize(existing.text) and candidate.scope == existing.scope:
+        if _can_be_duplicate(candidate, existing):
             return EdgeRelation.DUPLICATE
-        if candidate.effect == RuleEffect.ALLOW or candidate.kind == ContractKind.EXCEPTION:
-            return EdgeRelation.EXCEPTION_TO if _overlaps(candidate, existing) else EdgeRelation.INDEPENDENT
-        if _says_supersedes(candidate.text) and _overlaps(candidate, existing):
+        if _can_be_exception(candidate, existing):
+            return EdgeRelation.EXCEPTION_TO
+        if _can_supersede(candidate, existing):
             return EdgeRelation.SUPERSEDES
-        if _overlaps(candidate, existing) and _same_direction(candidate, existing):
-            if _contract_similarity(candidate, existing) >= 0.62:
-                return EdgeRelation.DUPLICATE
         if _contradicts(candidate, existing):
             return EdgeRelation.CONFLICTS_WITH
-        if _overlaps(candidate, existing) and _same_direction(candidate, existing):
-            if _is_refinement(candidate, existing):
-                return EdgeRelation.REFINEMENT
+        if candidate.effect == RuleEffect.ALLOW or candidate.kind == ContractKind.EXCEPTION:
+            return EdgeRelation.INDEPENDENT
+        if _can_be_refinement(candidate, existing):
+            return EdgeRelation.REFINEMENT
         return EdgeRelation.INDEPENDENT
 
     def _classify_with_llm(
@@ -355,6 +382,11 @@ class ConflictResolver:
             item = by_id.get(existing_id)
             if item is None or relation is None:
                 continue
+            relation = self._validate_llm_relation(
+                candidate,
+                item.existing,
+                relation,
+            )
             decisions.append(
                 RelationDecision(
                     candidate=candidate,
@@ -375,7 +407,7 @@ class ConflictResolver:
                     RelationDecision(
                         candidate=candidate,
                         existing=item.existing,
-                        relation=EdgeRelation.INDEPENDENT,
+                        relation=self.classify_relation(candidate, item.existing),
                         similarity=item.similarity,
                         text_score=item.text_score,
                         semantic_score=item.semantic_score,
@@ -441,6 +473,11 @@ class ConflictResolver:
             item = by_pair.get((candidate_id, existing_id))
             if candidate is None or item is None or relation is None:
                 continue
+            relation = self._validate_llm_relation(
+                candidate,
+                item.existing,
+                relation,
+            )
             seen_pairs.add((candidate_id, existing_id))
             decisions.append(
                 RelationDecision(
@@ -463,7 +500,7 @@ class ConflictResolver:
                 RelationDecision(
                     candidate=candidate,
                     existing=item.existing,
-                    relation=EdgeRelation.INDEPENDENT,
+                    relation=self.classify_relation(candidate, item.existing),
                     similarity=item.similarity,
                     text_score=item.text_score,
                     semantic_score=item.semantic_score,
@@ -471,6 +508,32 @@ class ConflictResolver:
                 )
             )
         return sorted(decisions, key=lambda item: item.similarity, reverse=True)
+
+    def _validate_llm_relation(
+        self,
+        candidate: Contract,
+        existing: Contract,
+        proposed: EdgeRelation,
+    ) -> EdgeRelation:
+        deterministic = self.classify_relation(candidate, existing)
+        if deterministic in {
+            EdgeRelation.DUPLICATE,
+            EdgeRelation.EXCEPTION_TO,
+            EdgeRelation.SUPERSEDES,
+            EdgeRelation.CONFLICTS_WITH,
+        }:
+            return deterministic
+        if proposed == EdgeRelation.DUPLICATE and not _can_be_duplicate(candidate, existing):
+            return deterministic
+        if proposed == EdgeRelation.EXCEPTION_TO and not _can_be_exception(candidate, existing):
+            return deterministic
+        if proposed == EdgeRelation.SUPERSEDES and not _can_supersede(candidate, existing):
+            return deterministic
+        if proposed == EdgeRelation.REFINEMENT and not _can_be_refinement(candidate, existing):
+            return deterministic
+        if proposed == EdgeRelation.CONFLICTS_WITH and not _overlaps(candidate, existing):
+            return deterministic
+        return proposed
 
     def _fallback_component_decisions(
         self,
@@ -629,7 +692,7 @@ def _relation_prompt(candidate: Contract, relation_candidates: list[RelationCand
         "Similarity is retrieval evidence: 0.55 * text_score + 0.30 * semantic "
         "overlap + 0.15 * operational pattern overlap. text_score is BM25 over "
         "contract text; pattern_score is weak auxiliary overlap over "
-        "tool_patterns and targets, not semantic overlap.\n"
+        "tool_patterns, not semantic overlap.\n"
         "Classify every candidate pair. Return exactly this JSON shape:\n"
         '{"relations":[{"existing_id":"MAC-...",'
         '"relation":"duplicate|refinement|supersedes|conflicts_with|exception_to|independent",'
@@ -683,7 +746,7 @@ def _batch_relation_prompt(
         "This is a batch relation-classification component. Multiple new rules "
         "share at least one retrieved existing rule, so classify the component as "
         "one graph rather than as independent pairwise updates.\n"
-        "Use semantics.actions/tags and targets for semantic overlap; treat "
+        "Use semantics.actions/tags and scope for semantic overlap; treat "
         "tool_patterns only as weak operational evidence.\n"
         "Return relation edges only; do not decide final active/rejected/superseded "
         "status. The deterministic apply phase handles status updates.\n"
@@ -708,7 +771,6 @@ def _contract_payload(contract: Contract) -> dict:
         "validity": contract.validity.model_dump(mode="json"),
         "semantics": contract.semantics.model_dump(mode="json"),
         "tool_patterns": [pattern.model_dump(mode="json") for pattern in contract.tool_patterns],
-        "targets": [target.model_dump(mode="json") for target in contract.targets],
         "predicate_pattern": _predicate_pattern_text(contract),
     }
 
@@ -752,16 +814,10 @@ def _says_supersedes(text: str) -> bool:
 
 
 def _overlaps(left: Contract, right: Contract) -> bool:
-    if left.scope.workspace and right.scope.workspace and left.scope.workspace != right.scope.workspace:
+    if not _scope_boundaries_compatible(left.scope, right.scope):
         return False
-    if left.scope.repo and right.scope.repo and left.scope.repo != right.scope.repo:
+    if not _semantic_surface_compatible(left, right):
         return False
-    if left.semantics.actions and right.semantics.actions:
-        if not set(left.semantics.actions).intersection(right.semantics.actions):
-            return False
-    if left.semantics.tags and right.semantics.tags:
-        if not set(left.semantics.tags).intersection(right.semantics.tags):
-            return False
     if left.scope.path_globs and right.scope.path_globs:
         return _path_globs_overlap(left.scope.path_globs, right.scope.path_globs)
     return True
@@ -770,13 +826,7 @@ def _overlaps(left: Contract, right: Contract) -> bool:
 def _scope_lifecycle_overlaps(left: Contract, right: Contract) -> bool:
     if left.is_expired() or right.is_expired():
         return False
-    if left.scope.workspace and right.scope.workspace and left.scope.workspace != right.scope.workspace:
-        return False
-    if left.scope.repo and right.scope.repo and left.scope.repo != right.scope.repo:
-        return False
-    if left.scope.task and right.scope.task and left.scope.task != right.scope.task:
-        return False
-    if left.scope.component and right.scope.component and left.scope.component != right.scope.component:
+    if not _scope_boundaries_compatible(left.scope, right.scope):
         return False
     if left.scope.path_globs and right.scope.path_globs:
         return _path_globs_overlap(left.scope.path_globs, right.scope.path_globs)
@@ -791,11 +841,45 @@ def _scope_lifecycle_overlaps(left: Contract, right: Contract) -> bool:
     return True
 
 
+def _scope_boundaries_compatible(left: Scope, right: Scope) -> bool:
+    scalar_boundaries = (
+        "workspace",
+        "repo",
+        "task",
+        "component",
+        "organization",
+        "user_id",
+    )
+    for field_name in scalar_boundaries:
+        left_value = getattr(left, field_name)
+        right_value = getattr(right, field_name)
+        if left_value and right_value and left_value != right_value:
+            return False
+    if left.agent_family and right.agent_family:
+        if not set(left.agent_family).intersection(right.agent_family):
+            return False
+    return True
+
+
+def _semantic_surface_compatible(left: Contract, right: Contract) -> bool:
+    left_actions = set(left.semantics.actions)
+    right_actions = set(right.semantics.actions)
+    if left_actions and right_actions:
+        return bool(left_actions.intersection(right_actions))
+    return True
+
+
 def _contradicts(left: Contract, right: Contract) -> bool:
     if not _overlaps(left, right):
         return False
+    left_allows = left.effect == RuleEffect.ALLOW or left.kind == ContractKind.EXCEPTION
+    right_allows = right.effect == RuleEffect.ALLOW or right.kind == ContractKind.EXCEPTION
     left_bans = left.effect == RuleEffect.DENY or left.kind == ContractKind.PROHIBITION or left.modality == Modality.MUST_NOT
     right_bans = right.effect == RuleEffect.DENY or right.kind == ContractKind.PROHIBITION or right.modality == Modality.MUST_NOT
+    if left_allows and right_bans:
+        return not _can_be_exception(left, right)
+    if right_allows and left_bans:
+        return not _can_be_exception(right, left)
     left_requires = left.effect == RuleEffect.REQUIRE or left.modality == Modality.MUST or left.kind in {
         ContractKind.REQUIREMENT,
         ContractKind.PROCEDURE,
@@ -807,8 +891,238 @@ def _contradicts(left: Contract, right: Contract) -> bool:
     return (left_bans and right_requires) or (right_bans and left_requires)
 
 
+def _can_be_exception(candidate: Contract, existing: Contract) -> bool:
+    candidate_allows = (
+        candidate.effect == RuleEffect.ALLOW
+        or candidate.kind == ContractKind.EXCEPTION
+        or candidate.modality == Modality.MAY
+    )
+    existing_restricts = (
+        existing.effect == RuleEffect.DENY
+        or existing.kind == ContractKind.PROHIBITION
+        or existing.modality == Modality.MUST_NOT
+    )
+    return (
+        candidate_allows
+        and existing_restricts
+        and _overlaps(candidate, existing)
+        and _applicability_is_strict_subset(candidate, existing)
+    )
+
+
+def _can_supersede(candidate: Contract, existing: Contract) -> bool:
+    return (
+        _says_supersedes(candidate.text)
+        and AUTHORITY_SCORE[candidate.authority] >= AUTHORITY_SCORE[existing.authority]
+        and _applicability_contains(candidate, existing)
+    )
+
+
+def _applicability_contains(broader: Contract, narrower: Contract) -> bool:
+    scope_contains, _ = _scope_contains(broader.scope, narrower.scope)
+    action_contains, _ = _action_binding_contains(broader, narrower)
+    pattern_contains, _ = _operational_binding_contains(broader, narrower)
+    lifecycle_contains, _ = _lifecycle_contains(broader, narrower)
+    return (
+        scope_contains
+        and action_contains
+        and pattern_contains
+        and lifecycle_contains
+    )
+
+
+def _applicability_is_strict_subset(narrower: Contract, broader: Contract) -> bool:
+    scope_contains, scope_strict = _scope_contains(broader.scope, narrower.scope)
+    if not scope_contains:
+        return False
+    action_contains, action_strict = _action_binding_contains(broader, narrower)
+    if not action_contains:
+        return False
+    pattern_contains, pattern_strict = _operational_binding_contains(broader, narrower)
+    if not pattern_contains:
+        return False
+    lifecycle_contains, lifecycle_strict = _lifecycle_contains(broader, narrower)
+    if not lifecycle_contains:
+        return False
+    return scope_strict or action_strict or pattern_strict or lifecycle_strict
+
+
+def _scope_contains(broader: Scope, narrower: Scope) -> tuple[bool, bool]:
+    strict = False
+    scalar_boundaries = (
+        "workspace",
+        "repo",
+        "task",
+        "component",
+        "organization",
+        "user_id",
+    )
+    for field_name in scalar_boundaries:
+        broad_value = getattr(broader, field_name)
+        narrow_value = getattr(narrower, field_name)
+        if broad_value and narrow_value != broad_value:
+            return False, False
+        if not broad_value and narrow_value:
+            strict = True
+    if broader.agent_family:
+        broad_families = set(broader.agent_family)
+        narrow_families = set(narrower.agent_family)
+        if not narrow_families or not narrow_families.issubset(broad_families):
+            return False, False
+        strict = strict or narrow_families != broad_families
+    elif narrower.agent_family:
+        strict = True
+    if broader.path_globs:
+        if not narrower.path_globs:
+            return False, False
+        for narrow_glob in narrower.path_globs:
+            if not any(
+                _glob_contains(broad_glob, narrow_glob)
+                for broad_glob in broader.path_globs
+            ):
+                return False, False
+        strict = strict or set(narrower.path_globs) != set(broader.path_globs)
+    elif narrower.path_globs:
+        strict = True
+    strict = strict or scope_specificity(narrower) > scope_specificity(broader)
+    return True, strict
+
+
+def _action_binding_contains(broader: Contract, narrower: Contract) -> tuple[bool, bool]:
+    broad_actions = set(broader.semantics.actions)
+    narrow_actions = set(narrower.semantics.actions)
+    if broad_actions:
+        if not narrow_actions or not narrow_actions.issubset(broad_actions):
+            return False, False
+        return True, narrow_actions != broad_actions
+    return True, bool(narrow_actions)
+
+
+def _operational_binding_contains(
+    broader: Contract,
+    narrower: Contract,
+) -> tuple[bool, bool]:
+    if broader.semantics.actions and narrower.semantics.actions:
+        for narrow_pattern in narrower.tool_patterns:
+            for broad_pattern in broader.tool_patterns:
+                if (
+                    _tool_pattern_contains(broad_pattern, narrow_pattern)
+                    and broad_pattern.model_dump(mode="json")
+                    != narrow_pattern.model_dump(mode="json")
+                ):
+                    return True, True
+        return True, False
+    return _tool_patterns_contain(
+        broader.tool_patterns,
+        narrower.tool_patterns,
+    )
+
+
+def _tool_patterns_contain(
+    broader: list[ToolPattern],
+    narrower: list[ToolPattern],
+) -> tuple[bool, bool]:
+    if not broader:
+        return True, bool(narrower)
+    if not narrower:
+        return False, False
+    strict = False
+    for narrow_pattern in narrower:
+        matches = [
+            broad_pattern
+            for broad_pattern in broader
+            if _tool_pattern_contains(broad_pattern, narrow_pattern)
+        ]
+        if not matches:
+            return False, False
+        strict = strict or all(
+            broad_pattern.model_dump(mode="json")
+            != narrow_pattern.model_dump(mode="json")
+            for broad_pattern in matches
+        )
+    return True, strict or _canonical_tool_patterns(broader) != _canonical_tool_patterns(narrower)
+
+
+def _tool_pattern_contains(broader: ToolPattern, narrower: ToolPattern) -> bool:
+    if broader.tool != narrower.tool:
+        return False
+    for arg_name, broad_matcher in broader.args.items():
+        narrow_matcher = narrower.args.get(arg_name)
+        if narrow_matcher is None or not _arg_pattern_contains(broad_matcher, narrow_matcher):
+            return False
+    return True
+
+
+def _arg_pattern_contains(broader: ArgPattern, narrower: ArgPattern) -> bool:
+    if broader == narrower:
+        return True
+    if broader.is_empty():
+        return True
+    if broader.equals is not None:
+        return narrower.equals == broader.equals
+    if broader.path_glob is not None and narrower.path_glob is not None:
+        return _glob_contains(broader.path_glob, narrower.path_glob)
+    if broader.mentions_path_glob is not None and narrower.mentions_path_glob is not None:
+        return _glob_contains(broader.mentions_path_glob, narrower.mentions_path_glob)
+    if broader.contains is not None:
+        if narrower.contains is not None:
+            return broader.contains in narrower.contains
+        if narrower.equals is not None:
+            return broader.contains in str(narrower.equals)
+    return False
+
+
+def _lifecycle_contains(broader: Contract, narrower: Contract) -> tuple[bool, bool]:
+    broad_end = broader.validity.until or broader.lifecycle.expires_at
+    narrow_end = narrower.validity.until or narrower.lifecycle.expires_at
+    if broad_end is not None and (narrow_end is None or narrow_end > broad_end):
+        return False, False
+    if broader.lifecycle.trigger_event:
+        if narrower.lifecycle.trigger_event != broader.lifecycle.trigger_event:
+            return False, False
+    strict = (
+        (broad_end is None and narrow_end is not None)
+        or (broad_end is not None and narrow_end is not None and narrow_end < broad_end)
+        or (
+            broader.lifecycle.type != narrower.lifecycle.type
+            and broader.lifecycle.until_revoked
+            and not narrower.lifecycle.until_revoked
+        )
+        or (
+            not broader.lifecycle.trigger_event
+            and bool(narrower.lifecycle.trigger_event)
+        )
+    )
+    return True, strict
+
+
+def _requires_relation_consideration(candidate: Contract, existing: Contract) -> bool:
+    if _contradicts(candidate, existing):
+        return True
+    if (
+        candidate.effect == RuleEffect.ALLOW
+        or candidate.kind == ContractKind.EXCEPTION
+        or _says_supersedes(candidate.text)
+    ):
+        return _overlaps(candidate, existing)
+    return (
+        _normalize(candidate.text) == _normalize(existing.text)
+        and _scope_lifecycle_overlaps(candidate, existing)
+    )
+
+
 def _same_direction(left: Contract, right: Contract) -> bool:
     return left.effect == right.effect or left.kind == right.kind or left.modality == right.modality
+
+
+def _can_be_refinement(candidate: Contract, existing: Contract) -> bool:
+    return (
+        candidate.effect == existing.effect
+        and candidate.modality == existing.modality
+        and _overlaps(candidate, existing)
+        and not _can_be_duplicate(candidate, existing)
+        and _is_refinement(candidate, existing)
+    )
 
 
 def _contract_similarity(left: Contract, right: Contract) -> float:
@@ -817,7 +1131,7 @@ def _contract_similarity(left: Contract, right: Contract) -> float:
         set(left.semantics.actions),
         set(right.semantics.actions),
     )
-    tag_score = _set_overlap(
+    tag_score = _set_containment(
         set(left.semantics.tags),
         set(right.semantics.tags),
     )
@@ -826,15 +1140,17 @@ def _contract_similarity(left: Contract, right: Contract) -> float:
 
 
 def _is_refinement(candidate: Contract, existing: Contract) -> bool:
-    if scope_specificity(candidate.scope) <= scope_specificity(existing.scope):
-        if not _has_narrower_action_binding(candidate, existing):
-            return False
     if _is_generic_broader_clause(candidate.text, existing.text):
         return False
     candidate_words = _content_words(candidate.text)
     existing_words = _content_words(existing.text)
     if not candidate_words or not existing_words:
         return False
+    if _applicability_is_strict_subset(candidate, existing):
+        return bool(candidate_words.intersection(existing_words))
+    if scope_specificity(candidate.scope) <= scope_specificity(existing.scope):
+        if not _has_narrower_action_binding(candidate, existing):
+            return False
     return bool(candidate_words.intersection(existing_words)) and (
         candidate_words != existing_words
         or _has_narrower_action_binding(candidate, existing)
@@ -870,9 +1186,67 @@ def _is_generic_broader_clause(candidate_text: str, existing_text: str) -> bool:
 def _is_duplicate(left: Contract, right: Contract, similarity: float) -> bool:
     return (
         similarity >= DEFAULT_RELATION_SIMILARITY_THRESHOLD
-        and left.effect == right.effect
-        and left.modality == right.modality
-        and left.scope.level == right.scope.level
+        and _can_be_duplicate(left, right)
+    )
+
+
+def _can_be_duplicate(left: Contract, right: Contract) -> bool:
+    if left.effect != right.effect or left.modality != right.modality:
+        return False
+    if left.scope != right.scope:
+        return False
+    if set(left.semantics.actions) != set(right.semantics.actions):
+        return False
+    left_tags = set(left.semantics.tags)
+    right_tags = set(right.semantics.tags)
+    if left_tags and right_tags and not left_tags.intersection(right_tags):
+        return False
+    if (
+        not left.semantics.actions
+        and _canonical_tool_patterns(left.tool_patterns)
+        != _canonical_tool_patterns(right.tool_patterns)
+    ):
+        return False
+    if left.override != right.override:
+        return False
+    if not _enforcement_equivalent(left, right):
+        return False
+    if not _lifecycle_equivalent(left, right):
+        return False
+    return (
+        _normalize(left.text) == _normalize(right.text)
+        or _contract_similarity(left, right) >= 0.62
+    )
+
+
+def _enforcement_equivalent(left: Contract, right: Contract) -> bool:
+    return (
+        left.validator_enforcement_shape == right.validator_enforcement_shape
+        and _canonical_tool_patterns(left.check_patterns)
+        == _canonical_tool_patterns(right.check_patterns)
+        and _canonical_tool_patterns(left.update_patterns)
+        == _canonical_tool_patterns(right.update_patterns)
+        and set(left.state_fields) == set(right.state_fields)
+    )
+
+
+def _lifecycle_equivalent(left: Contract, right: Contract) -> bool:
+    return (
+        left.lifecycle.type == right.lifecycle.type
+        and left.lifecycle.expires_at == right.lifecycle.expires_at
+        and left.lifecycle.until_revoked == right.lifecycle.until_revoked
+        and left.lifecycle.trigger_event == right.lifecycle.trigger_event
+        and left.lifecycle.review_after == right.lifecycle.review_after
+        and left.validity.until == right.validity.until
+    )
+
+
+def _canonical_tool_patterns(patterns: list[ToolPattern]) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            json.dumps(pattern.model_dump(mode="json"), sort_keys=True)
+            for pattern in patterns
+        )
     )
 
 
@@ -890,6 +1264,14 @@ def _set_overlap(left: set[str], right: set[str]) -> float:
     if not left or not right:
         return 0.0
     return len(left.intersection(right)) / len(left.union(right))
+
+
+def _set_containment(left: set[str], right: set[str]) -> float:
+    if not left and not right:
+        return 1.0
+    if not left or not right:
+        return 0.0
+    return len(left.intersection(right)) / min(len(left), len(right))
 
 
 def _content_words(text: str) -> set[str]:
@@ -963,9 +1345,6 @@ def _predicate_pattern_text(contract: Contract) -> str:
         for key, matcher in sorted(pattern.args.items()):
             parts.append(key)
             parts.append(matcher.model_dump_json())
-    for target in contract.targets:
-        parts.append(target.kind)
-        parts.append(target.value)
     return " ".join(parts)
 
 
@@ -984,6 +1363,23 @@ def _path_globs_overlap(left_globs: list[str], right_globs: list[str]) -> bool:
             if fnmatch(sample_left, right) or fnmatch(sample_right, left):
                 return True
     return False
+
+
+def _glob_contains(broader: str, narrower: str) -> bool:
+    if broader == narrower:
+        return True
+    broader_prefix = _glob_prefix(broader)
+    narrower_prefix = _glob_prefix(narrower)
+    if not broader_prefix:
+        return fnmatch(narrower.replace("**", "sample").replace("*", "sample"), broader)
+    return bool(
+        narrower_prefix
+        and narrower_prefix.startswith(broader_prefix)
+        and fnmatch(
+            narrower.replace("**", "sample").replace("*", "sample"),
+            broader,
+        )
+    )
 
 
 def _glob_prefix(glob: str) -> str:

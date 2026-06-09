@@ -21,7 +21,7 @@ def normalize_rule_payload(data: Any) -> Any:
 
     This is the compatibility seam for v1/v2 payloads and tests that still pass
     legacy fields. Runtime modules should consume the canonical fields produced
-    here: semantics, tool_patterns, targets, validity, effect, and authority.
+    here: semantics, tool_patterns, validity, effect, and authority.
     """
 
     if not isinstance(data, dict):
@@ -55,12 +55,9 @@ def normalize_rule_payload(data: Any) -> Any:
     constraints = _model_to_dict(normalized.get("action_constraints"))
     if semantics is not None:
         normalized["semantics"] = semantics
-    if constraints is not None:
-        normalized["action_constraints"] = constraints
     if "semantics" not in normalized and isinstance(constraints, dict):
         normalized["semantics"] = semantics_from_action_constraints(constraints)
-    if "action_constraints" not in normalized and isinstance(semantics, dict):
-        normalized["action_constraints"] = action_constraints_from_semantics(semantics)
+    normalized.pop("action_constraints", None)
 
     lifecycle = _model_to_dict(normalized.get("lifecycle"))
     validity = _model_to_dict(normalized.get("validity"))
@@ -80,17 +77,15 @@ def normalize_rule_payload(data: Any) -> Any:
     pattern_version = normalized.get("compiled_predicates")
     if "pattern_version" in normalized and pattern_version is None:
         pattern_version = normalized.pop("pattern_version")
-        normalized["compiled_predicates"] = pattern_version
     else:
         normalized.pop("pattern_version", None)
     pattern_payload = _model_to_dict(pattern_version)
     if isinstance(pattern_payload, dict):
         canonical_pattern = canonical_pattern_version_payload(pattern_payload)
         normalized.setdefault("tool_patterns", canonical_pattern.get("tool_patterns", []))
-        normalized.setdefault("targets", canonical_pattern.get("targets", []))
-
-    if "targets" not in normalized:
-        normalized["targets"] = target_patterns_from_scope(_model_to_dict(normalized.get("scope")))
+    normalized.pop("compiled_predicates", None)
+    normalized.pop("targets", None)
+    normalized.pop("target_patterns", None)
     return normalized
 
 
@@ -117,9 +112,8 @@ def canonical_pattern_version_payload(payload: dict[str, Any]) -> dict[str, Any]
     """
 
     canonical = dict(payload)
-    targets = canonical.pop("target_patterns", None)
-    if targets is not None and "targets" not in canonical:
-        canonical["targets"] = targets
+    canonical.pop("target_patterns", None)
+    canonical.pop("targets", None)
     if not canonical.get("tool_patterns"):
         canonical["tool_patterns"] = tool_patterns_from_host_patterns(
             canonical.get("host_action_patterns", [])
@@ -161,17 +155,6 @@ def lifecycle_from_validity(validity: dict[str, Any] | None) -> dict[str, Any] |
         "expires_at": until,
         "until_revoked": until is None,
     }
-
-
-def target_patterns_from_scope(scope: dict[str, Any] | None) -> list[dict[str, str]]:
-    if not isinstance(scope, dict):
-        return []
-    values = scope.get("paths", scope.get("path_globs", []))
-    if isinstance(values, str):
-        values = [values]
-    if not isinstance(values, list):
-        return []
-    return [{"kind": "path_glob", "value": str(value)} for value in values if value]
 
 
 def tool_patterns_from_host_patterns(patterns: list[Any]) -> list[dict[str, Any]]:

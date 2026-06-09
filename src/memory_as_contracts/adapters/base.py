@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import hashlib
+import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -10,8 +11,10 @@ from pathlib import Path
 from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
+from memory_as_contracts.config import MacConfig, load_config
 from memory_as_contracts.extractor import ExtractionContext
-from memory_as_contracts.gate import ActionGate, ExcludedActionPattern, GateResult
+from memory_as_contracts.gate import ExcludedActionPattern, GateResult
+from memory_as_contracts.logging_config import configure_logging, log_event
 from memory_as_contracts.models import (
     ActionSignature,
     AvailableAction,
@@ -24,7 +27,6 @@ from memory_as_contracts.normalizers import NormalizationContext
 from memory_as_contracts.resolver import ConflictResolver
 from memory_as_contracts.retrieval import (
     DEFAULT_PROMPT_TOKEN_BUDGET,
-    PromptIntakeRetriever,
     PromptRetrievalContext,
 )
 from memory_as_contracts.signatures import (
@@ -37,6 +39,10 @@ from memory_as_contracts.tool_capsules import (
     ToolCapabilityCapsule,
     render_tool_capsule_system_prompt,
 )
+from memory_as_contracts.validator_generation import ValidatorSnippetGenerator
+
+PERIODIC_USER_TURN_BATCH_SIZE = 10
+LOGGER = logging.getLogger(__name__)
 
 
 class ColdStartExtractor(Protocol):
@@ -48,6 +54,17 @@ class ColdStartExtractor(Protocol):
         context: ExtractionContext,
         path: str | None = None,
         fingerprint: str | None = None,
+    ) -> list[Contract]:
+        ...
+
+
+class OnlineTurnExtractor(Protocol):
+    def extract_online_turn(
+        self,
+        *,
+        role: str,
+        text: str,
+        context: ExtractionContext,
     ) -> list[Contract]:
         ...
 
@@ -106,6 +123,15 @@ class AdapterResult:
     snapshots_updated: list[SourceSnapshot] = field(default_factory=list)
     prompt_text: str = ""
     gate_result: GateResult | None = None
+    error: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class AdapterCapabilities:
+    pre_action: bool
+    post_action: bool
+    user_input_event: bool
+    native_auto_install: bool = True
 
 
 class BaseAdapter:
@@ -113,7 +139,13 @@ class BaseAdapter:
     host = "base"
     exclude_actions: tuple[ExcludedActionPattern, ...] = ()
     always_on_tool_capsules: tuple[ToolCapabilityCapsule, ...] = ()
+    tool_alias_families: tuple[frozenset[str], ...] = ()
     prompt_token_budget = DEFAULT_PROMPT_TOKEN_BUDGET
+    capabilities = AdapterCapabilities(
+        pre_action=True,
+        post_action=True,
+        user_input_event=True,
+    )
 
     def __init__(
         self,
@@ -122,10 +154,16 @@ class BaseAdapter:
         available_actions: Sequence[AvailableAction] | None = None,
         exclude_actions: Sequence[ExcludedActionPattern] | None = None,
         conflict_resolver_factory: Callable[[ContractStore], ConflictResolver] | None = None,
+        online_extractor_factory: Callable[[], OnlineTurnExtractor] | None = None,
+        validator_generator_factory: Callable[[], ValidatorSnippetGenerator] | None = None,
+        pattern_refiner_factory: Callable[[], Callable[[str], str]] | None = None,
     ) -> None:
         self.signature_builder = signature_builder or ActionSignatureBuilder()
         self._available_actions = list(available_actions) if available_actions is not None else None
         self._conflict_resolver_factory = conflict_resolver_factory
+        self._online_extractor_factory = online_extractor_factory
+        self._validator_generator_factory = validator_generator_factory
+        self._pattern_refiner_factory = pattern_refiner_factory
         if exclude_actions is not None:
             self.exclude_actions = tuple(exclude_actions)
 
@@ -140,6 +178,14 @@ class BaseAdapter:
     def tool_capsule_system_prompt(self) -> str | None:
         return render_tool_capsule_system_prompt(self.tool_capsules())
 
+    def configure_runtime(self, context: AdapterContext) -> MacConfig:
+        config = adapter_config(context)
+        configure_logging(
+            path=resolve_workspace_path(config.log_path, context),
+            level=config.log_level,
+        )
+        return config
+
     def discover_sources(self, context: AdapterContext) -> list[MemorySourceSpec]:
         raise NotImplementedError
 
@@ -149,23 +195,25 @@ class BaseAdapter:
         extractor: ColdStartExtractor,
         context: AdapterContext,
     ) -> list[Contract]:
-        contracts: list[Contract] = []
-        for spec in self.discover_sources(context):
-            content = _read_text(spec.path)
-            fingerprint = _fingerprint(content)
-            extracted = extractor.extract_cold_start_source(
-                text=self._cold_start_source_text(spec, content),
-                source_kind=spec.source_kind,
-                context=self._extraction_context(context),
-                path=str(spec.path),
-                fingerprint=fingerprint,
-            )
-            resolved = self._resolve_and_store(store, extracted)
-            store.add_source_snapshot(self._snapshot(spec, content, fingerprint, context))
-            contracts.extend(resolved)
-        return contracts
+        return self._hook_runtime().cold_start_import(store, extractor, context)
 
     def refresh_changed_sources(
+        self,
+        store: ContractStore,
+        extractor: ColdStartExtractor,
+        context: AdapterContext,
+    ) -> list[Contract]:
+        self.configure_runtime(context)
+        log_event(
+            LOGGER,
+            "source_refresh.skipped",
+            adapter=self.host,
+            session_id=context.session_id,
+            reason="file_diff_refresh_may_use_in_future",
+        )
+        return []
+
+    def _refresh_changed_sources_may_use_in_future(
         self,
         store: ContractStore,
         extractor: ColdStartExtractor,
@@ -193,7 +241,7 @@ class BaseAdapter:
                 path=str(spec.path),
                 fingerprint=fingerprint,
             )
-            resolved = self._resolve_and_store(store, extracted)
+            resolved = self._resolve_and_store(store, extracted, context)
             store.add_source_snapshot(self._snapshot(spec, content, fingerprint, context))
             contracts.extend(resolved)
         return contracts
@@ -226,10 +274,7 @@ class BaseAdapter:
         user_turn: str,
         context: AdapterContext,
     ) -> str:
-        retriever = PromptIntakeRetriever(store)
-        prompt_context = self.build_prompt_context(user_turn, context)
-        packets = retriever.retrieve(prompt_context)
-        return retriever.render_prompt_text(packets, token_budget=self.prompt_token_budget)
+        return self._hook_runtime().render_prompt_context(store, user_turn, context)
 
     def build_action_signature(self, event: Mapping[str, Any] | Any, context: AdapterContext) -> ActionSignature:
         tool_name, raw_arguments, intent = self._extract_tool_call(event)
@@ -248,6 +293,7 @@ class BaseAdapter:
                 task_id=context.task_id,
                 user_id=context.user_id,
                 cwd=str(context.cwd_path()),
+                workspace=str(context.workspace_path()),
                 repo=context.repo,
                 branch=context.branch,
                 timezone=context.timezone,
@@ -262,9 +308,64 @@ class BaseAdapter:
         event: Mapping[str, Any] | Any,
         context: AdapterContext,
     ) -> dict[str, Any]:
-        signature = self.build_action_signature(event, context)
-        result = ActionGate(store, exclude_actions=self.exclude_actions).gate(signature)
-        return self._format_gate_payload(result)
+        return self._format_gate_payload(
+            self.evaluate_action(store, event, context)
+        )
+
+    def evaluate_action(
+        self,
+        store: ContractStore,
+        event: Mapping[str, Any] | Any,
+        context: AdapterContext,
+    ) -> GateResult:
+        return self._hook_runtime().gate(store, event, context)
+
+    def tool_family(self, tool_name: str) -> frozenset[str]:
+        for family in self.tool_alias_families:
+            if tool_name in family:
+                return family
+        return frozenset({tool_name})
+
+    def observe_user_input(
+        self,
+        store: ContractStore,
+        context: AdapterContext,
+    ):
+        return self._hook_runtime().observe_user_input(store, context)
+
+    def process_user_prompt_submit(
+        self,
+        store: ContractStore,
+        user_turn: str,
+        context: AdapterContext,
+        *,
+        extractor_factory: Callable[[], OnlineTurnExtractor] | None = None,
+    ) -> AdapterResult:
+        return self._hook_runtime().process_user_prompt_submit(
+            store,
+            user_turn,
+            context,
+            extractor_factory=extractor_factory,
+        )
+
+    def handle_post_tool_use(
+        self,
+        store: ContractStore,
+        event: Mapping[str, Any] | Any,
+        context: AdapterContext,
+    ) -> dict[str, Any]:
+        return self.record_committed_action(store, event, context)
+
+    def record_committed_action(
+        self,
+        store: ContractStore,
+        event: Mapping[str, Any] | Any,
+        context: AdapterContext,
+    ) -> dict[str, Any]:
+        return self._hook_runtime().record_committed_action(store, event, context)
+
+    def _should_cold_start_once(self, store: ContractStore, context: AdapterContext) -> bool:
+        return self._hook_runtime().should_cold_start_once(store, context)
 
     def hook_config_snippet(self) -> dict[str, Any] | str:
         raise NotImplementedError
@@ -278,24 +379,33 @@ class BaseAdapter:
         return tool_name, dict(raw_arguments), intent
 
     def _format_gate_payload(self, result: GateResult) -> dict[str, Any]:
-        payload = _receipt_summary(result)
-        if result.decision.decision == GateDecisionType.BLOCK:
-            return {"decision": "block", "reason": result.decision.reason, "mac": payload}
+        payload = self.decision_metadata(result)
+        if result.decision.decision == GateDecisionType.REJECT:
+            return {"decision": "reject", "reason": result.decision.reason, "mac": payload}
+        if result.decision.decision == GateDecisionType.ASK:
+            return {
+                "decision": "ask",
+                "reason": result.decision.reason,
+                "requires_user_input": True,
+                "mac": payload,
+            }
         return {"decision": "allow", "mac": payload}
+
+    def decision_metadata(self, result: GateResult) -> dict[str, Any]:
+        return _receipt_summary(result)
 
     def _resolve_and_store(
         self,
         store: ContractStore,
         contracts: list[Contract],
+        context: AdapterContext,
     ) -> list[Contract]:
-        if not contracts:
-            return []
-        resolver = (
-            self._conflict_resolver_factory(store)
-            if self._conflict_resolver_factory is not None
-            else ConflictResolver(store)
-        )
-        return [result.contract for result in resolver.insert_batch(contracts)]
+        return self._hook_runtime().resolve_and_store(store, contracts, context)
+
+    def _hook_runtime(self):
+        from memory_as_contracts.hook_runtime import MacHookRuntime
+
+        return MacHookRuntime(self)
 
     def _cold_start_source_text(self, spec: MemorySourceSpec, content: str) -> str:
         return (
@@ -406,46 +516,16 @@ def configured_filenames(env_name: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
-def _canonical_tool_call(tool_name: str, raw_arguments: dict[str, Any]) -> str:
-    lower = tool_name.lower()
-    if lower in {"bash", "shell", "exec", "terminal", "run_command"}:
-        return "exec"
-    if lower in {"read", "read_file", "fileread", "file.read"}:
-        return "file.read"
-    if lower in {"write", "edit", "multiedit", "apply_patch", "filewrite", "file.write"}:
-        return "file.write"
-    if lower in {"delete", "remove", "file.delete"}:
-        return "file.delete"
-    if lower in {"websearch", "web_search", "web.search", "search"}:
-        return "web.search"
-    if lower in {"send_message", "message_send", "message.send", "notify", "slack"}:
-        return "message.send"
-    if lower in {"send_email", "email_send", "email.send"}:
-        return "email.send"
-    if raw_arguments.get("cmd") or raw_arguments.get("command"):
-        return "exec"
-    return tool_name
+def adapter_config(context: AdapterContext) -> MacConfig:
+    env_file = context.workspace_path() / ".env"
+    return load_config(env_file if env_file.exists() else None)
 
 
-def canonical_raw_arguments(tool_name: str, raw_arguments: Mapping[str, Any]) -> dict[str, Any]:
-    args = dict(raw_arguments)
-    canonical_tool = _canonical_tool_call(tool_name, args)
-    if canonical_tool == "exec":
-        command = args.get("cmd") or args.get("command") or args.get("script") or ""
-        return {
-            "cmd": str(command),
-            "host_tool_name": tool_name,
-            "host_arguments": args,
-        }
-    if canonical_tool.startswith("file."):
-        path = args.get("path") or args.get("file_path") or args.get("filename")
-        if path is not None:
-            args["path"] = str(path)
-    if canonical_tool in {"message.send", "email.send"}:
-        channel = args.get("channel") or args.get("to") or args.get("recipient")
-        if channel is not None:
-            args["target"] = str(channel)
-    return args
+def resolve_workspace_path(path: str | Path, context: AdapterContext) -> Path:
+    candidate = Path(path).expanduser()
+    if candidate.is_absolute():
+        return candidate
+    return context.workspace_path() / candidate
 
 
 def _event_value(event: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
@@ -484,4 +564,5 @@ def _receipt_summary(result: GateResult) -> dict[str, Any]:
         "match_outcome": result.decision.match_outcome.value
         if result.decision.match_outcome is not None
         else None,
+        "ask_id": result.receipt.ask_request_id,
     }

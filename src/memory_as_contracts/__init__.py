@@ -1,25 +1,32 @@
 """Memory-as-Contracts core package."""
 
-from memory_as_contracts.ambiguity import AmbiguityMonitor, LLMPredicateRefiner
+from memory_as_contracts.action_log import (
+    ActionLogSearchSpecV1,
+    ActionLogSearchTranslator,
+    ActionLogView,
+)
 from memory_as_contracts.adapters import (
+    AdapterCapabilities,
     AdapterContext,
     ChangedSource,
-    ClaudeCodeAdapter,
-    CodexAdapter,
     MemorySourceSpec,
-    NanobotAdapter,
-    OpenClawAdapter,
 )
 from memory_as_contracts.compiler import PolicyCompiler
-from memory_as_contracts.extractor import HeuristicContractExtractor, JsonContractExtractor
+from memory_as_contracts.extractor import (
+    HeuristicContractExtractor,
+    JsonContractExtractor,
+    LLMCallError,
+)
 from memory_as_contracts.gate import ActionGate, ExcludedActionPattern
+from memory_as_contracts.logging_config import configure_logging
 from memory_as_contracts.models import (
-    ActionConstraints,
+    ActionLogEntryV1,
+    ActionOutcome,
     ActionSignature,
-    AmbiguityEvent,
     ArgPattern,
     AvailableAction,
-    CompiledPredicateVersion,
+    AskRequest,
+    AskRequestStatus,
     Contract,
     ContractEdge,
     ContractSource,
@@ -30,56 +37,87 @@ from memory_as_contracts.models import (
     RulePatternVersion,
     RuleSemantics,
     RuleValidity,
-    PredicateEvaluation,
     Lifecycle,
-    RefinementJob,
     Receipt,
     Scope,
     SourceSnapshot,
-    TargetPattern,
     ToolPattern,
+    ValidatorEnforcementShape,
+    ValidatorInstallationRecord,
+    ValidatorInstallationStatus,
+    ValidatorRuntimeErrorRecord,
+    ValidatorState,
+    ValidatorStateTransition,
+    ValidatorVerdict,
+    ValidatorVersion,
 )
 from memory_as_contracts.normalizers import LifecycleNormalizer, ScopeNormalizer
+from memory_as_contracts.pattern_validation import (
+    PATTERN_REFINEMENT_SYSTEM_PROMPT,
+    PatternProvisioner,
+    PatternProvisioningResult,
+    PatternValidationIssue,
+    PatternVerificationResult,
+    PatternVerifier,
+)
 from memory_as_contracts.resolver import ConflictResolver
 from memory_as_contracts.retrieval import PromptIntakeRetriever, PromptRetrievalContext
 from memory_as_contracts.signatures import ActionSignatureBuilder
 from memory_as_contracts.store import ContractStore
 from memory_as_contracts.tool_capsules import ToolCapabilityCapsule
+from memory_as_contracts.validator_generation import (
+    VALIDATOR_GENERATION_SYSTEM_PROMPT,
+    ValidatorSnippetGenerator,
+    ValidatorSnippetPackage,
+)
+from memory_as_contracts.validator_installation import (
+    ValidatorInstaller,
+    ValidatorSnippetVerifier,
+    ValidatorVerificationResult,
+)
+from memory_as_contracts.validators import (
+    ValidatorRuntime,
+    ValidatorSandboxError,
+    ValidatorSandboxRunner,
+)
 
 __all__ = [
-    "ActionConstraints",
     "ActionGate",
+    "ActionLogEntryV1",
+    "ActionLogSearchSpecV1",
+    "ActionLogSearchTranslator",
+    "ActionLogView",
+    "ActionOutcome",
     "ActionSignature",
     "ActionSignatureBuilder",
     "AdapterContext",
-    "AmbiguityEvent",
-    "AmbiguityMonitor",
+    "AdapterCapabilities",
     "ArgPattern",
     "AvailableAction",
+    "AskRequest",
+    "AskRequestStatus",
     "ChangedSource",
     "ClaudeCodeAdapter",
-    "CompiledPredicateVersion",
     "Contract",
     "ContractEdge",
     "ContractSource",
     "ContractStore",
     "ConflictResolver",
+    "configure_logging",
     "CodexAdapter",
     "ExcludedActionPattern",
     "GateDecision",
     "HeuristicContractExtractor",
     "JsonContractExtractor",
-    "PredicateEvaluation",
     "Lifecycle",
     "LifecycleNormalizer",
-    "LLMPredicateRefiner",
+    "LLMCallError",
     "MemorySourceSpec",
     "NanobotAdapter",
     "OpenClawAdapter",
     "PolicyCompiler",
     "PromptIntakeRetriever",
     "PromptRetrievalContext",
-    "RefinementJob",
     "Receipt",
     "Rule",
     "RuleAuthority",
@@ -90,9 +128,51 @@ __all__ = [
     "Scope",
     "ScopeNormalizer",
     "SourceSnapshot",
-    "TargetPattern",
+    "PATTERN_REFINEMENT_SYSTEM_PROMPT",
+    "PatternProvisioner",
+    "PatternProvisioningResult",
+    "PatternValidationIssue",
+    "PatternVerificationResult",
+    "PatternVerifier",
     "ToolCapabilityCapsule",
     "ToolPattern",
+    "VALIDATOR_GENERATION_SYSTEM_PROMPT",
+    "ValidatorEnforcementShape",
+    "ValidatorInstallationRecord",
+    "ValidatorInstallationStatus",
+    "ValidatorInstaller",
+    "ValidatorRuntimeErrorRecord",
+    "ValidatorRuntime",
+    "ValidatorSandboxError",
+    "ValidatorSandboxRunner",
+    "ValidatorSnippetGenerator",
+    "ValidatorSnippetPackage",
+    "ValidatorSnippetVerifier",
+    "ValidatorState",
+    "ValidatorStateTransition",
+    "ValidatorVerdict",
+    "ValidatorVerificationResult",
+    "ValidatorVersion",
 ]
 
 __version__ = "0.1.0"
+
+
+def __getattr__(name: str):
+    if name == "ClaudeCodeAdapter":
+        from memory_as_contracts.adapters.claude_code import ClaudeCodeAdapter
+
+        return ClaudeCodeAdapter
+    if name == "CodexAdapter":
+        from memory_as_contracts.adapters.codex import CodexAdapter
+
+        return CodexAdapter
+    if name == "NanobotAdapter":
+        from memory_as_contracts.adapters.nanobot import NanobotAdapter
+
+        return NanobotAdapter
+    if name == "OpenClawAdapter":
+        from memory_as_contracts.adapters.openclaw import OpenClawAdapter
+
+        return OpenClawAdapter
+    raise AttributeError(name)

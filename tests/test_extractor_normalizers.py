@@ -9,7 +9,14 @@ from memory_as_contracts.extractor import (
     ExtractionContext,
     HeuristicContractExtractor,
 )
-from memory_as_contracts.models import ContractKind, LifecycleType, Modality, ScopeLevel, SourceKind
+from memory_as_contracts.models import (
+    ContractKind,
+    LifecycleType,
+    Modality,
+    ScopeLevel,
+    SourceKind,
+    ValidatorEnforcementShape,
+)
 from memory_as_contracts.normalizers import LifecycleNormalizer, NormalizationContext, ScopeNormalizer
 
 
@@ -86,10 +93,10 @@ def test_heuristic_extraction_binds_web_search_and_message_actions() -> None:
         context=context(),
     )[0]
 
-    assert "web.search" in web_contract.action_constraints.host_actions
-    assert "network_read" in web_contract.action_constraints.canonical_tags
-    assert "message.send" in message_contract.action_constraints.host_actions
-    assert "notify_human" in message_contract.action_constraints.canonical_tags
+    assert "web.search" in web_contract.semantics.actions
+    assert "network_read" in web_contract.semantics.tags
+    assert "message.send" in message_contract.semantics.actions
+    assert "notify_human" in message_contract.semantics.tags
 
 
 def test_heuristic_extraction_binds_publish_clause() -> None:
@@ -100,8 +107,34 @@ def test_heuristic_extraction_binds_publish_clause() -> None:
     )[0]
 
     assert contract.kind == ContractKind.PROHIBITION
-    assert "git.push" in contract.action_constraints.host_actions
-    assert "publish_code" in contract.action_constraints.canonical_tags
+    assert "git.push" in contract.semantics.actions
+    assert "publish_code" in contract.semantics.tags
+
+
+def test_heuristic_extraction_classifies_check_only_validator_shape() -> None:
+    contract = HeuristicContractExtractor().extract_online_turn(
+        role="user",
+        text="For this repo, before git push, run tests.",
+        context=context(),
+    )[0]
+
+    assert contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_ONLY
+    assert contract.check_patterns
+    assert contract.update_patterns == []
+    assert contract.state_fields == []
+
+
+def test_heuristic_extraction_classifies_check_update_validator_shape() -> None:
+    contract = HeuristicContractExtractor().extract_online_turn(
+        role="user",
+        text="For this task, total cost must not exceed $90.",
+        context=context(),
+    )[0]
+
+    assert contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE
+    assert contract.check_patterns
+    assert contract.update_patterns
+    assert {"spent_cents", "seen_entry_seqs"}.issubset(set(contract.state_fields))
 
 
 def test_cold_start_preserves_source_and_path() -> None:
@@ -159,6 +192,11 @@ def test_llm_user_turn_prompt_is_fixed_but_cold_start_prompt_is_adapter_owned() 
 
     assert "fixed user-turn extraction policy" in prompts[0]
     assert "confidence" not in prompts[0].lower()
+    assert "validator_enforcement_shape" in prompts[0]
+    assert "check_patterns" in prompts[0]
+    assert "update_patterns" in prompts[0]
+    assert "incrementally maintained numeric or symbolic state" in prompts[0]
+    assert "only valid pattern surface that does not need to appear" in prompts[0]
     assert prompts[1] == "CUSTOM project_doc: Do not edit files under vendor/**."
 
 
@@ -185,6 +223,12 @@ def test_llm_extractor_injects_tool_capsules_as_system_prompt() -> None:
         text="For this repo, do not push without asking.",
         context=extraction_context,
     )
+
+    assert "Represent every explicit durable rule" in seen["prompt"]
+    assert "final internally consistent contract set" in seen["prompt"]
+    assert "emit only the final effective version" in seen["prompt"]
+    assert "Do not compare against stored similar rules" in seen["prompt"]
+    assert "source-coverage check" in seen["prompt"]
 
     assert "A MAC contract is" in (seen["system_prompt"] or "")
     assert "exec_command" in (seen["system_prompt"] or "")
@@ -213,7 +257,7 @@ def test_llm_extractor_falls_back_to_prompt_injection_for_simple_providers() -> 
     assert '"name":"Bash"' in prompts[0]
 
 
-def test_llm_extractor_treats_predicate_hints_as_non_authoritative() -> None:
+def test_llm_extractor_reads_only_canonical_semantics_and_tool_patterns() -> None:
     def response_provider(prompt: str) -> str:
         assert "tool_patterns" in prompt
         assert "native tool name" in prompt
@@ -224,17 +268,14 @@ def test_llm_extractor_treats_predicate_hints_as_non_authoritative() -> None:
           "kind": "prohibition",
           "modality": "MUST_NOT",
           "strength": "hard",
-          "action_constraints": {
-            "host_actions": ["web.search"],
-            "canonical_tags": ["network_read"]
+          "semantics": {
+            "actions": ["web.search"],
+            "tags": ["network_read"]
           },
-          "predicate_hints": {
-            "host_action_patterns": [{
-              "host_action": "exec",
-              "tool_name": "exec",
-              "parameter_regex": {"cmd": "^.*(curl|wget|search|browser|fetch).*$"}
-            }]
-          }
+          "tool_patterns": [{
+            "tool": "web.search",
+            "args": {}
+          }]
         }]}
         '''
 
@@ -245,9 +286,40 @@ def test_llm_extractor_treats_predicate_hints_as_non_authoritative() -> None:
     )
 
     contract = contracts[0]
-    assert contract.action_constraints.host_actions == ["web.search"]
-    assert contract.compiled_predicates is None
+    assert contract.semantics.actions == ["web.search"]
+    assert contract.semantics.tags == ["network_read"]
     assert any(pattern.tool == "web.search" for pattern in contract.tool_patterns)
+
+
+def test_llm_extractor_downgrades_direct_rule_from_spurious_validator_shape() -> None:
+    def response_provider(prompt: str) -> str:
+        return r'''
+        {"contracts": [{
+          "text": "For this repo, never edit files under generated/**.",
+          "source_span": "never edit files under generated/**",
+          "effect": "deny",
+          "tool_patterns": [{
+            "tool": "apply_patch",
+            "args": {"patch": {"mentions_path_glob": "generated/**"}}
+          }],
+          "validator_enforcement_shape": "check_only",
+          "check_patterns": [{
+            "tool": "apply_patch",
+            "args": {"patch": {"mentions_path_glob": "generated/**"}}
+          }],
+          "update_patterns": [],
+          "state_fields": []
+        }]}
+        '''
+
+    contract = CandidateJsonContractExtractor(response_provider).extract_online_turn(
+        role="user",
+        text="For this repo, never edit files under generated/**.",
+        context=context(),
+    )[0]
+
+    assert contract.validator_enforcement_shape == ValidatorEnforcementShape.NO_VALIDATOR
+    assert contract.check_patterns == []
 
 
 def test_scope_and_lifecycle_normalizers_ground_relative_fields() -> None:

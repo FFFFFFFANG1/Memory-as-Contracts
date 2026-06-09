@@ -25,7 +25,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 默认技术选择：
 
 - Python 3.11、`uv`、`typer`、`pydantic`、`openai`、`rich`、SQLite、pytest；
-- LLM 只用于写入时抽取、冲突关系分类、异步 predicate refinement；
+- LLM 只用于写入时抽取、冲突关系分类、验证失败后的单次同步 pattern repair，以及 validator snippet generation；
 - action-time gate 必须是确定性的，不调用 LLM；
 - 核心检索使用 SQLite FTS/BM25 + structured filters；
 - embeddings 只作为后续 ablation，不作为核心依赖；
@@ -54,8 +54,8 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 完成标准：
 
-- `UV_CACHE_DIR=.uv-cache uv run --no-editable python -c "import memory_as_contracts"` 能运行。
-- `UV_CACHE_DIR=.uv-cache uv run --no-editable pytest` 至少能进入有意义的测试阶段，而不是因缺少 package/test directory 失败。
+- `UV_CACHE_DIR=.uv-cache uv sync --dev --reinstall-package memory-as-contracts` 后，`UV_CACHE_DIR=.uv-cache uv run python -c "import memory_as_contracts"` 能运行。
+- `UV_CACHE_DIR=.uv-cache uv run pytest` 至少能进入有意义的测试阶段，而不是因缺少 package/test directory 失败。
 - baseline 决策已写明。
 
 ## Step 1: 命名、包结构和 CLI
@@ -79,8 +79,8 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 完成标准：
 
-- `UV_CACHE_DIR=.uv-cache uv run --no-editable mac --help` 能工作。
-- `UV_CACHE_DIR=.uv-cache uv run --no-editable python -c "import memory_as_contracts"` 能工作。
+- `UV_CACHE_DIR=.uv-cache uv run mac --help` 能工作。
+- `UV_CACHE_DIR=.uv-cache uv run python -c "import memory_as_contracts"` 能工作。
 - 有测试覆盖 CLI 和 config 行为。
 
 ## Step 2: 核心数据模型
@@ -89,7 +89,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 工作内容：
 
-- 实现 `Rule/Contract`、`ContractSource`、`Scope`、`Lifecycle`、`RuleSemantics`、`ToolPattern`、`TargetPattern`、`RulePatternVersion`、`ContractEdge`、`AvailableAction`、`ActionSignature`、`GateDecision`、`Receipt`、`AmbiguityEvent`。
+- 实现 `Rule/Contract`、`ContractSource`、`Scope`、`Lifecycle`、`RuleSemantics`、`ToolPattern`、`RulePatternVersion`、`ContractEdge`、`AvailableAction`、`ActionSignature`、`GateDecision`、`Receipt`。
 - 定义 contract kind、modality、strength、status、source kind、edge relation、lifecycle type、decision、match outcome 等 enum。
 - 支持 edge 自己的 scope/lifecycle，不能只把关系写成全局替代。
 - 保留 source span 和 created_at，用于 provenance、relative time grounding 和 audit。
@@ -114,11 +114,11 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 ## Step 3: SQLite store、FTS 和迁移机制
 
-目标：建立 durable store，能保存 contracts、edges、rule pattern versions、receipts、source snapshots 和 ambiguity/refinement 状态。
+目标：建立 durable store，能保存 contracts、edges、rule pattern versions、receipts 和 source snapshots。
 
 工作内容：
 
-- 建表：contracts、contract FTS、contract edges、rule pattern versions、receipts、source snapshots、ambiguity events、refinement jobs。
+- 建表：contracts、contract FTS、contract edges、rule pattern versions、receipts、source snapshots。
 - 常用过滤字段用显式列，adapter-specific 扩展保留 JSON 字段。
 - 支持 SQLite FTS/BM25 检索 contract text 和 source span。
 - 加 `schema_version` 或等价 migration 机制，避免未来 MAC DB schema 被静默误用。
@@ -137,7 +137,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 完成标准：
 
 - 空数据库 init 幂等。
-- roundtrip 测试覆盖 contract、edge、rule pattern version、receipt、snapshot、ambiguity event。
+- roundtrip 测试覆盖 contract、edge、rule pattern version、receipt 和 snapshot。
 - FTS 检索能和结构化过滤一起工作。
 
 ## Step 4: 抽取、scope normalization 和 lifecycle normalization
@@ -177,33 +177,34 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 ## Step 5: Deterministic pattern materializer 和 rule pattern versions
 
-目标：把能机器检查的 contracts 转成 action-time 可确定执行的 patterns。这里仍保留 compiler/materializer 这一步，但它不调用 LLM；它只消费 extraction 阶段产出的 `tool_patterns/targets` operational seed，校验到当前 adapter `available_actions`，并在 seed 缺失时使用有限 rule-base fallback。
+目标：把能机器检查的 contracts 转成 action-time 可确定执行的 patterns。这里仍保留 compiler/materializer 这一步；它消费 extraction 阶段产出的 `tool_patterns` operational seed，校验当前 adapter tool schema，并在 seed 缺失时使用有限 rule-base fallback。
 
 工作内容：
 
-- 定义 rule pattern version schema：native `tool_patterns`、`targets`、scope predicate、lifecycle predicate、parser hints。
-- extraction 输出可选 `tool_patterns/targets` seed，用于把自然语言 rule 投影成初始 operational surface；Step 5 不新增任何 LLM call。
-- compiler/materializer 的职责是 deterministic：读取 `tool_patterns/targets` seed、校验 native tool/action 是否在 adapter 的 `available_actions` 中、补齐 scope/lifecycle predicate、生成 rule pattern version、执行 action-time evaluation。
+- 定义 rule pattern version schema：native `tool_patterns`、scope predicate、lifecycle predicate、parser hints。
+- extraction 输出 `tool_patterns` seed，用于把自然语言 rule 投影成初始 operational surface。路径和资源约束直接写在 raw arg matcher 中，不再维护独立 `targets`。
+- compiler/materializer 的职责是 deterministic：读取 `tool_patterns` seed、校验 native tool/action 是否在 adapter capsules 中、补齐 scope/lifecycle predicate、生成 rule pattern version、执行 action-time evaluation。
 - 当 operational seed 缺失时，compiler 只允许使用有限 rule-base fallback：path glob、git push/commit、dependency install、package-manager command、generated-file edit ban 等可机器解析模式。
 - action-time pattern 中 native `tool` 使用 exact match；对 tool parameter 的要求使用字段级 matcher，例如 `args.command.regex = "^git\\s+push(\\s|$)"`。
-- compiler 接收 adapter 的 `available_actions`，避免依赖固定 global action enum。
-- 不可稳定 rule-base 编译的语义规则保持无 binding predicate，action-time evaluation 返回 `ambiguous`，不 unsafe allow/block。
+- compiler 只依赖 `tool_patterns`、`semantics`、scope/lifecycle；native tool
+  和参数字段是否合法由 Tool Capsules verifier 在 ingestion/materialization 边界检查。
+- 不可稳定 rule-base 编译或无法通过 verifier 的规则保持 candidate，不安装 active binding predicate。
 - 覆盖 coding 常见规则：path edit bans、git commit/push 限制、dependency manager 限制、test command requirement、generated-file edit ban、confirmation-before-action。
 - rule pattern version 独立于 source contract 保存。
-- pattern evaluation 返回 `matched`、`not_matched`、`ambiguous`。
-- 对欠规格规则默认进入 ambiguity，而不是 unsafe allow/block。
+- pattern evaluation 只返回 `matched`、`not_matched`。
+- 缺少参数或参数不匹配返回 `not_matched`；坏 regex 在 ingestion-time verifier 阶段被拒绝。
 
 边界：
 
 - compiler/materializer 不调用 LLM；需要 LLM 判断的 predicate projection 必须并入 extraction 或 dedup/relation 预算。
 - 不删除 compiler 这一步，因为它是 extraction 输出和 action-time gate 之间的 schema validation、adapter grounding、pattern versioning 边界。
 - action-time pattern evaluation 不得调用 LLM。
-- 本阶段只产生和执行初始 pattern version，不做异步 refinement。
+- verifier 失败时最多进行一次同步 LLM pattern refinement，再失败则保持 candidate。
 
 仍需决策：
 
 - 当前决策：pattern language 使用结构化 JSON pattern，允许字段级 regex；v0 不使用 Python policy functions 作为默认 pattern language。
-- 当前决策：LLM call budget 最多两次：extraction 和 dedup/relation；compiler/materializer 不调用 LLM，只消费 extraction 输出的 `tool_patterns/targets` seed 或 rule-base fallback。
+- 当前决策：pattern verifier 本身不调用 LLM；只有验证失败时允许一次同步 repair call，之后必须再次通过同一 verifier。
 - 当前决策：保留 compiler/materializer 这一步；它不是自然语言理解模块，而是 deterministic adapter-grounded predicate projection、validation 和 versioning 模块。
 - 当前决策：tool name exact match；tool parameter 条件生成 regex。不要把整个 action 压成单一字符串 regex。
 - 当前决策：generic command parsing 只覆盖 shell/git/package-manager 基础形态；复杂 host tool 参数解析交给 adapter。
@@ -211,7 +212,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 完成标准：
 
-- 测试覆盖 `git push`、路径保护、dependency commands、package manager preferences 和 ambiguous semantic rules。
+- 测试覆盖 `git push`、路径保护、dependency commands、package manager preferences、坏 regex、未知 tool 和未知参数。
 - rule pattern version history 可以持久化和查询。
 
 ## Step 6: 相似检索、冲突处理和 scoped edges
@@ -327,14 +328,14 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 工作内容：
 
-- 实现 gate decisions：当前 gate 只返回 `allow` 或 `block`。
+- 实现 gate decisions：gate 只返回 `allow`、`reject` 或 `ask`。
 - 用当前 action signature 评估 active contracts 和 active edges。
 - 综合 predicate match、scope/lifecycle applicability、status、authority、conflict state。
 - 默认所有 non-excluded actions 都 gate。
 - preference 不进入 action-time gate；preference 只通过 Step 7 prompt-intake 影响 planning。
-- block reason 必须包含可直接给 agent 的 hint：`Action violates rule <id>: <text>. Consider another way or ask user for clarification.`
+- reject/ask reason 必须包含可直接给 agent 的 hint。
 - receipt 记录 contracts used、edges applied、contracts ignored with reasons、match outcome、targets、canonical tags、decision、result。
-- allowed/blocked/ignored/ambiguous 都要有 receipt。
+- allow/reject/ask/ignored 都要有 receipt；pattern match outcome 只有 matched/not_matched。
 - 提供 `mac_rule_override` CLI：当 action 被 block 后，agent 在获得用户批准或查阅信息到足够 confident 后，可调用 CLI 在被 block 的 rule 上添加 `override` edge；edge 的 scope 和 lifecycle 由 agent 通过 CLI 显式传入。
 - override edge 命中当前 action signature 时，gate 忽略对应 block rule，并在 receipt 中记录 `override_applied`。
 - 将 override 操作流程写成 skill，放在 `src/skill/mac_rule_override/SKILL.md`。
@@ -347,45 +348,42 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 仍需决策：
 
-- 当前决策：action gate 不返回 `confirm`、`revise`、`defer`；需要人工介入时先 `block`，再通过用户批准或足够证据触发 `mac_rule_override`。
-- 当前决策：soft preference 不进入 gate，也不返回 `revise`；只进入 prompt-intake reminder。
-- 当前决策：多个 applicable contracts 中任一 block rule 命中即 block；override/exception edge 可让对应 rule 不参与 blocking。
+- 当前决策：action gate 使用三态 `allow/reject/ask`。`ask` 创建 `required`
+  AskRequest；同 session/task 的下一条 `UserPromptSubmit` 直接把它标记为
+  `responded`。single-use flag 只跳过相关 ask-before rule，不代表用户批准。
+- 当前决策：soft preference 不进入 gate；只进入 prompt-intake reminder。
+- 当前决策：先应用 override/exception，再评估全部 applicable rules，并按
+  `reject > ask > allow` 聚合。
 
 完成标准：
 
 - 测试覆盖 hard block、preference bypass gate、excluded action bypass、expired contract、scoped exception/override edge activation、receipt correctness。
 - CLI/API 能模拟 gate、显示 receipt，并能用 `mac_rule_override` 创建 override edge。
 
-## Step 10: Ambiguity monitor 和异步 predicate refinement
+## Step 10: Pattern verifier 和单次同步 refinement
 
-目标：当某个 rule pattern version 在 action-time 反复 ambiguous 时，自动排队修正 action-signature pattern projection。
+目标：在 extractor 提议的 pattern 进入 active runtime 前验证其结构正确性。
 
 工作内容：
 
-- 按 contract rule pattern version 记录 match outcomes。
-- 维护 rolling ambiguity window。
-- 当最近窗口 evaluated >= 10 且 ambiguous ratio >= 0.60 时，enqueue refinement job。
-- background job 调用 LLM，输入 immutable rule、current rule pattern version、adapter available_actions、以及触发 ambiguity window 的调用结果：signature id、match outcome、receipt、tool name、raw arguments、host action、tags、targets、intent、decision/result。
-- refinement 的定义收窄：默认认为 rule 本身没有问题，ambiguous 是 action signature pattern 匹配问题；LLM 只能修改 active pattern version 的 `tool_patterns` 和 `targets`，不能修改 rule text、source、scope、semantics、validity、lifecycle、modality、strength。
-- 输出新的 rule pattern version，并通过 `refines` 记录 `PV-004 refines PV-003 for MAC-014` 这样的 version edge。
-- refinement pending 时，当前 gate 不等待；ambiguous non-preference contract 在 action gate 中按 allow/block 模型处理，高风险默认 block 并通过 override 流程处理人工批准。
+- 对 `tool_patterns`、`check_patterns`、`update_patterns` 使用同一个 rule-based verifier。
+- 按 adapter tool capsules 检查 exact native tool name 和 raw argument name。
+- 检查 matcher 与参数类型兼容，并编译所有 regex。
+- 首次失败时允许一次同步 LLM refinement；prompt 包含 immutable rule、当前 patterns、verifier errors 和 tool capsules。
+- LLM 只能返回三组 patterns，不能修改 text/effect/authority/scope/semantics/validity/source/lifecycle/status。
+- refinement 输出必须再次经过相同 verifier；第二次失败则 rule 保持 `candidate`，不安装 active pattern version。
 
 边界：
 
-- refinement 不改写 original contract text、source span、scope、lifecycle 或其他 rule semantics。
-- refinement 是异步流程，不能阻塞 action-time gate。
-
-仍需决策：
-
-- 当前决策：refinement job 仍然是 DB queue；worker 取 pending job 后调用 LLM-backed pattern refiner。
-- failed refinement 如何标记和去重。
-- 某些 refined pattern versions 是否需要用户确认后才激活。
+- 不维护 ambiguity event、rolling window、refinement queue 或 background worker。
+- action-time matcher 只返回 `matched/not_matched`，且不调用 LLM。
+- refinement 只负责 LLM 输出正确性，不根据运行时 precision/recall 判断 pattern 效果。
 
 完成标准：
 
-- 测试可模拟 ambiguous window 并触发 job enqueue。
-- refinement job 能写新 rule pattern version，source contract 不变。
-- 测试证明 LLM refinement prompt 包含触发 window 的 ambiguous invocation results 和 available_actions，且输出只能更新 `tool_patterns/targets`。
+- 测试覆盖未知 tool、未知 arg、参数类型不兼容和坏 regex。
+- 测试证明 refiner 最多调用一次，且不可修改 immutable rule fields。
+- 只有 verifier 通过的 patterns 才能生成 active rule pattern version。
 
 ## Step 11: Adapter skeletons 和 cold-start import
 
@@ -395,22 +393,22 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 - 新增 `memory_as_contracts.adapters`，四个 agent 各一个主文件：`codex.py`、`claude_code.py`、`openclaw.py`、`nanobot.py`。
 - 新增 shared adapter layer：`AdapterContext`、`MemorySourceSpec`、`ChangedSource`、`AdapterResult`。
-- 每个 adapter 暴露统一 API：`discover_sources`、`cold_start_import`、`refresh_changed_sources`、`build_prompt_context`、`build_action_signature`、`gate_event`、`hook_config_snippet`。
+- 每个 adapter 暴露统一 API：`discover_sources`、`cold_start_import`、`build_prompt_context`、`build_action_signature`、`gate_event`、`hook_config_snippet`。`refresh_changed_sources` 保留为 may-use-future/disabled surface，不接入自动 adapter path。
 - backup 不使用额外 markdown sidecar，直接复用 `source_snapshots` 表。
-- cold start 对每个 memory/instruction file 单独 snapshot，并单独调用 extraction。
-- online refresh 读取当前 source file，与 `source_snapshots.content/fingerprint` 做 diff；无 diff 不调用 LLM，有 diff 才把 unified diff 作为 cold-start-style source 送入 extractor。
+- cold start 对每个 memory/instruction file 单独 snapshot，并单独调用 extraction；当前实现只在每个 adapter/workspace 首次 `UserPromptSubmit` 时默认执行一次。
+- file-diff refresh 读取当前 source file，与 `source_snapshots.content/fingerprint` 做 diff 的机制保留为 future work；当前 adapter 自动路径不执行 diff refresh。
 - source kind 规则：repo/project instruction files 标成 `PROJECT_DOC`；user/global instruction files 标成 `USER_PROFILE`；auto memory、dream memory、durable memory files 标成 `MEMORY_FILE`。
 - `codex.py` source：`$CODEX_HOME/AGENTS.override.md` 或 `$CODEX_HOME/AGENTS.md`；workspace root 到 cwd 的 `AGENTS.override.md`、`AGENTS.md`、configured fallback filenames。
-- `codex.py` trigger：Codex 没有 auto markdown memory 写入机制，因此 `UserPromptSubmit`、`PostToolUse`、`Stop` 都应执行 cheap diff；Step 11 先实现 handler/snippet。
+- `codex.py` trigger：首次 `UserPromptSubmit` 执行一次 cold start；不接入 `PostToolUse`/`Stop` diff refresh。
 - `codex.py` hook：提供 Codex official hooks config snippet；`UserPromptSubmit` 返回 `additionalContext`，`PreToolUse` block 时返回 `permissionDecision: "deny"`。
 - `claude_code.py` source：managed/user/project `CLAUDE.md`、`CLAUDE.local.md`、`.claude/rules/*.md`、auto memory directory `~/.claude/projects/<project>/memory/**/*.md`。
-- `claude_code.py` trigger：优先 `FileChanged` 监听 CLAUDE/rules/auto-memory paths；fallback 在 `UserPromptSubmit` 和 `Stop` 做 diff。
+- `claude_code.py` trigger：首次 `UserPromptSubmit` 执行一次 cold start；`FileChanged`/diff refresh 标记为 future work，不进入当前 hook snippet。
 - `claude_code.py` hook：提供 Claude Code settings JSON snippet；`UserPromptSubmit` 返回 prompt reminder，`PreToolUse` block 时返回 deny payload。
 - `openclaw.py` source：workspace `MEMORY.md`、`memory/*.md`、`DREAMS.md`，以及存在的 instruction docs。
-- `openclaw.py` trigger：memory writes 可能来自 user remember、automatic memory flush、session-memory `/new`/`/reset`、Dream；adapter 每个 inbound/user turn 和 before/after compaction/session events 做 diff。
+- `openclaw.py` trigger：首次 prompt bridge 执行一次 cold start；memory diff refresh 标记为 future work。
 - `openclaw.py` hook：提供 typed plugin hook bridge shape for `before_prompt_build`/`before_tool_call`；不 auto-install。
 - `nanobot.py` source：`SOUL.md`、`USER.md`、`memory/MEMORY.md`、`memory/history.jsonl`，其中 `history.jsonl` 作为 lower-authority memory source。
-- `nanobot.py` trigger：durable files 由 Dream on `intervalH` 或 manual trigger 改写；第一版每个 user turn 和 after run iteration 做 diff。
+- `nanobot.py` trigger：首次 observability prompt 执行一次 cold start；Dream/manual diff refresh 标记为 future work。
 - `nanobot.py` gate：提供 `gate_nanobot_tool_call(...)` function interface 供手动插入 runner；可提供 observability prompt/diff hook，但不声称已经 native automatic blocking。
 - 默认所有 adapters 的 excluded actions 为空，除非 adapter 文件显式配置更窄的 `ExcludedActionPattern`。
 
@@ -423,8 +421,8 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 仍需决策：
 
-- 当前决策：Codex 使用 `AGENTS.md`/`AGENTS.override.md` 和 `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop` lifecycle hooks。
-- 当前决策：Claude Code 使用 `CLAUDE.md`、`CLAUDE.local.md`、`.claude/rules/*.md`、auto memory markdown，以及 `UserPromptSubmit`、`PreToolUse`、`FileChanged` 等 hooks。
+- 当前决策：Codex 使用 `AGENTS.md`/`AGENTS.override.md` 和 `UserPromptSubmit`、`PreToolUse`、`PostToolUse` hooks；source diff refresh 不接入当前自动路径。
+- 当前决策：Claude Code 使用 `CLAUDE.md`、`CLAUDE.local.md`、`.claude/rules/*.md`、auto memory markdown，以及 `UserPromptSubmit`、`PreToolUse`、`PostToolUse` hooks；`FileChanged` 作为 future work。
 - 当前决策：OpenClaw memory 以 workspace markdown files 为主，并通过 typed plugin hooks/function bridge 接入。
 - 当前决策：Nanobot memory 使用 `memory/history.jsonl`、`SOUL.md`、`USER.md`、`memory/MEMORY.md`；blocking gate 先做 function interface。
 - 当前决策：Codex/Claude 提供 native hook config snippets；OpenClaw/Nanobot 在 Step 11 只声明 bridge/function interface，不声明已完成真实 runner 级阻断。
@@ -434,9 +432,11 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 - 每个 adapter 能发现预期 source files，并正确标注 `SourceKind`。
 - cold start 对每个 source file 调用 extractor 一次。
 - snapshot diff 对 unchanged files 不调用 extractor，对 changed files 只调用 changed sources，并在成功 extraction 后更新 snapshot content/fingerprint。
-- Codex 和 Claude hook handlers 能返回 prompt `additionalContext`，并在 block 时返回 host deny payload。
+- Codex 和 Claude hook handlers 能返回 prompt `additionalContext`，并在
+  reject/ask 时返回 host deny payload；ask payload 额外包含 `ask_id`。
 - OpenClaw `before_tool_call` bridge 能映射到 MAC gate。
-- Nanobot `gate_nanobot_tool_call(...)` 能返回 allow/block，但不声称 native hook install。
+- Nanobot `gate_nanobot_tool_call(...)` 能返回 allow/reject/ask，并暴露
+  post-tool 与 user-input interfaces，但不声称 native hook install。
 - blocked gate payload 包含 Step 9 hint text，receipt 成功写入 store。
 
 ## Step 12: CLI、diagnostics 和开发工作流
@@ -445,7 +445,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 工作内容：
 
-- CLI 覆盖 init、env、live LLM check、user-turn ingest、cold-start import、instruction refresh、contracts、conflicts、predicates、prompt-intake retrieval、gate simulation、receipts、ambiguity jobs、refinement worker。
+- CLI 覆盖 init、env、live LLM check、user-turn ingest、cold-start import、instruction refresh、contracts、conflicts、predicates、prompt-intake retrieval、gate simulation、receipts 和 pattern verification diagnostics。
 - 只维护 `mac` 命令。
 - 支持 JSON output，供 eval scripts 使用。
 - 支持 human-readable rich table，供手工检查。
@@ -475,7 +475,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 - 定义 benchmark item schema：prior user turns/cold-start sources、generated rules、hidden scope/lifecycle labels、current task prompt、environment state、available actions、expected outcome、violation oracle、expected receipt。
 - 生成 coding variants：path edit bans、commit/push restrictions、test command requirements、package-manager restrictions、temporary exceptions、project-local vs global conflicts、stale instructions、user-change preservation。
 - 实现 baselines：no memory、full transcript、top-k retrieval、native/structured memory without gate、heuristic-only MAC、text-retrieval-only MAC、hybrid MAC。
-- 记录 metrics：hard violation rate、scope accuracy、lifecycle accuracy、edge activation accuracy、predicate precision/recall、ambiguity rate、conflict resolution、task success、false block/confirmation、unsafe bypass、receipt correctness、latency、token overhead、extra LLM calls。
+- 记录 metrics：hard violation rate、scope accuracy、lifecycle accuracy、edge activation accuracy、predicate precision/recall、pattern verification/repair pass rate、conflict resolution、task success、false block/confirmation、unsafe bypass、receipt correctness、latency、token overhead、extra LLM calls。
 
 边界：
 
@@ -501,7 +501,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 
 - 定义 general-work action registries：email、message、calendar、document、file share、purchase、task update、memory write。
 - 构造 MEMTRACK-like 或其他 general-agent tasks，并注入 MAC rules：calendar sharing restrictions、email confirmation requirements、document preferences、week-only policies、session exceptions、global/project conflicts。
-- 复用同一套 contract store、prompt-intake retrieval、action gate、receipt、ambiguity metrics。
+- 复用同一套 contract store、prompt-intake retrieval、action gate、receipt 和 pattern verification metrics。
 
 边界：
 
@@ -528,7 +528,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 - 每个大 milestone 后更新 README，保证它描述的是 live code，不是 aspirational design。
 - proposal 保留研究愿景，README 标明当前实现状态。
 - 明确记录 adapter limitations 和真实 host integration gaps。
-- 补充 schema、edge activation、predicate refinement、action signatures、evaluation methodology 文档。
+- 补充 schema、edge activation、pattern verification/repair、action signatures、evaluation methodology 文档。
 - 维护 implemented/simulated/deferred changelog。
 
 边界：
@@ -558,7 +558,7 @@ MAC 不是完整记忆系统。它只负责把用户声明的行为规则、偏�
 8. 实现 prompt-intake retrieval。
 9. 实现 action signature construction。
 10. 实现 action gate 和 receipts。
-11. 实现 ambiguity refinement。
+11. 实现 pattern verifier 和单次同步 refinement。
 12. 实现 adapters。
 13. 实现 CLI diagnostics。
 14. 实现 MACBench-Code。

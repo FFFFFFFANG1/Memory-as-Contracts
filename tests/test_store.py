@@ -1,30 +1,30 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 
 from memory_as_contracts.models import (
-    ActionConstraints,
-    CompiledPredicateVersion,
+    ArgPattern,
     Contract,
     ContractEdge,
     ContractKind,
     ContractSource,
     EdgeRelation,
-    HostActionPattern,
     Lifecycle,
     LifecycleType,
     MatchOutcome,
     Modality,
-    PredicateEvaluation,
     PredicateStatus,
     Receipt,
     RulePatternVersion,
+    RuleSemantics,
     Scope,
     ScopeLevel,
     SourceKind,
     SourceSnapshot,
     Strength,
+    ToolPattern,
 )
 from memory_as_contracts.store import ContractStore
 
@@ -53,21 +53,29 @@ def make_contract(contract_id: str = "MAC-test") -> Contract:
             effective_from=datetime(2026, 5, 23, tzinfo=timezone.utc),
             expires_at=datetime(2026, 5, 30, tzinfo=timezone.utc),
         ),
-        action_constraints=ActionConstraints(
-            host_actions=["exec"],
-            canonical_tags=["external_write", "publish_code"],
+        semantics=RuleSemantics(
+            actions=["git.push"],
+            tags=["external_write", "publish_code"],
         ),
-        compiled_predicates=CompiledPredicateVersion(
-            id="PV-test",
-            contract_id=contract_id,
-            host_action_patterns=[HostActionPattern(action="exec", program="git", subcommand="push")],
-        ),
+        tool_patterns=[
+            ToolPattern(
+                tool="exec",
+                args={"cmd": ArgPattern(regex=r"^\s*git\s+push(?:\s|$)")},
+            )
+        ],
     )
 
 
-def test_store_round_trips_contract_edge_receipt_snapshot_and_events() -> None:
+def test_store_round_trips_contract_edge_receipt_and_snapshot() -> None:
     store = make_store()
     contract = store.add_contract(make_contract())
+    store.install_rule_pattern_version(
+        RulePatternVersion(
+            id="PV-test",
+            contract_id=contract.id,
+            tool_patterns=contract.tool_patterns,
+        )
+    )
     edge = store.add_edge(
         ContractEdge(
             from_contract="MAC-new",
@@ -81,10 +89,10 @@ def test_store_round_trips_contract_edge_receipt_snapshot_and_events() -> None:
         Receipt(
             signature_id="AS-1",
             session_id="sess-1",
-            decision="confirm",
+            decision="ask",
             host_action="git.push",
             match_outcome=MatchOutcome.MATCHED,
-            result="confirm",
+            result="ask",
         )
     )
     snapshot = store.add_source_snapshot(
@@ -98,24 +106,13 @@ def test_store_round_trips_contract_edge_receipt_snapshot_and_events() -> None:
             content="Do not push.",
         )
     )
-    store.add_predicate_evaluation(
-        PredicateEvaluation(
-            contract_id=contract.id,
-            predicate_version_id="PV-test",
-            signature_id="AS-1",
-            match_outcome=MatchOutcome.AMBIGUOUS,
-        )
-    )
-
     stored_contract = store.get_contract(contract.id)
     assert stored_contract is not None
-    assert stored_contract.compiled_predicates is None
     assert stored_contract.text == contract.text
     assert store.get_active_rule_pattern_version(contract.id) is not None
     assert store.list_edges()[0].id == edge.id
     assert store.list_receipts()[0].id == receipt.id
     assert store.list_source_snapshots()[0].source_key == snapshot.source_key
-    assert len(store.recent_ambiguity_events(contract.id, "PV-test")) == 1
 
 
 def test_fts_search_uses_contract_text() -> None:
@@ -127,7 +124,7 @@ def test_fts_search_uses_contract_text() -> None:
     assert [contract.id for contract in results] == ["MAC-test"]
 
 
-def test_store_uses_schema_v3_rule_columns_and_rule_pattern_versions() -> None:
+def test_store_uses_schema_v9_without_targets_or_refinement_queue_tables() -> None:
     store = make_store()
     contract = store.add_contract(make_contract())
 
@@ -154,26 +151,85 @@ def test_store_uses_schema_v3_rule_columns_and_rule_pattern_versions() -> None:
         ).fetchone()["payload_json"]
     )
 
-    assert schema_version == 3
+    action_log_table = store.conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'action_log'"
+    ).fetchone()
+
+    assert schema_version == 9
+    assert action_log_table is not None
     assert {
         "effect",
         "authority",
         "semantics_json",
         "tool_patterns_json",
-        "targets_json",
         "validity_json",
     } <= columns
+    assert "targets_json" not in columns
     assert "action_constraints" not in payload
     assert "compiled_predicates" not in payload
     assert "pattern_version" not in payload
     assert "from" in payload["validity"]
     assert "start" not in payload["validity"]
     assert "target_patterns" not in pattern_payload
-    assert "targets" in pattern_payload
+    assert "targets" not in pattern_payload
     assert "host_action_patterns" not in pattern_payload
     assert store.list_rule_pattern_versions(contract.id)[-1].id == "RPV-next"
-    assert store.list_predicate_versions(contract.id)[-1].id == "RPV-next"
     predicate_versions_table = store.conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'predicate_versions'"
     ).fetchone()
     assert predicate_versions_table is None
+    for table in ("predicate_evaluations", "ambiguity_events", "refinement_jobs"):
+        assert (
+            store.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                (table,),
+            ).fetchone()
+            is None
+        )
+
+
+def test_schema_v6_validator_state_migrates_to_scoped_v9_state(tmp_path) -> None:
+    path = tmp_path / "mac-v6.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version(version) VALUES (6);
+        CREATE TABLE validator_states (
+            validator_version_id TEXT PRIMARY KEY,
+            contract_id TEXT NOT NULL,
+            state_json TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO validator_states (
+            validator_version_id, contract_id, state_json, payload_json, updated_at
+        ) VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            "VV-old",
+            "MAC-old",
+            '{"count":1}',
+            (
+                '{"validator_version_id":"VV-old","contract_id":"MAC-old",'
+                '"state":{"count":1},"updated_at":"2026-06-06T00:00:00Z"}'
+            ),
+            "2026-06-06T00:00:00Z",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    store = ContractStore(path)
+    store.init_db()
+
+    state = store.get_validator_state("VV-old", "legacy")
+    assert state is not None
+    assert state.scope_key == "legacy"
+    assert state.state == {"count": 1}
+    assert state.revision == 0
+    assert store.conn.execute("SELECT version FROM schema_version").fetchone()["version"] == 9

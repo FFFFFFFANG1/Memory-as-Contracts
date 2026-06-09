@@ -2,7 +2,7 @@
 
 ## 1. 背景与目标
 
-当前 MAC 已经完成了没有 validator snippet 的版本：系统可以从用户输入或项目文档中抽取 rule，并在 action gate 阶段根据 rule 的 scope、lifecycle、tool pattern 和 target pattern 判断当前 action 是否应该被 allow / block / confirm / revise。
+当前 MAC 已经完成了没有 validator snippet 的版本：系统可以从用户输入或项目文档中抽取 rule，并在 action gate 阶段根据 rule 的 scope、lifecycle、tool pattern 和 target pattern 判断当前 action 是否应该 `allow`、`reject` 或 `ask`。
 
 这个版本适合处理 direct rule，例如：
 
@@ -40,6 +40,17 @@ MAC 不直接信任 agent 的 hidden reasoning，也不把 validator 的内部�
 Action log 只记录已经实际执行并产生 tool result 的 committed tool action；被
 pre-action gate 拒绝、撤回或尚未执行的 proposed action 不进入 action log。
 
+### 2.2 Ask Response Flag 只证明交互发生
+
+`ask` 会停止当前 Pending Action 并创建 `AskRequest`，但 gate 返回 ask 不代表
+用户批准。下一条同 session/task 的 `UserPromptSubmit` 将 `required` request
+直接标记为 `responded`。下一次相关 rule 且 native tool family 相同的 Pending
+Action 可读取该 single-use flag；默认要求 exact native tool name，只有 adapter
+显式声明的 alias family 可以等价匹配。不同 tool family、不同 response turn 或
+30 分钟 TTL 到期会取消旧 flag。该 flag 只跳过对应 ask-before rule，其他 rules
+仍按 `reject > ask > allow` 聚合。MAC 不保存或解释用户回复内容，也不比较
+arguments/targets。
+
 这个 log 可以采用类似 nanobot 的格式：
 
 ```text
@@ -59,7 +70,7 @@ optional reasoning content
 给 gate / validator.check，但 pending action 不是 action log entry，除非它后来
 真实执行并在 post-action 阶段完成记录。
 
-### 2.2 State 是从 action log 派生出来的持久化视图
+### 2.3 State 是从 action log 派生出来的持久化视图
 
 state 必须存在，并且必须持久化。
 
@@ -75,7 +86,7 @@ validator = state transition and checking logic
 
 如果 state 出错，理论上可以通过 replay action log 重建。
 
-### 2.3 Validator snippet 不保存状态
+### 2.4 Validator snippet 不保存状态
 
 validator snippet 不能像 global variable 一样保存当前状态。
 
@@ -97,7 +108,7 @@ validator snippet contains:
 
 当前 state 的值由 MAC runtime 持久化维护，而不是由脚本自身保存。
 
-### 2.4 Runtime 不依赖 LLM
+### 2.5 Runtime 不依赖 LLM
 
 action-time 不能再调用 LLM。
 
@@ -286,6 +297,11 @@ counted_transactions
 state 不应该被理解成普通 global variable。它更接近：
 
 > rule-local materialized view over observable agent history.
+
+持久化主键是 `validator_version_id + scope_key`。`scope_key` 由 contract scope
+和 action 当时的 session/task/workspace/repo/user context 确定性生成；`revision`
+与 `last_applied_seq` 防止并发或重复计数。Replay 使用与正常 post-action 相同的
+scope、lifecycle、pattern 和幂等规则。
 
 ---
 
@@ -513,8 +529,13 @@ and at least one of:
 runtime 应默认注入当前 session/task scope，除非 validator package 明确声明需要
 跨 session 查询并通过 installation review。
 
-ActionLogSearchTranslator 可以用 SQLite JSON function、FTS、普通索引或先取 bounded candidate
-再在 Python worker 内做二次过滤。这个实现策略对 validator 不可见。
+Sandbox worker 不接收完整 Action Log。它持有一个 RPC proxy；每次
+`log.search(spec)` 都把 spec 发给 parent，parent 使用唯一的 production
+`ActionLogSearchTranslator` 完成 validation、SQLite candidate query 和必要的
+bounded filtering，再把结果行返回 worker。Runtime 统一限制 query 次数、总行数、
+协议消息大小和输出大小。Parent 先按 `timestamp DESC, seq DESC` 选择最近的
+bounded candidate window；默认最多检查 1000 条候选，再执行 Python 侧的
+regex/nested-field filtering。
 
 #### update
 
@@ -551,7 +572,7 @@ runtime 调用 verified validator snippet 的 `check`：读取被 `check_pattern
 如果当前 action 是 git push，
 并且 dirty = true，
 并且 test_ran_after_dirty = false，
-则 revise/block。
+则 reject。
 ```
 
 validator 本身不能：
@@ -595,7 +616,7 @@ structured_error:
 
 ```json
 {
-  "decision": "allow|revise|confirm|defer|block",
+  "decision": "allow|reject|ask",
   "reason": "short human-readable reason",
   "evidence_refs": [{"kind": "action_log_seq", "seq": 123}],
   "confidence": 0.0
@@ -603,7 +624,7 @@ structured_error:
 ```
 
 `unknown` 不能转成 `allow`。当 evidence 不足且 action 风险较高时，默认返回
-`confirm` / `defer` / `revise`，而不是 `allow`。
+`ask`，而不是 `allow`。
 
 ---
 
@@ -652,7 +673,9 @@ restricted Python snippet。
 validator_version_id
 rule_id
 snippet_hash
+verification_hash
 state_schema_version
+initial_state
 check_patterns
 update_patterns
 sandbox_policy_version
@@ -685,7 +708,7 @@ Runtime will call:
   check(action, state, log, context)
 You must write EFSM-like code: explicit state, explicit update conditions,
 explicit check conditions. Do not use global mutable state.
-If evidence is insufficient, return confirm/defer/revise rather than allow.
+If evidence is insufficient, return ask rather than allow.
 
 IMMUTABLE RULE
 id: rule_budget_01
@@ -726,10 +749,8 @@ Every search must include limit and a bounded window.
 VERDICT API
 Return one of:
   allow(reason, evidence_refs=None, confidence=1.0)
-  revise(reason, evidence_refs=None, confidence=1.0)
-  confirm(reason, evidence_refs=None, confidence=1.0)
-  defer(reason, evidence_refs=None, confidence=1.0)
-  block(reason, evidence_refs=None, confidence=1.0)
+  reject(reason, evidence_refs=None, confidence=1.0)
+  ask(reason, evidence_refs=None, confidence=1.0)
 
 RECENT COMMITTED ACTION EXAMPLES
 [
@@ -756,7 +777,7 @@ TASK
 Generate:
 1. initial_state JSON
 2. Python validator snippet defining update and check
-3. brief notes on when the validator returns confirm/defer/revise
+3. brief notes on when the validator returns ask or reject
 ```
 
 如果 prompt 缺少 ActionLogEntry schema、SearchSpec docs、verdict API、tool
@@ -783,7 +804,7 @@ validator enforcement shape 只有三类：
 ```text
 no_validator:
   不安装 validator snippet；具体 route 可以是 pattern-only gate、prompt retrieval、
-  confirm-only 或 manual-review。
+  ask-only 或 manual-review。
 
 check_only:
   安装 validator snippet，但只在 pre-action 运行 check；
@@ -807,7 +828,7 @@ Total budget must not exceed $90
   -> check_update
 
 Do the safe thing before publishing
-  -> no_validator / manual-review or confirm-only
+  -> no_validator / manual-review or ask-only
 ```
 
 ---
@@ -830,7 +851,7 @@ Do the safe thing before publishing
 
 ```text
 1. rule 仍然可以保留为普通 contract；
-2. action-time 可以 fallback 到 confirm/defer；
+2. action-time 对匹配 action fallback 到 ask；
 3. 系统可以标记该 rule 需要人工 review 或后续 refinement。
 ```
 
@@ -883,8 +904,7 @@ post-action:
    - 调用 check；
    - 得到 local verdict。
 5. MAC 聚合所有 local verdict。
-6. 返回最终 decision：
-   allow / revise / confirm / block / defer。
+6. 返回最终 decision：`allow`、`reject` 或 `ask`。
 7. 写入 receipt。
 ```
 
@@ -998,7 +1018,10 @@ validator 不可以看到：
 
 ## 7. 为什么不要求预定义 tool schema
 
-Stage 2 不要求 MAC 预先知道所有工具的完整字段。
+Stage 2 的 Action Log/validator query surface 不要求 MAC 预先知道所有工具的
+完整字段；raw entries 仍然保持 schema-light。另一方面，进入 gate 的
+`tool_patterns/check_patterns/update_patterns` 必须使用 adapter always-on
+tool capsules 做结构验证，确认 native tool、raw argument 和 regex 合法。
 
 原因是 raw action log 采用 schema-light design：
 
@@ -1073,7 +1096,7 @@ Before git push, run tests.
 用 bounded `log.search(spec)` 查询是否存在相关 test action，不一定需要
 persistent state 或 `update_patterns`。
 
-v3 的 `tool_patterns/targets` 继续服务于 pattern-only gate，也可以作为
+v3 的 `tool_patterns` 继续服务于 pattern-only gate，也可以作为
 validator `check_patterns` 的 seed。`update_patterns` 是 Stage 2 新增的
 post-action subscription surface，不能从 check surface 隐式推断。
 
@@ -1099,17 +1122,10 @@ conflict status
 validator verdict
 ```
 
-不能简单地说：
+先应用 narrow exception/override，再对剩余 local verdict 使用固定优先级：
 
 ```text
-block > confirm > revise > allow
-```
-
-因为 narrow exception 可能覆盖 broader prohibition。
-
-因此：
-
-```text
+reject > ask > allow
 contract-level resolver 和 edge graph 仍然在 validator 之前生效；
 validator 只负责判断某条 active rule 在当前 action 上是否 satisfied。
 ```
@@ -1214,15 +1230,15 @@ def check(action, state, log, context):
         proposed = infer_from_recent_shape(action, candidates)
 
     if proposed is None:
-        return confirm("Cannot determine proposed cost.")
+        return ask("Cannot determine proposed cost.")
 
     if state["spent_cents"] + proposed["cents"] > 9000:
-        return block("Budget would exceed $90.")
+        return reject("Budget would exceed $90.")
     return allow()
 ```
 
 如果 price 只会在 tool result 中出现，pre-action 不能假装知道这次 action 的
-最终成本；validator 应返回 confirm/defer/revise，或只在 post-action 更新 state
+最终成本；validator 应返回 ask，或只在 post-action 更新 state
 并阻止后续消费。
 
 ---
@@ -1266,7 +1282,7 @@ tool / target / rule 范围的 pending action。action 成功、被放弃、tool
 处理原则：
 
 ```text
-high-risk action should default to confirm/defer rather than allow。
+high-risk action should default to ask rather than allow。
 ```
 
 ---
@@ -1284,7 +1300,7 @@ unknown should not become success。
 不确定时，应返回：
 
 ```text
-confirm / revise / defer
+ask
 ```
 
 而不是 allow。
@@ -1304,7 +1320,7 @@ state 必须能从 action log rebuild；
 
 ---
 
-### 11.4 Ambiguous rule
+### 11.4 Uninstallable validator
 
 某些 rule 无法自动转成稳定 validator。
 
@@ -1312,14 +1328,14 @@ state 必须能从 action log rebuild；
 
 ```text
 不要强行生成 validator snippet；
-fallback 到 confirm/defer/manual review。
+fallback 到 ask/manual review。
 ```
 
 ---
 
 ### 11.5 Host coverage 不完整
 
-有些 host agent 可能只能 post-log，不能 pre-block。
+有些 host agent 可能只能 post-log，不能 pre-action gate。
 
 处理原则：
 
@@ -1330,7 +1346,8 @@ MAC 应区分：
   only auditable externally
 ```
 
-只有 pre-action hook 能覆盖的 action 才能真正实时 block。
+只有 pre-action hook 能覆盖的 action 才能实时 reject/ask；没有可靠 post-action
+能力的 adapter 不能安装 `check_update` validator。
 
 ---
 
@@ -1349,9 +1366,9 @@ Stage 2 应该按以下顺序落地：
 8. 增加 replay/rebuild state 能力。
 9. 增加 tests：
    - direct rule 无 validator 仍然有效；
-   - no-push-before-test 能 block；
+   - no-push-before-test 能 ask；
    - test 之后能 allow；
-   - budget 累计能 block；
+   - budget 累计能 reject；
    - state 可以由 action log rebuild。
 ```
 

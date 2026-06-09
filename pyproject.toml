@@ -37,6 +37,7 @@ target-version = "py311"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["-m", "not live_llm"]
 markers = [
     "live_llm: tests that call the configured live LLM endpoint",
 ]

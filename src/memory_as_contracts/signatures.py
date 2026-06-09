@@ -76,6 +76,7 @@ class SignatureContext:
     task_id: str | None = None
     user_id: str | None = None
     cwd: str = "."
+    workspace: str | None = None
     repo: str | None = None
     branch: str | None = None
     timezone: str = "UTC"
@@ -110,6 +111,7 @@ class ActionSignatureBuilder:
             time=TimeContext(now=now or datetime.now(zone), timezone=context.timezone),
             workspace=WorkspaceContext(
                 cwd=str(Path(context.cwd)),
+                root=str(Path(context.workspace or context.cwd)),
                 repo=context.repo,
                 branch=context.branch,
             ),

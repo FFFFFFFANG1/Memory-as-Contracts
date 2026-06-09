@@ -5,21 +5,31 @@ from datetime import datetime, timezone
 import pytest
 from openai import APIConnectionError, APITimeoutError
 
+from memory_as_contracts.adapters import CodexAdapter
 from memory_as_contracts.extractor import (
     CandidateJsonContractExtractor,
     ExtractionContext,
+    LLMCallError,
     OpenAIChatResponseProvider,
 )
 from memory_as_contracts.gate import ActionGate
 from memory_as_contracts.models import (
+    ArgPattern,
     Contract,
     ContractKind,
     ContractStatus,
     EdgeRelation,
     GateDecisionType,
     SourceKind,
+    ToolPattern,
 )
 from memory_as_contracts.normalizers import NormalizationContext
+from memory_as_contracts.pattern_validation import (
+    PATTERN_REFINEMENT_SYSTEM_PROMPT,
+    PatternInstaller,
+    PatternProvisioner,
+    PatternVerifier,
+)
 from memory_as_contracts.resolver import ConflictResolver, RELATION_CLASSIFICATION_SYSTEM_PROMPT
 from memory_as_contracts.signatures import ActionSignatureBuilder, SignatureContext
 from memory_as_contracts.store import ContractStore
@@ -61,6 +71,7 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
         ),
         conversation_id="conv-effect",
         turn_id="u-effect",
+        tool_capsule_system_prompt=CodexAdapter().tool_capsule_system_prompt(),
     )
 
     try:
@@ -76,7 +87,9 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
             text=USER_TURN,
             context=context,
         )
-    except (APIConnectionError, APITimeoutError) as exc:
+    except ValueError as exc:
+        pytest.skip(str(exc))
+    except (APIConnectionError, APITimeoutError, LLMCallError) as exc:
         pytest.skip(f"live LLM endpoint unavailable: {exc}")
     all_contracts = project_contracts + user_contracts
     diagnostics = _diagnostics(all_contracts)
@@ -99,6 +112,18 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
     resolver = ConflictResolver(store, relation_response_provider=relation_provider)
     for contract in all_contracts:
         resolver.insert(contract)
+    pattern_installer = PatternInstaller(
+        store=store,
+        verifier=PatternVerifier(CodexAdapter().tool_capsules()),
+        response_provider=OpenAIChatResponseProvider.from_env(
+            system_prompt=PATTERN_REFINEMENT_SYSTEM_PROMPT
+        ),
+    )
+    for contract in store.list_contracts(
+        [ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT]
+    ):
+        if contract.tool_patterns:
+            pattern_installer.install(contract)
 
     edges = store.list_edges()
     edge_relations = {edge.relation for edge in edges}
@@ -116,19 +141,21 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
     gate = ActionGate(store)
 
     sandbox_write = builder.build(
-        tool_name="file.write",
-        raw_arguments={"path": "generated/sandbox/demo.py"},
+        tool_name="apply_patch",
+        raw_arguments={
+            "patch": "*** Update File: generated/sandbox/demo.py\n@@\n-old\n+new"
+        },
         intent="edit generated sandbox fixture",
         context=signature_context,
     )
     protected_write = builder.build(
-        tool_name="file.write",
-        raw_arguments={"path": "generated/core.py"},
+        tool_name="apply_patch",
+        raw_arguments={"patch": "*** Update File: generated/core.py\n@@\n-old\n+new"},
         intent="edit generated core file",
         context=signature_context,
     )
     git_push = builder.build(
-        tool_name="exec",
+        tool_name="exec_command",
         raw_arguments={"cmd": "git push origin release"},
         intent="publish release branch",
         context=signature_context,
@@ -143,13 +170,15 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
         _diagnostics(store.list_contracts([ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT])),
     )
     assert protected_result.decision.decision in {
-        GateDecisionType.BLOCK,
+        GateDecisionType.REJECT,
     }, protected_result.decision
     assert push_result.decision.decision in {
-        GateDecisionType.BLOCK,
+        GateDecisionType.ASK,
     }, push_result.decision
-    assert EdgeRelation.CONFLICTS_WITH in edge_relations or push_result.decision.decision in {
-        GateDecisionType.BLOCK,
+    assert edge_relations.intersection(
+        {EdgeRelation.CONFLICTS_WITH, EdgeRelation.SUPERSEDES}
+    ) or push_result.decision.decision in {
+        GateDecisionType.REJECT,
     }, _diagnostics(store.list_contracts())
     assert edge_relations.intersection(
         {EdgeRelation.DUPLICATE, EdgeRelation.REFINEMENT}
@@ -159,6 +188,54 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
         for receipt in store.list_receipts()
         for ignored in receipt.contracts_ignored
     ), [receipt.model_dump(mode="json") for receipt in store.list_receipts()]
+
+
+def test_live_llm_repairs_invalid_native_pattern_once() -> None:
+    adapter = CodexAdapter()
+    try:
+        provider = OpenAIChatResponseProvider.from_env(
+            system_prompt=PATTERN_REFINEMENT_SYSTEM_PROMPT
+        )
+        result = PatternProvisioner(
+            verifier=PatternVerifier(adapter.tool_capsules()),
+            response_provider=provider,
+        ).provision(
+            Contract.model_validate(
+                {
+                    "text": "Do not run git push.",
+                    "effect": "deny",
+                    "authority": "user_explicit",
+                    "source": {
+                        "kind": "user_turn",
+                        "span": "Do not run git push.",
+                    },
+                    "scope": {
+                        "level": "project",
+                        "workspace": "/workspace/project",
+                    },
+                    "semantics": {
+                        "actions": ["git.push"],
+                        "tags": ["publish_code"],
+                    },
+                    "tool_patterns": [
+                        ToolPattern(
+                            tool="exec_command",
+                            args={"command": ArgPattern(regex="(")},
+                        ).model_dump(mode="json")
+                    ],
+                }
+            )
+        )
+    except ValueError as exc:
+        pytest.skip(str(exc))
+    except (APIConnectionError, APITimeoutError, LLMCallError) as exc:
+        pytest.skip(f"live LLM endpoint unavailable: {exc}")
+
+    assert result.refined is True
+    assert result.verification.accepted is True, [
+        issue.__dict__ for issue in result.verification.issues
+    ]
+    assert result.contract.tool_patterns
 
 
 def _live_provider_or_skip() -> OpenAIChatResponseProvider:
@@ -180,7 +257,6 @@ def _diagnostics(contracts: list[Contract]) -> list[dict]:
             "scope": contract.scope.model_dump(mode="json"),
             "semantics": contract.semantics.model_dump(mode="json"),
             "tool_patterns": [pattern.model_dump(mode="json") for pattern in contract.tool_patterns],
-            "targets": [target.model_dump(mode="json") for target in contract.targets],
         }
         for contract in contracts
     ]

@@ -6,24 +6,23 @@ import pytest
 from pydantic import ValidationError
 
 from memory_as_contracts.models import (
-    ActionConstraints,
     ActionSignature,
     ArgPattern,
     AvailableAction,
-    CompiledPredicateVersion,
     Contract,
     ContractEdge,
     ContractKind,
     ContractSource,
     EdgeRelation,
     GateDecisionType,
-    HostActionPattern,
     IgnoredContract,
     Lifecycle,
     LifecycleType,
     MatchOutcome,
     Modality,
     Receipt,
+    RulePatternVersion,
+    RuleSemantics,
     Scope,
     ScopeLevel,
     SessionContext,
@@ -34,6 +33,7 @@ from memory_as_contracts.models import (
     ToolCall,
     WorkspaceContext,
 )
+from memory_as_contracts.schema_compat import normalize_rule_payload
 
 
 def project_scope() -> Scope:
@@ -50,7 +50,7 @@ def user_source() -> ContractSource:
     )
 
 
-def test_contract_serializes_proposal_style_example() -> None:
+def test_contract_and_pattern_version_serialize_canonical_schema() -> None:
     contract = Contract(
         id="MAC-001",
         text="This week, do not push any code changes to Git before asking me.",
@@ -65,25 +65,36 @@ def test_contract_serializes_proposal_style_example() -> None:
             expires_at=datetime(2026, 5, 30, 23, 59, 59, tzinfo=timezone.utc),
             original_text="this week",
         ),
-        action_constraints=ActionConstraints(
-            host_actions=["exec"],
-            canonical_tags=["external_write", "publish_code"],
+        semantics=RuleSemantics(
+            actions=["git.push"],
+            tags=["external_write", "publish_code"],
         ),
-        compiled_predicates=CompiledPredicateVersion(
-            id="PV-001",
-            version="PV-001",
-            host_action_patterns=[HostActionPattern(action="exec", program="git", subcommand="push")],
-            canonical_tags=["external_write", "publish_code"],
-        ),
+        tool_patterns=[
+            ToolPattern(
+                tool="exec",
+                args={"cmd": ArgPattern(regex=r"^\s*git\s+push(?:\s|$)")},
+            )
+        ],
         confidence=0.94,
+    )
+    pattern_version = RulePatternVersion(
+        id="PV-001",
+        contract_id=contract.id,
+        version="PV-001",
+        tool_patterns=contract.tool_patterns,
+        canonical_tags=["external_write", "publish_code"],
     )
 
     payload = contract.model_dump(mode="json")
+    pattern_payload = pattern_version.model_dump(mode="json")
 
     assert payload["id"] == "MAC-001"
     assert payload["kind"] == "prohibition"
     assert payload["scope"]["level"] == "project"
-    assert payload["compiled_predicates"]["host_action_patterns"][0]["subcommand"] == "push"
+    assert "action_constraints" not in payload
+    assert "compiled_predicates" not in payload
+    assert "host_action_patterns" not in pattern_payload
+    assert pattern_payload["tool_patterns"][0]["args"]["cmd"]["regex"].startswith("^")
 
 
 def test_rule_schema_round_trips_linked_repo_tool_patterns() -> None:
@@ -108,7 +119,6 @@ def test_rule_schema_round_trips_linked_repo_tool_patterns() -> None:
                 "args": {"patch": {"mentions_path_glob": "../linked_repo/**"}},
             },
         ],
-        "targets": [{"kind": "path_glob", "value": "../linked_repo/**"}],
         "override": {"type": "explicit_user_current_turn"},
         "validity": {"from": "2026-06-03T10:00:00Z", "until": None},
     }
@@ -118,8 +128,7 @@ def test_rule_schema_round_trips_linked_repo_tool_patterns() -> None:
 
     assert rule.effect == "deny"
     assert rule.scope.path_globs == ["../linked_repo/**"]
-    assert rule.action_constraints.host_actions == ["file.write"]
-    assert rule.compiled_predicates is None
+    assert rule.semantics.actions == ["file.write"]
     assert rule.tool_patterns[0] == ToolPattern(
         tool="Edit",
         args={"file_path": ArgPattern(path_glob="../linked_repo/**")},
@@ -127,30 +136,63 @@ def test_rule_schema_round_trips_linked_repo_tool_patterns() -> None:
     assert dumped["semantics"]["tags"] == ["workspace_write", "source_modification"]
 
 
-def test_fact_cannot_bind_action_constraints() -> None:
-    with pytest.raises(ValidationError, match="fact contracts cannot bind action constraints"):
+def test_fact_cannot_bind_rule_semantics() -> None:
+    with pytest.raises(ValidationError, match="fact contracts cannot bind rule semantics"):
         Contract(
             text="This repo uses uv.",
             kind=ContractKind.FACT,
             modality=Modality.MAY,
             source=ContractSource(kind=SourceKind.PROJECT_DOC, span="uses uv"),
             scope=project_scope(),
-            action_constraints=ActionConstraints(host_actions=["exec"]),
+            semantics=RuleSemantics(actions=["exec"]),
         )
 
 
-def test_fact_cannot_bind_compiled_predicates() -> None:
-    with pytest.raises(ValidationError, match="fact contracts cannot bind compiled predicates"):
+def test_fact_cannot_bind_tool_patterns() -> None:
+    with pytest.raises(ValidationError, match="fact contracts cannot bind tool patterns"):
         Contract(
             text="This repo uses uv.",
             kind=ContractKind.FACT,
             modality=Modality.MAY,
             source=ContractSource(kind=SourceKind.PROJECT_DOC, span="uses uv"),
             scope=project_scope(),
-            compiled_predicates=CompiledPredicateVersion(
-                host_action_patterns=[HostActionPattern(action="exec", program="uv")]
-            ),
+            tool_patterns=[
+                ToolPattern(tool="exec", args={"cmd": ArgPattern(regex=r"^uv(?:\s|$)")})
+            ],
         )
+
+
+def test_legacy_rule_payload_requires_explicit_compatibility_adapter() -> None:
+    legacy_payload = {
+        "text": "Do not push code.",
+        "kind": "prohibition",
+        "modality": "MUST_NOT",
+        "source": {"kind": "user_turn", "span": "Do not push code."},
+        "scope": {"level": "project", "workspace": "/workspace/project"},
+        "action_constraints": {
+            "host_actions": ["git.push"],
+            "canonical_tags": ["publish_code"],
+        },
+        "compiled_predicates": {
+            "host_action_patterns": [
+                {
+                    "action": "exec",
+                    "tool_name": "exec",
+                    "parameter_regex": {"cmd": r"^git\s+push(?:\s|$)"},
+                }
+            ]
+        },
+    }
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        Contract.model_validate(legacy_payload)
+
+    rule = Contract.model_validate(normalize_rule_payload(legacy_payload))
+
+    assert rule.semantics.actions == ["git.push"]
+    assert rule.tool_patterns[0].tool == "exec"
+    assert "action_constraints" not in Contract.model_fields
+    assert "compiled_predicates" not in Contract.model_fields
 
 
 def test_path_scope_requires_path_globs() -> None:
@@ -249,7 +291,7 @@ def test_receipt_serializes_gate_decision_evidence() -> None:
         action_id="A-102",
         signature_id="AS-102",
         session_id="sess-1",
-        decision=GateDecisionType.CONFIRM,
+        decision=GateDecisionType.ASK,
         host_action="git.push",
         canonical_tags=["external_write", "publish_code"],
         match_outcome=MatchOutcome.MATCHED,
@@ -262,5 +304,5 @@ def test_receipt_serializes_gate_decision_evidence() -> None:
 
     payload = receipt.model_dump(mode="json")
 
-    assert payload["decision"] == "confirm"
+    assert payload["decision"] == "ask"
     assert payload["contracts_ignored"][0]["reason"] == "expired"

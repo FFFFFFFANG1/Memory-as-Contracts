@@ -187,7 +187,6 @@ An initial contract object should look like this:
       "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}
     }
   ],
-  "targets": [{"kind": "git_remote", "value": "*"}],
   "override": {
     "allowed": true,
     "requires": "explicit_user_confirmation"
@@ -297,7 +296,7 @@ The extractor should identify:
 - scope;
 - lifecycle;
 - semantic actions/tags;
-- native `tool_patterns` and `targets` as operational seeds when the rule is
+- native `tool_patterns` as operational seeds when the rule is
   hookable;
 - source span;
 - authority/source type;
@@ -318,23 +317,24 @@ at action time:
         "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}
       }
     ],
-    "targets": [{"kind": "git_remote", "value": "*"}],
     "scope_predicate": {"level": "project"},
     "lifecycle_predicate": {"type": "bounded_time"}
   }
 }
 ```
 
-The compiler should receive the adapter's current available-action registry, so
-it does not depend on a fixed global action-class enum. Extraction may provide
-`tool_patterns` and `targets` as native operational seeds, but the compiler owns
-adapter grounding, validation, fallback materialization, and versioning. A
-coding adapter might advertise semantic actions such as `exec`, `file.read`,
-`file.write`, and `web.search`; a general-work adapter might additionally
+The compiler consumes verified `tool_patterns`, semantics, scope, and lifecycle;
+it does not receive the adapter's `available_actions` registry. Extraction may
+provide `tool_patterns` as native operational seeds, while the Pattern Verifier
+checks those seeds against adapter tool capsules before the compiler owns
+fallback materialization and versioning. A coding adapter might still advertise
+semantic actions such as `exec`, `file.read`, `file.write`, and `web.search` in
+Action Signatures and receipts; a general-work adapter might additionally
 advertise `email.send`, `calendar.create`, `document.edit`, or `task.update`.
 MAC can still maintain a small cross-agent tag vocabulary such as
 `external_write`, `destructive`, `memory_write`, `publish_code`, and
-`notify_human`, but native tool names in `tool_patterns` come from the adapter.
+`notify_human`, but native tool names in `tool_patterns` come from tool
+capsules, not from the semantic action registry.
 
 MAC should support periodic extraction by default. Candidate schedules:
 
@@ -387,48 +387,28 @@ The cleanest design is hybrid: every contract has a text record and structured
 metadata; contracts that are machine-checkable additionally compile to policy
 checks.
 
-### 5.3 Adaptive Pattern Refinement
+### 5.3 Pattern Verification and One-Shot Refinement
 
-Rule pattern versions will sometimes be too broad, too narrow, or under-specified.
-MAC should treat repeated ambiguous action-time matches as feedback for improving
-the operational patterns.
+Pattern refinement validates LLM output correctness before a rule becomes
+hook-active. It is not an action-time effectiveness feedback loop.
 
-The action gate should record a match outcome for each evaluated contract:
+The deterministic verifier checks all proposed `tool_patterns`,
+`check_patterns`, and `update_patterns` against the current adapter capsules:
 
-- `matched`: the predicate clearly applies;
-- `not_matched`: the predicate clearly does not apply;
-- `ambiguous`: the deterministic matcher cannot decide from the current
-  signature and active rule pattern version.
+- native tool names must exist;
+- raw argument names must exist in the tool input schema;
+- text matchers must be compatible with the argument type;
+- every regex must compile.
 
-For each contract version, MAC should maintain a rolling ambiguity window. A
-reasonable default policy is:
+If verification fails, MAC may call an LLM refiner once. The immutable rule
+fields cannot change; only the three pattern lists may be rewritten. MAC then
+runs the same verifier again. A second failure leaves the rule as a retrievable
+`candidate` without an active pattern version.
 
-```text
-if evaluated_count over last window >= 10
-and ambiguous_count / evaluated_count >= 0.60
-then enqueue async predicate refinement
-```
-
-This refinement is asynchronous. It should not block the current action gate.
-The background job can call an LLM with:
-
-- the original contract text and source span;
-- the current rule pattern version;
-- the adapter's available-action registry;
-- recent ambiguous action signatures;
-- receipts and user confirmations when available.
-
-The output is a new rule pattern version, not a silent rewrite of the original
-rule. The source contract remains stable; only its executable pattern projection
-changes. The refinement job should write a version edge such as:
-
-```text
-rule_pattern_version PV-004 refines PV-003 for MAC-014
-```
-
-While refinement is pending, ambiguous high-risk actions should return
-`confirm` or `defer`; ambiguous low-risk actions may be allowed with a receipt,
-depending on adapter policy.
+The action-time matcher returns only `matched` or `not_matched`. Missing
+arguments are `not_matched`; invalid regexes cannot reach the gate. Whether a
+valid pattern is too broad or too narrow is currently treated as model
+capability rather than a runtime refinement signal.
 
 ### 5.4 Conflict and Update Handling
 
@@ -523,11 +503,11 @@ The action gate should be implemented as a host-agent hook. Before a host action
 is executed, the hook uses a rule base to map the host tool call into a normalized
 MAC action signature, then sends that signature to MAC for judgment.
 
-The rule base is adapter-specific. The adapter should pass MAC both the current
-host action and a current `available_actions` registry for that agent. This keeps
-MAC extensible: coding agents, browser agents, and general-work agents can expose
-different tool surfaces without requiring MAC to hard-code one global action
-enum.
+The rule base is adapter-specific. The adapter should pass MAC the current host
+action plus ActionSignature context, including the semantic `available_actions`
+registry used for receipts and retrieval features. Native tool schemas and raw
+argument fields live in adapter tool capsules, which are consumed by the Pattern
+Verifier rather than by the compiler.
 
 ```json
 {
@@ -583,10 +563,18 @@ enum.
 MAC retrieves applicable contracts and returns:
 
 - `allow`: the action can proceed;
-- `revise`: the action should be changed before execution;
-- `confirm`: ask the user before execution;
-- `block`: do not execute;
-- `defer`: unresolved conflict requires clarification.
+- `reject`: the action must not execute;
+- `ask`: the action pauses until the agent actually asks and MAC observes a
+  later user input.
+
+Local verdicts are aggregated after exception and override handling with
+`reject > ask > allow`. MAC persists an `AskRequest` in `required`; the next
+same-session/task `UserPromptSubmit` changes it directly to `responded`. A
+related Pending Action in the same response turn consumes the flag once. Tool
+matching is exact by default, with only explicit adapter alias families allowed.
+A different tool family, turn change, or 30-minute TTL expiry cancels the flag.
+The flag only skips its related ask-before rule, so all other rules are still
+evaluated. User reply content is never stored or interpreted.
 
 The default gate policy should be **gate by default**. The adapter should expose
 an `exclude_action` list containing actions that are safe to bypass. Only actions
@@ -631,7 +619,7 @@ Every gated action should produce a receipt:
   "action_id": "A-102",
   "signature_id": "AS-102",
   "session_id": "sess-20260523-001",
-  "decision": "confirm",
+  "decision": "ask",
   "host_action": "git.push",
   "canonical_tags": ["external_write", "publish_code"],
   "match_outcome": "matched",
@@ -641,7 +629,8 @@ Every gated action should produce a receipt:
   "contracts_ignored": [
     {"id": "MAC-005", "reason": "expired"}
   ],
-  "result": "awaiting_user_confirmation"
+  "ask_request_id": "ASK-014",
+  "result": "ask"
 }
 ```
 
@@ -697,8 +686,10 @@ Adapter responsibilities:
 - import existing memory files for cold start;
 - maintain the host-specific hook rule base that maps tool calls into MAC action
   signatures;
-- provide the current `available_actions` registry, including host action names,
-  argument schemas, parsers, side-effect categories, and canonical tags;
+- provide the current semantic `available_actions` registry for signatures and
+  receipts;
+- provide adapter tool capsules for native tool names, argument schemas, and
+  matcher validation;
 - define the adapter's `exclude_action` bypass list;
 - inject prompt-intake contract packets;
 - enforce gate decisions before every non-excluded action;
@@ -798,7 +789,7 @@ Primary metrics:
 - lifecycle accuracy;
 - edge scope/lifecycle activation accuracy;
 - predicate match precision and recall;
-- ambiguity rate before and after async predicate refinement;
+- pattern verification and one-shot repair pass rate;
 - conflict resolution accuracy;
 - task success rate;
 - unnecessary block/confirmation rate;
@@ -828,7 +819,7 @@ Important ablations:
 - remove conflict edges;
 - remove edge-level scope/lifecycle;
 - replace gate-by-default with effectful-action-only gating;
-- remove adaptive predicate refinement;
+- remove ingestion-time pattern verification/refinement;
 - replace adapter-provided available actions with a fixed global action enum;
 - remove cold-start import;
 - replace hybrid backend with heuristic-only;
@@ -853,13 +844,13 @@ The first useful MAC version should implement:
    before enforcement.
 6. `ConflictResolver`: LLM-assisted relation classification plus deterministic
    precedence.
-7. `PolicyCompiler`: compiles machine-checkable contracts into heuristic checks
-   using the adapter's available-action registry.
+7. `PolicyCompiler`: compiles verified tool patterns, semantics, scope, and
+   lifecycle into versioned machine checks.
 8. `PromptIntakeRetriever`: returns compact rules for the next agent plan.
 9. `HookRuleBase`: maps host-agent tool calls into MAC action signatures with
    session/workspace/time metadata.
-10. `AmbiguityMonitor`: tracks ambiguous predicate matches and enqueues async
-   refinement when the last 10 evaluations are at least 60% ambiguous.
+10. `PatternVerifier`: checks native tools, raw arguments, matcher types, and
+   regex syntax; an invalid proposal may receive one synchronous LLM repair.
 11. `ActionGate`: gates all non-excluded action signatures before execution.
 12. `ReceiptLogger`: records why a contract did or did not affect behavior.
 13. `Adapters`: initial `cc`, `codex`, `openclaw`, and `nanobot` bridges.

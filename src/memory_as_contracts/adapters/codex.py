@@ -15,7 +15,7 @@ from memory_as_contracts.adapters.base import (
     dedupe_specs,
     source_spec,
 )
-from memory_as_contracts.gate import ActionGate
+from memory_as_contracts.hook_runtime import default_pattern_refiner_factory
 from memory_as_contracts.models import ActionSignature, GateDecisionType, SourceKind
 from memory_as_contracts.store import ContractStore
 from memory_as_contracts.tool_capsules import ToolCapabilityCapsule, object_schema
@@ -56,10 +56,10 @@ class CodexAdapter(BaseAdapter):
         ToolCapabilityCapsule(
             name="apply_patch",
             description="Applies a patch that creates, updates, moves, or deletes files.",
-            input_schema={
-                "type": "string",
-                "description": "Freeform patch text.",
-            },
+            input_schema=object_schema(
+                required=("patch",),
+                properties={"patch": {"type": "string"}},
+            ),
         ),
         ToolCapabilityCapsule(
             name="view_image",
@@ -121,27 +121,21 @@ class CodexAdapter(BaseAdapter):
         event: Mapping[str, Any] | Any,
         context: AdapterContext,
     ) -> dict[str, Any]:
-        signature = self.build_action_signature(event, context)
-        result = ActionGate(store, exclude_actions=self.exclude_actions).gate(signature)
-        mac_payload = {
-            "receipt_id": result.receipt.id,
-            "signature_id": result.receipt.signature_id,
-            "decision": result.decision.decision.value,
-            "reason": result.decision.reason,
-            "contracts_used": result.decision.contracts_used,
-            "edges_applied": result.decision.edges_applied,
-        }
+        result = self.evaluate_action(store, event, context)
+        mac_payload = self.decision_metadata(result)
         output: dict[str, Any] = {
             "hookSpecificOutput": {"hookEventName": "PreToolUse"},
             "mac": mac_payload,
         }
-        if result.decision.decision == GateDecisionType.BLOCK:
+        if result.decision.decision in {GateDecisionType.REJECT, GateDecisionType.ASK}:
             output["hookSpecificOutput"].update(
                 {
                     "permissionDecision": "deny",
                     "permissionDecisionReason": result.decision.reason,
                 }
             )
+        if result.decision.decision == GateDecisionType.ASK:
+            output["mac"]["requires_user_input"] = True
         return output
 
     def handle_user_prompt_submit(
@@ -149,16 +143,24 @@ class CodexAdapter(BaseAdapter):
         store: ContractStore,
         user_turn: str,
         context: AdapterContext,
+        *,
+        extractor_factory=None,
     ) -> dict[str, Any]:
-        prompt_text = self.render_prompt_context(store, user_turn, context)
-        if not prompt_text:
-            return {}
-        return {
-            "hookSpecificOutput": {
+        result = self.process_user_prompt_submit(
+            store,
+            user_turn,
+            context,
+            extractor_factory=extractor_factory,
+        )
+        output: dict[str, Any] = {}
+        if result.prompt_text:
+            output["hookSpecificOutput"] = {
                 "hookEventName": "UserPromptSubmit",
-                "additionalContext": prompt_text,
+                "additionalContext": result.prompt_text,
             }
-        }
+        if result.error is not None:
+            output["mac"] = {"error": result.error}
+        return output
 
     def handle_pre_tool_use(
         self,
@@ -177,7 +179,7 @@ class CodexAdapter(BaseAdapter):
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": "python -m memory_as_contracts.adapters.codex user_prompt_submit",
+                                "command": "uv run python -m memory_as_contracts.adapters.codex user_prompt_submit",
                             }
                         ],
                     }
@@ -188,7 +190,18 @@ class CodexAdapter(BaseAdapter):
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": "python -m memory_as_contracts.adapters.codex pre_tool_use",
+                                "command": "uv run python -m memory_as_contracts.adapters.codex pre_tool_use",
+                            }
+                        ],
+                    }
+                ],
+                "PostToolUse": [
+                    {
+                        "matcher": "*",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "uv run python -m memory_as_contracts.adapters.codex post_tool_use",
                             }
                         ],
                     }
@@ -200,7 +213,7 @@ class CodexAdapter(BaseAdapter):
         tool_name = _value(event, "tool_name", _value(event, "name", "exec"))
         raw = _value(event, "tool_input", _value(event, "arguments", {}))
         if not isinstance(raw, dict):
-            raw = {"value": raw}
+            raw = {"patch": raw} if tool_name == "apply_patch" else {"value": raw}
         return str(tool_name), dict(raw), str(_value(event, "intent", ""))
 
 
@@ -210,7 +223,7 @@ def _value(event: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any
     return getattr(event, key, default)
 
 
-_ADAPTER = CodexAdapter()
+_ADAPTER = CodexAdapter(pattern_refiner_factory=default_pattern_refiner_factory)
 
 
 def discover_sources(context: AdapterContext) -> list[MemorySourceSpec]:
@@ -247,3 +260,9 @@ def gate_event(store: ContractStore, event: Mapping[str, Any] | Any, context: Ad
 
 def hook_config_snippet():
     return _ADAPTER.hook_config_snippet()
+
+
+if __name__ == "__main__":
+    from memory_as_contracts.adapters.command import run_adapter_command
+
+    raise SystemExit(run_adapter_command(_ADAPTER))
