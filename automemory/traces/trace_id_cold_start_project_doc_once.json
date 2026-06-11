@@ -1,0 +1,22 @@
+{
+  "trace_id": "trace_id_cold_start_project_doc_once",
+  "eval_mode": "qa",
+  "memory_path": "cold_start_adapter_import",
+  "category": "normal",
+  "driver": "adapter_cold_start",
+  "description": "Codex cold-start import reads project instructions, snapshots the source, retrieves reminders, and gates matching actions.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "content": "# Project instructions\n\nDo not run git push until I approve it.\nFor this repo, always prefer concise implementation notes.\n"
+    }
+  ],
+  "user_turn": "Please prepare the patch and keep the final summary concise. Do not push anything yet.",
+  "assertions": [
+    {"name": "cold start extracted at least one contract", "path": "extracted_count", "expected": {"matcher": "gte", "value": 1}},
+    {"name": "project document source snapshot recorded", "path": "snapshot_count", "expected": {"matcher": "equals", "value": 1}},
+    {"name": "push rule text is stored", "path": "contract_texts", "expected": {"matcher": "contains", "value": "Do not run git push until I approve it"}},
+    {"name": "prompt includes imported preference or rule", "path": "prompt_text", "expected": {"matcher": "contains", "value": "MAC reminders"}},
+    {"name": "unrelated web search is not blocked by push-only cold-start rule", "path": "web_gate_decision", "expected": {"matcher": "equals", "value": "allow"}}
+  ]
+}

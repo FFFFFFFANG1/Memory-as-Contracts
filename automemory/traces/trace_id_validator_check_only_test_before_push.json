@@ -1,0 +1,39 @@
+{
+  "trace_id": "trace_id_validator_check_only_test_before_push",
+  "eval_mode": "qa",
+  "memory_path": "validator_check_only_gate",
+  "category": "normal",
+  "driver": "validator_check_only",
+  "description": "A check-only validator should ask before git push until the Action Log contains a successful test run.",
+  "contract": {
+    "id": "MAC-test-before-push",
+    "text": "Before git push, run tests.",
+    "effect": "require",
+    "kind": "requirement",
+    "modality": "MUST",
+    "scope": {"level": "task", "workspace": "/workspace/project", "repo": "project", "task": "task-1"},
+    "validator_enforcement_shape": "check_only",
+    "check_patterns": [
+      {"tool": "Bash", "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}}
+    ]
+  },
+  "pending_action": {
+    "id": "push",
+    "tool_name": "Bash",
+    "arguments": {"command": "git push origin main"},
+    "intent": "publish code after fixing tests"
+  },
+  "context": {
+    "session_id": "sess-1",
+    "task_id": "task-1",
+    "workspace": "/workspace/project",
+    "repo": "project"
+  },
+  "assertions": [
+    {"name": "validator initially asks", "path": "before_decision", "expected": {"matcher": "equals", "value": "ask"}},
+    {"name": "initial verdict mentions tests", "path": "before_verdicts", "expected": {"matcher": "contains", "value": "Run tests before git push"}},
+    {"name": "after committed pytest action gate allows", "path": "after_decision", "expected": {"matcher": "equals", "value": "allow"}},
+    {"name": "allow verdict carries action-log evidence", "path": "after_verdicts", "expected": {"matcher": "contains", "value": "action_log_seq"}},
+    {"name": "installed validator id is present", "path": "validator_id", "expected": {"matcher": "regex", "value": "^VV-"}}
+  ]
+}

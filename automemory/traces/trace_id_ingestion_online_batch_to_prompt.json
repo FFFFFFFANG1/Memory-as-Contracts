@@ -1,0 +1,56 @@
+{
+  "trace_id": "trace_id_ingestion_online_batch_to_prompt",
+  "eval_mode": "qa",
+  "memory_path": "online_user_turn_ingestion",
+  "category": "multi_session",
+  "driver": "online_ingestion",
+  "description": "Ten user turns trigger online extraction; durable user rules then appear in prompt-intake context.",
+  "adapter_context": {
+    "workspace": "/tmp/mac-trace-online-project",
+    "cwd": "/tmp/mac-trace-online-project",
+    "repo": "project",
+    "session_id": "sess-online",
+    "task_id": "task-online",
+    "user_id": "user-1",
+    "now": "2026-06-10T08:00:00+00:00"
+  },
+  "turns": [
+    {"role": "user", "content": "Please inspect the failing parser test first."},
+    {"role": "user", "content": "The bug is likely in generated/core.py but do not change anything yet."},
+    {"role": "user", "content": "Run a quick search for ParserConfig references."},
+    {"role": "user", "content": "Ignore the old TODO note in the fixture."},
+    {"role": "user", "content": "Use uv for this repo from now on."},
+    {"role": "user", "content": "When editing generated files, be careful about generated/**."},
+    {"role": "user", "content": "For this project, do not edit files under generated/** without asking me."},
+    {"role": "user", "content": "Do not run git push until I approve it."},
+    {"role": "user", "content": "This answer can be brief."},
+    {"role": "user", "content": "Please edit generated/core.py only after checking the MAC reminders."}
+  ],
+  "assertions": [
+    {
+      "name": "online extraction stored multiple contracts",
+      "path": "contract_count",
+      "expected": {"matcher": "gte", "value": 2}
+    },
+    {
+      "name": "git push approval rule extracted",
+      "path": "contract_texts",
+      "expected": {"matcher": "contains", "value": "Do not run git push until I approve it"}
+    },
+    {
+      "name": "generated path rule extracted",
+      "path": "contract_texts",
+      "expected": {"matcher": "contains", "value": "generated/**"}
+    },
+    {
+      "name": "ten-turn batch was marked extracted",
+      "path": "pending_turns",
+      "expected": {"matcher": "equals", "value": 0}
+    },
+    {
+      "name": "prompt context includes retrieved MAC reminders",
+      "path": "prompt_text",
+      "expected": {"matcher": "contains", "value": "MAC reminders"}
+    }
+  ]
+}

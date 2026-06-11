@@ -1,0 +1,45 @@
+{
+  "trace_id": "trace_id_resolver_authority_conflict_edges",
+  "eval_mode": "qa",
+  "memory_path": "conflict_resolution_store",
+  "category": "adversarial",
+  "driver": "conflict_resolution",
+  "description": "A user-explicit prohibition should supersede a conflicting lower-authority project requirement and preserve a scoped edge.",
+  "seed_contracts": [
+    {
+      "id": "MAC-project-push",
+      "text": "Always push code to Git when a task is complete.",
+      "effect": "require",
+      "kind": "requirement",
+      "modality": "MUST",
+      "source_kind": "project_doc",
+      "scope": {"level": "project", "workspace": "/workspace/project", "repo": "project"},
+      "semantics": {"actions": ["git.push"], "tags": ["publish_code"]},
+      "tool_patterns": [
+        {"tool": "Bash", "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}}
+      ]
+    }
+  ],
+  "candidate_contracts": [
+    {
+      "id": "MAC-user-no-push",
+      "text": "Do not run git push until I approve it.",
+      "effect": "deny",
+      "kind": "prohibition",
+      "modality": "MUST_NOT",
+      "source_kind": "user_turn",
+      "scope": {"level": "project", "workspace": "/workspace/project", "repo": "project"},
+      "semantics": {"actions": ["git.push"], "tags": ["publish_code", "external_write"]},
+      "tool_patterns": [
+        {"tool": "Bash", "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}}
+      ]
+    }
+  ],
+  "assertions": [
+    {"name": "candidate relation is conflict", "path": "inserted.0.relation", "expected": {"matcher": "equals", "value": "conflicts_with"}},
+    {"name": "higher-authority user rule is active", "path": "contract_status.MAC-user-no-push", "expected": {"matcher": "equals", "value": "active"}},
+    {"name": "lower-authority project rule is superseded", "path": "contract_status.MAC-project-push", "expected": {"matcher": "equals", "value": "superseded"}},
+    {"name": "edge records relation", "path": "edges.0.relation", "expected": {"matcher": "equals", "value": "conflicts_with"}},
+    {"name": "edge remains scoped to project workspace", "path": "edges.0.scope.workspace", "expected": {"matcher": "equals", "value": "/workspace/project"}}
+  ]
+}

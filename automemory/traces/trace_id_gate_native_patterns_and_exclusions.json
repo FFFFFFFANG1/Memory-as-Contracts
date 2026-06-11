@@ -1,0 +1,52 @@
+{
+  "trace_id": "trace_id_gate_native_patterns_and_exclusions",
+  "eval_mode": "qa",
+  "memory_path": "action_signature_gate",
+  "category": "normal",
+  "driver": "gate",
+  "description": "Native action signatures should reject matched hard rules, allow nonmatches, and honor explicit exclude rules only for matching actions.",
+  "contracts": [
+    {
+      "id": "MAC-push",
+      "text": "Do not run git push until I approve it.",
+      "effect": "deny",
+      "kind": "prohibition",
+      "modality": "MUST_NOT",
+      "scope": {"level": "project", "workspace": "/workspace/project", "repo": "project"},
+      "semantics": {"actions": ["git.push"], "tags": ["external_write", "publish_code"]},
+      "tool_patterns": [
+        {"tool": "Bash", "args": {"command": {"regex": "^git\\s+push(\\s|$)"}}},
+        {"tool": "exec", "args": {"cmd": {"regex": "^git\\s+push(\\s|$)"}}}
+      ]
+    },
+    {
+      "id": "MAC-generated",
+      "text": "Do not edit files under generated/** without asking.",
+      "effect": "deny",
+      "kind": "prohibition",
+      "modality": "MUST_NOT",
+      "scope": {"level": "path", "workspace": "/workspace/project", "repo": "project", "path_globs": ["generated/**"]},
+      "semantics": {"actions": ["file.write"], "tags": ["file_write", "workspace_write"]},
+      "tool_patterns": [
+        {"tool": "apply_patch", "args": {"patch": {"mentions_path_glob": "generated/**"}}},
+        {"tool": "file.write", "args": {"path": {"path_glob": "generated/**"}}}
+      ]
+    }
+  ],
+  "exclude_actions": [
+    {"tool_name": "Bash", "parameter_regex": {"command": "^git\\s+status(\\s|$)"}}
+  ],
+  "events": [
+    {"id": "push", "tool_name": "Bash", "arguments": {"command": "git push origin main"}, "intent": "publish branch"},
+    {"id": "status", "tool_name": "Bash", "arguments": {"command": "git status --short"}, "intent": "inspect status"},
+    {"id": "patch_generated", "tool_name": "apply_patch", "arguments": {"patch": "*** Update File: generated/core.py\n@@\n-old\n+new"}, "intent": "patch generated file"},
+    {"id": "read_generated", "tool_name": "Read", "arguments": {"file_path": "generated/core.py"}, "intent": "inspect generated file"}
+  ],
+  "assertions": [
+    {"name": "git push is rejected", "path": "push.decision", "expected": {"matcher": "equals", "value": "reject"}},
+    {"name": "git push receipt cites rule", "path": "push.contracts_used", "expected": {"matcher": "contains", "value": "MAC-push"}},
+    {"name": "git status is excluded rather than gated", "path": "status.receipt_result", "expected": {"matcher": "equals", "value": "excluded_action"}},
+    {"name": "generated patch is rejected", "path": "patch_generated.decision", "expected": {"matcher": "equals", "value": "reject"}},
+    {"name": "read-only generated inspection is allowed", "path": "read_generated.decision", "expected": {"matcher": "equals", "value": "allow"}}
+  ]
+}

@@ -1,0 +1,2138 @@
+{
+  "all_passed": false,
+  "llm_mode": true,
+  "mean_score": 0.911111111111111,
+  "results": [
+    {
+      "checks": [
+        {
+          "actual": "deny",
+          "expected": {
+            "matcher": "equals",
+            "value": "deny"
+          },
+          "name": "first hook denies host tool call",
+          "passed": true
+        },
+        {
+          "actual": "ask",
+          "expected": {
+            "matcher": "equals",
+            "value": "ask"
+          },
+          "name": "first decision is ask",
+          "passed": true
+        },
+        {
+          "actual": true,
+          "expected": {
+            "matcher": "equals",
+            "value": true
+          },
+          "name": "adapter signals required user input",
+          "passed": true
+        },
+        {
+          "actual": "allow",
+          "expected": {
+            "matcher": "equals",
+            "value": "allow"
+          },
+          "name": "same-action retry after observed user input is allowed",
+          "passed": true
+        },
+        {
+          "actual": [
+            "consumed"
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "consumed"
+          },
+          "name": "ask request lifecycle reaches consumed",
+          "passed": true
+        }
+      ],
+      "description": "An adapter-level ask decision should deny the first notification, observe the next user turn, and allow exactly the matching retry once.",
+      "memory_path": "adapter_ask_lifecycle",
+      "outputs": {
+        "ask_statuses": [
+          "consumed"
+        ],
+        "contract": {
+          "authority": "user_explicit",
+          "check_patterns": [
+            {
+              "args": {},
+              "tool": "message.send"
+            }
+          ],
+          "confidence": 1.0,
+          "conflicts_with": [],
+          "effect": "require",
+          "id": "MAC-ask-before-message",
+          "kind": "requirement",
+          "lifecycle": {
+            "effective_from": "2026-06-10T06:04:31.774200Z",
+            "expires_at": null,
+            "original_text": null,
+            "review_after": null,
+            "trigger_event": null,
+            "type": "until_revoked",
+            "until_revoked": true
+          },
+          "modality": "MUST",
+          "override": {
+            "allowed": true,
+            "requires": "explicit_user_confirmation",
+            "type": "explicit_user_current_turn"
+          },
+          "scope": {
+            "agent_family": [],
+            "component": null,
+            "level": "task",
+            "organization": null,
+            "path_globs": [],
+            "repo": "project",
+            "task": "task-1",
+            "user_id": null,
+            "workspace": "/workspace/project"
+          },
+          "semantics": {
+            "actions": [],
+            "tags": []
+          },
+          "source": {
+            "conversation_id": null,
+            "created_at": "2026-06-10T08:00:00Z",
+            "fingerprint": null,
+            "kind": "user_turn",
+            "metadata": {},
+            "path": null,
+            "span": "Ask me before sending Slack notifications.",
+            "turn_id": null
+          },
+          "state_fields": [],
+          "status": "active",
+          "strength": "hard",
+          "supersedes": [],
+          "text": "Ask me before sending Slack notifications.",
+          "tool_patterns": [],
+          "update_patterns": [],
+          "validator_enforcement_shape": "check_only",
+          "validity": {
+            "start": "2026-06-10T06:04:31.774200Z",
+            "until": null
+          }
+        },
+        "first_decision": "ask",
+        "first_permission": "deny",
+        "first_requires_user_input": true,
+        "generated_package": {
+          "initial_state": {},
+          "notes": [
+            "check_only validator: blocks Slack message.send unless prior log evidence shows explicit user approval mentioning Slack. Asks when destination is ambiguous."
+          ],
+          "snippet": "def check(action, state, log, context):\n    tool = action.get(\"tool_name\") or action.get(\"host_action\")\n    if tool != \"message.send\":\n        return allow(\"Not a message.send action\")\n    args = action.get(\"arguments\") or {}\n    # Detect slack-targeted notifications\n    channel = args.get(\"channel\")\n    target = args.get(\"target\")\n    destination = args.get(\"destination\")\n    platform = args.get(\"platform\")\n    integration = args.get(\"integration\")\n    candidates = [channel, target, destination, platform, integration]\n    text_blob = \"\"\n    for v in candidates:\n        if isinstance(v, str):\n            text_blob += \" \" + v.lower()\n    is_slack = \"slack\" in text_blob\n    # If we cannot determine the destination at all, ask for clarification\n    if not is_slack:\n        has_any_dest = any(isinstance(v, str) and v.strip() for v in candidates)\n        if not has_any_dest:\n            return ask(\"Cannot determine message destination; user requires confirmation before Slack notifications.\")\n        return allow(\"Non-Slack message send\")\n    # Slack notification requires prior explicit user approval\n    approvals = log.search({\n        \"from\": \"actions\",\n        \"limit\": 50,\n        \"order_by\": [{\"field\": \"seq\", \"direction\": \"desc\"}],\n        \"select\": [\"seq\", \"tool_name\", \"host_action\", \"arguments\", \"result_text\", \"reasoning_text\"],\n        \"where\": {\n            \"any_text\": {\"regex\": \"(?i)slack\"}\n        }\n    })\n    entries = (approvals or {}).get(\"rows\") if isinstance(approvals, dict) else approvals\n    if not entries:\n        entries = []\n    approval_regex = re.compile(r\"(?i)(approve|approved|yes,? send|go ahead|confirm(ed)?|please send|ok,? send|send it)\")\n    for e in entries:\n        blob_parts = []\n        for f in (\"result_text\", \"reasoning_text\"):\n            v = e.get(f)\n            if isinstance(v, str):\n                blob_parts.append(v)\n        args_e = e.get(\"arguments\")\n        if isinstance(args_e, dict):\n            for vv in args_e.values():\n                if isinstance(vv, str):\n                    blob_parts.append(vv)\n        blob = \" \\n\".join(blob_parts)\n        if approval_regex.search(blob) and re.search(r\"(?i)slack\", blob):\n            return allow(\"Prior explicit user approval for Slack notification found\", evidence_refs=[e.get(\"seq\")])\n    return ask(\"User requires confirmation before sending Slack notifications.\")\n\nimport re",
+          "status": "ready"
+        },
+        "second_decision": "allow",
+        "validator": {
+          "action_log_search_spec_version": "ActionLogSearchSpecV1",
+          "check_patterns": [
+            {
+              "args": {},
+              "tool": "message.send"
+            }
+          ],
+          "contract_id": "MAC-ask-before-message",
+          "created_at": "2026-06-10T06:04:46.449134Z",
+          "enforcement_shape": "check_only",
+          "id": "VV-a96e88c3d8c7",
+          "initial_state": {},
+          "sandbox_policy_version": "subprocess-v1",
+          "snippet": "def check(action, state, log, context):\n    tool = action.get(\"tool_name\") or action.get(\"host_action\")\n    if tool != \"message.send\":\n        return allow(\"Not a message.send action\")\n    args = action.get(\"arguments\") or {}\n    # Detect slack-targeted notifications\n    channel = args.get(\"channel\")\n    target = args.get(\"target\")\n    destination = args.get(\"destination\")\n    platform = args.get(\"platform\")\n    integration = args.get(\"integration\")\n    candidates = [channel, target, destination, platform, integration]\n    text_blob = \"\"\n    for v in candidates:\n        if isinstance(v, str):\n            text_blob += \" \" + v.lower()\n    is_slack = \"slack\" in text_blob\n    # If we cannot determine the destination at all, ask for clarification\n    if not is_slack:\n        has_any_dest = any(isinstance(v, str) and v.strip() for v in candidates)\n        if not has_any_dest:\n            return ask(\"Cannot determine message destination; user requires confirmation before Slack notifications.\")\n        return allow(\"Non-Slack message send\")\n    # Slack notification requires prior explicit user approval\n    approvals = log.search({\n        \"from\": \"actions\",\n        \"limit\": 50,\n        \"order_by\": [{\"field\": \"seq\", \"direction\": \"desc\"}],\n        \"select\": [\"seq\", \"tool_name\", \"host_action\", \"arguments\", \"result_text\", \"reasoning_text\"],\n        \"where\": {\n            \"any_text\": {\"regex\": \"(?i)slack\"}\n        }\n    })\n    entries = (approvals or {}).get(\"rows\") if isinstance(approvals, dict) else approvals\n    if not entries:\n        entries = []\n    approval_regex = re.compile(r\"(?i)(approve|approved|yes,? send|go ahead|confirm(ed)?|please send|ok,? send|send it)\")\n    for e in entries:\n        blob_parts = []\n        for f in (\"result_text\", \"reasoning_text\"):\n            v = e.get(f)\n            if isinstance(v, str):\n                blob_parts.append(v)\n        args_e = e.get(\"arguments\")\n        if isinstance(args_e, dict):\n            for vv in args_e.values():\n                if isinstance(vv, str):\n                    blob_parts.append(vv)\n        blob = \" \\n\".join(blob_parts)\n        if approval_regex.search(blob) and re.search(r\"(?i)slack\", blob):\n            return allow(\"Prior explicit user approval for Slack notification found\", evidence_refs=[e.get(\"seq\")])\n    return ask(\"User requires confirmation before sending Slack notifications.\")\n\nimport re",
+          "snippet_hash": "31da5d0f6c2a860c196a2151356cbaa55606067d2257c00ec333cabdaecf295e",
+          "state_fields": [],
+          "state_schema_version": "state-v1",
+          "status": "active",
+          "update_patterns": [],
+          "verification_hash": "acb7701c78ddccb30cf28e569116431470964e5018a9530bfea615c8c8047b48",
+          "verified_at": "2026-06-10T06:04:46.449068Z"
+        },
+        "validator_id": "VV-a96e88c3d8c7"
+      },
+      "passed": 5,
+      "score": 1.0,
+      "total": 5,
+      "trace_id": "trace_id_adapter_ask_response_single_use"
+    },
+    {
+      "checks": [
+        {
+          "actual": 2,
+          "expected": {
+            "matcher": "gte",
+            "value": 1
+          },
+          "name": "cold start extracted at least one contract",
+          "passed": true
+        },
+        {
+          "actual": 1,
+          "expected": {
+            "matcher": "equals",
+            "value": 1
+          },
+          "name": "project document source snapshot recorded",
+          "passed": true
+        },
+        {
+          "actual": [
+            "Do not run git push until I approve it.",
+            "For this repo, always prefer concise implementation notes."
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "Do not run git push until I approve it"
+          },
+          "name": "push rule text is stored",
+          "passed": true
+        },
+        {
+          "actual": "MAC reminders\nPreferences:\n- MAC-59a3b66d0606 [project_doc;active;global;agents=codex;until_revoked] For this repo, always prefer concise implementation notes. (ambient scope match)\nLocal reminders:\n- MAC-1c5f319dfac8 [project_doc;active;project;workspace=/tmp/tmp9imrps10/project;repo=project;agents=codex;conditional] Do not run git push until I approve it. (actions=exec,git.push; tags=approval_required,external_write,publish_code; query-actions=external_write,git.push,publish_code)",
+          "expected": {
+            "matcher": "contains",
+            "value": "MAC reminders"
+          },
+          "name": "prompt includes imported preference or rule",
+          "passed": true
+        },
+        {
+          "actual": "allow",
+          "expected": {
+            "matcher": "equals",
+            "value": "allow"
+          },
+          "name": "unrelated web search is not blocked by push-only cold-start rule",
+          "passed": true
+        }
+      ],
+      "description": "Codex cold-start import reads project instructions, snapshots the source, retrieves reminders, and gates matching actions.",
+      "memory_path": "cold_start_adapter_import",
+      "outputs": {
+        "contract_texts": [
+          "Do not run git push until I approve it.",
+          "For this repo, always prefer concise implementation notes."
+        ],
+        "contracts": [
+          {
+            "authority": "project_instruction",
+            "check_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^git\\s+push(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "deny",
+            "id": "MAC-1c5f319dfac8",
+            "kind": "prohibition",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": "until I approve it",
+              "review_after": null,
+              "trigger_event": "I approve it",
+              "type": "conditional",
+              "until_revoked": false
+            },
+            "modality": "MUST_NOT",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "project",
+              "organization": null,
+              "path_globs": [],
+              "repo": "project",
+              "task": null,
+              "user_id": "user-1",
+              "workspace": "/tmp/tmp9imrps10/project"
+            },
+            "semantics": {
+              "actions": [
+                "exec",
+                "git.push"
+              ],
+              "tags": [
+                "approval_required",
+                "external_write",
+                "publish_code"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": "dfae59752bedb70c34ba46ecf033c312b2d02b154ae77aea9c666c24380a0c26",
+              "kind": "project_doc",
+              "metadata": {},
+              "path": "/tmp/tmp9imrps10/project/AGENTS.md",
+              "span": "Do not run git push until I approve it.",
+              "turn_id": null
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Do not run git push until I approve it.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^git\\s+push(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "check_only",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "project_instruction",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "prefer",
+            "id": "MAC-59a3b66d0606",
+            "kind": "preference",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": "until revoked",
+              "review_after": null,
+              "trigger_event": null,
+              "type": "until_revoked",
+              "until_revoked": true
+            },
+            "modality": "SHOULD",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "global",
+              "organization": null,
+              "path_globs": [],
+              "repo": null,
+              "task": null,
+              "user_id": "user-1",
+              "workspace": null
+            },
+            "semantics": {
+              "actions": [
+                "response.style"
+              ],
+              "tags": [
+                "concise",
+                "implementation_notes",
+                "style_preference"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": "dfae59752bedb70c34ba46ecf033c312b2d02b154ae77aea9c666c24380a0c26",
+              "kind": "project_doc",
+              "metadata": {},
+              "path": "/tmp/tmp9imrps10/project/AGENTS.md",
+              "span": "For this repo, always prefer concise implementation notes.",
+              "turn_id": null
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "For this repo, always prefer concise implementation notes.",
+            "tool_patterns": [
+              {
+                "args": {},
+                "tool": "agent.response"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          }
+        ],
+        "extracted_count": 2,
+        "prompt_text": "MAC reminders\nPreferences:\n- MAC-59a3b66d0606 [project_doc;active;global;agents=codex;until_revoked] For this repo, always prefer concise implementation notes. (ambient scope match)\nLocal reminders:\n- MAC-1c5f319dfac8 [project_doc;active;project;workspace=/tmp/tmp9imrps10/project;repo=project;agents=codex;conditional] Do not run git push until I approve it. (actions=exec,git.push; tags=approval_required,external_write,publish_code; query-actions=external_write,git.push,publish_code)",
+        "snapshot_count": 1,
+        "web_gate_decision": "allow"
+      },
+      "passed": 5,
+      "score": 1.0,
+      "total": 5,
+      "trace_id": "trace_id_cold_start_project_doc_once"
+    },
+    {
+      "checks": [
+        {
+          "actual": [
+            "Do not edit files under generated/** without asking first.",
+            "Avoid broad rewrites; keep patches narrow.",
+            "Do not edit unrelated README files.",
+            "Do not run git push until I approve it.",
+            "Use uv for this repo from now on.",
+            "Editing src/parser.py is allowed when needed."
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "Do not run git push until I approve it"
+          },
+          "name": "push contract appears in stored texts",
+          "passed": true
+        },
+        {
+          "actual": [
+            "Do not edit files under generated/** without asking first.",
+            "Avoid broad rewrites; keep patches narrow.",
+            "Do not edit unrelated README files.",
+            "Do not run git push until I approve it.",
+            "Use uv for this repo from now on.",
+            "Editing src/parser.py is allowed when needed."
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "generated/**"
+          },
+          "name": "generated contract appears in stored texts",
+          "passed": true
+        },
+        {
+          "actual": "MAC reminders\nPreferences:\n- MAC-2a5d9f72a3bb [user_turn;active;project;workspace=/tmp/mac-trace-e2e-project;repo=project;agents=codex;immediate] Avoid broad rewrites; keep patches narrow. (ambient scope match)\nGlobal rules:\n- MAC-ec3c397f6ae9 [user_turn;active;global;agents=codex;until_revoked] Use uv for this repo from now on. (ambient scope match)",
+          "expected": {
+            "matcher": "contains",
+            "value": "MAC reminders"
+          },
+          "name": "prompt retrieval emits MAC reminders",
+          "passed": true
+        },
+        {
+          "actual": "allow",
+          "expected": {
+            "matcher": "equals",
+            "value": "allow"
+          },
+          "name": "safe source edit is allowed",
+          "passed": true
+        },
+        {
+          "actual": "deny",
+          "expected": {
+            "matcher": "equals",
+            "value": "deny"
+          },
+          "name": "generated edit is denied by adapter gate",
+          "passed": true
+        },
+        {
+          "actual": "reject",
+          "expected": {
+            "matcher": "equals",
+            "value": "reject"
+          },
+          "name": "git push is rejected",
+          "passed": true
+        },
+        {
+          "actual": 3,
+          "expected": {
+            "matcher": "equals",
+            "value": 3
+          },
+          "name": "each pre-tool gate writes a receipt",
+          "passed": true
+        }
+      ],
+      "description": "End-to-end MAC kernel flow: user-turn extraction, conflict/storage, prompt retrieval, adapter gate decisions, and receipt creation.",
+      "memory_path": "e2e",
+      "outputs": {
+        "contract_texts": [
+          "Do not edit files under generated/** without asking first.",
+          "Avoid broad rewrites; keep patches narrow.",
+          "Do not edit unrelated README files.",
+          "Do not run git push until I approve it.",
+          "Use uv for this repo from now on.",
+          "Editing src/parser.py is allowed when needed."
+        ],
+        "contracts": [
+          {
+            "authority": "user_explicit",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "deny",
+            "id": "MAC-0b77b240b046",
+            "kind": "prohibition",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": null,
+              "review_after": null,
+              "trigger_event": null,
+              "type": "immediate",
+              "until_revoked": false
+            },
+            "modality": "MUST_NOT",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "path",
+              "organization": null,
+              "path_globs": [
+                "generated/**"
+              ],
+              "repo": "project",
+              "task": "task-e2e",
+              "user_id": "user-1",
+              "workspace": "/tmp/mac-trace-e2e-project"
+            },
+            "semantics": {
+              "actions": [
+                "file.delete",
+                "file.edit",
+                "file.write"
+              ],
+              "tags": [
+                "file_write",
+                "generated_code",
+                "scoped_path",
+                "source_modification",
+                "workspace_write"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "Do not edit files under generated/** without asking me.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Do not edit files under generated/** without asking first.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "patch": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": "generated/**",
+                    "path_glob": null,
+                    "regex": null
+                  }
+                },
+                "tool": "apply_patch"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "user_explicit",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "prefer",
+            "id": "MAC-2a5d9f72a3bb",
+            "kind": "preference",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": null,
+              "review_after": null,
+              "trigger_event": null,
+              "type": "immediate",
+              "until_revoked": false
+            },
+            "modality": "SHOULD",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "project",
+              "organization": null,
+              "path_globs": [],
+              "repo": "project",
+              "task": null,
+              "user_id": "user-1",
+              "workspace": "/tmp/mac-trace-e2e-project"
+            },
+            "semantics": {
+              "actions": [
+                "file.delete",
+                "file.edit",
+                "file.write"
+              ],
+              "tags": [
+                "file_write",
+                "minimal_diff",
+                "patch_scope",
+                "source_modification",
+                "workspace_write"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "Avoid broad rewrites; keep the patch narrow.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Avoid broad rewrites; keep patches narrow.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "patch": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": ".*"
+                  }
+                },
+                "tool": "apply_patch"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "user_explicit",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "deny",
+            "id": "MAC-2f48114641dc",
+            "kind": "prohibition",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": null,
+              "review_after": null,
+              "trigger_event": null,
+              "type": "immediate",
+              "until_revoked": false
+            },
+            "modality": "MUST_NOT",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "project",
+              "organization": null,
+              "path_globs": [],
+              "repo": "project",
+              "task": null,
+              "user_id": "user-1",
+              "workspace": "/tmp/mac-trace-e2e-project"
+            },
+            "semantics": {
+              "actions": [
+                "file.delete",
+                "file.edit",
+                "file.write"
+              ],
+              "tags": [
+                "file_write",
+                "readme",
+                "scoped_path",
+                "source_modification",
+                "workspace_write"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "Keep unrelated README files alone.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Do not edit unrelated README files.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "patch": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": "**/README*",
+                    "path_glob": null,
+                    "regex": null
+                  }
+                },
+                "tool": "apply_patch"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "user_explicit",
+            "check_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^git\\s+push(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "deny",
+            "id": "MAC-b8d30294903a",
+            "kind": "prohibition",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": "until I approve it",
+              "review_after": null,
+              "trigger_event": "I approve it",
+              "type": "conditional",
+              "until_revoked": false
+            },
+            "modality": "MUST_NOT",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "project",
+              "organization": null,
+              "path_globs": [],
+              "repo": "project",
+              "task": null,
+              "user_id": "user-1",
+              "workspace": "/tmp/mac-trace-e2e-project"
+            },
+            "semantics": {
+              "actions": [
+                "exec",
+                "git.push"
+              ],
+              "tags": [
+                "external_write",
+                "publish_code"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "Do not run git push until I approve it.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Do not run git push until I approve it.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^git\\s+push(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "check_only",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "user_explicit",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "require",
+            "id": "MAC-ec3c397f6ae9",
+            "kind": "requirement",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": "until revoked",
+              "review_after": null,
+              "trigger_event": null,
+              "type": "until_revoked",
+              "until_revoked": true
+            },
+            "modality": "MUST",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "global",
+              "organization": null,
+              "path_globs": [],
+              "repo": null,
+              "task": null,
+              "user_id": "user-1",
+              "workspace": null
+            },
+            "semantics": {
+              "actions": [
+                "dependency.install",
+                "exec",
+                "package.manage",
+                "python.run"
+              ],
+              "tags": [
+                "dependency_change",
+                "repo_tooling",
+                "shell",
+                "uv"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "Use uv for this repo from now on.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Use uv for this repo from now on.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^(pip|python\\s+-m\\s+pip|poetry|pipenv|conda)(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "user_explicit",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "allow",
+            "id": "MAC-fcdb6117a68a",
+            "kind": "exception",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": null,
+              "review_after": null,
+              "trigger_event": null,
+              "type": "immediate",
+              "until_revoked": false
+            },
+            "modality": "MAY",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "path",
+              "organization": null,
+              "path_globs": [
+                "src/parser.py"
+              ],
+              "repo": "project",
+              "task": "task-e2e",
+              "user_id": "user-1",
+              "workspace": "/tmp/mac-trace-e2e-project"
+            },
+            "semantics": {
+              "actions": [
+                "file.delete",
+                "file.edit",
+                "file.write"
+              ],
+              "tags": [
+                "file_write",
+                "parser",
+                "scoped_path",
+                "source_modification",
+                "workspace_write"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "You can edit src/parser.py if needed.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Editing src/parser.py is allowed when needed.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "patch": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": "src/parser.py",
+                    "path_glob": null,
+                    "regex": null
+                  }
+                },
+                "tool": "apply_patch"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          }
+        ],
+        "gates": {
+          "generated_edit": {
+            "contracts_used": [
+              "MAC-0b77b240b046"
+            ],
+            "decision": "reject",
+            "permission": "deny"
+          },
+          "push": {
+            "contracts_used": [
+              "MAC-b8d30294903a"
+            ],
+            "decision": "reject",
+            "permission": "deny"
+          },
+          "safe_src_edit": {
+            "contracts_used": [
+              "MAC-fcdb6117a68a"
+            ],
+            "decision": "allow",
+            "permission": "allow"
+          }
+        },
+        "prompt_text": "MAC reminders\nPreferences:\n- MAC-2a5d9f72a3bb [user_turn;active;project;workspace=/tmp/mac-trace-e2e-project;repo=project;agents=codex;immediate] Avoid broad rewrites; keep patches narrow. (ambient scope match)\nGlobal rules:\n- MAC-ec3c397f6ae9 [user_turn;active;global;agents=codex;until_revoked] Use uv for this repo from now on. (ambient scope match)",
+        "receipt_count": 3
+      },
+      "passed": 7,
+      "score": 1.0,
+      "total": 7,
+      "trace_id": "trace_id_e2e_online_to_gate_receipts"
+    },
+    {
+      "checks": [
+        {
+          "actual": "reject",
+          "expected": {
+            "matcher": "equals",
+            "value": "reject"
+          },
+          "name": "git push is rejected",
+          "passed": true
+        },
+        {
+          "actual": [
+            "MAC-push"
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "MAC-push"
+          },
+          "name": "git push receipt cites rule",
+          "passed": true
+        },
+        {
+          "actual": "excluded_action",
+          "expected": {
+            "matcher": "equals",
+            "value": "excluded_action"
+          },
+          "name": "git status is excluded rather than gated",
+          "passed": true
+        },
+        {
+          "actual": "reject",
+          "expected": {
+            "matcher": "equals",
+            "value": "reject"
+          },
+          "name": "generated patch is rejected",
+          "passed": true
+        },
+        {
+          "actual": "allow",
+          "expected": {
+            "matcher": "equals",
+            "value": "allow"
+          },
+          "name": "read-only generated inspection is allowed",
+          "passed": true
+        }
+      ],
+      "description": "Native action signatures should reject matched hard rules, allow nonmatches, and honor explicit exclude rules only for matching actions.",
+      "memory_path": "action_signature_gate",
+      "outputs": {
+        "patch_generated": {
+          "contracts_ignored": [
+            {
+              "id": "MAC-push",
+              "reason": "predicate_not_matched"
+            }
+          ],
+          "contracts_used": [
+            "MAC-generated"
+          ],
+          "decision": "reject",
+          "edges_applied": [],
+          "reason": "Action violates rule MAC-generated: Do not edit files under generated/** without asking.. Consider another way or ask user for clarification.",
+          "receipt_result": "reject"
+        },
+        "push": {
+          "contracts_ignored": [
+            {
+              "id": "MAC-generated",
+              "reason": "out_of_scope"
+            }
+          ],
+          "contracts_used": [
+            "MAC-push"
+          ],
+          "decision": "reject",
+          "edges_applied": [],
+          "reason": "Action violates rule MAC-push: Do not run git push until I approve it.. Consider another way or ask user for clarification.",
+          "receipt_result": "reject"
+        },
+        "read_generated": {
+          "contracts_ignored": [
+            {
+              "id": "MAC-generated",
+              "reason": "predicate_not_matched"
+            },
+            {
+              "id": "MAC-push",
+              "reason": "predicate_not_matched"
+            }
+          ],
+          "contracts_used": [],
+          "decision": "allow",
+          "edges_applied": [],
+          "reason": "no applicable contract required intervention",
+          "receipt_result": "allow"
+        },
+        "status": {
+          "contracts_ignored": [],
+          "contracts_used": [],
+          "decision": "allow",
+          "edges_applied": [],
+          "reason": "excluded action",
+          "receipt_result": "excluded_action"
+        }
+      },
+      "passed": 5,
+      "score": 1.0,
+      "total": 5,
+      "trace_id": "trace_id_gate_native_patterns_and_exclusions"
+    },
+    {
+      "checks": [
+        {
+          "actual": 3,
+          "expected": {
+            "matcher": "gte",
+            "value": 2
+          },
+          "name": "online extraction stored multiple contracts",
+          "passed": true
+        },
+        {
+          "actual": [
+            "Use uv for this repo from now on.",
+            "For this project, do not edit files under generated/** without asking.",
+            "Do not run git push until I approve it."
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "Do not run git push until I approve it"
+          },
+          "name": "git push approval rule extracted",
+          "passed": true
+        },
+        {
+          "actual": [
+            "Use uv for this repo from now on.",
+            "For this project, do not edit files under generated/** without asking.",
+            "Do not run git push until I approve it."
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "generated/**"
+          },
+          "name": "generated path rule extracted",
+          "passed": true
+        },
+        {
+          "actual": 0,
+          "expected": {
+            "matcher": "equals",
+            "value": 0
+          },
+          "name": "ten-turn batch was marked extracted",
+          "passed": true
+        },
+        {
+          "actual": "MAC reminders\nPreferences:\n- MAC-0f443b3b0f9d [user_turn;active;global;agents=codex;until_revoked] Use uv for this repo from now on. (ambient scope match)\nLocal reminders:\n- MAC-6d1f7166de3b [user_turn;active;path;workspace=/tmp/mac-trace-online-project;repo=project;paths=generated/**;task=task-online;agents=codex;immediate] For this project, do not edit files under generated/** without asking. (target=generated/core.py; actions=file.delete,file.edit,file.write; tags=approval_required,file_write,generated_files,project_scope,source_modification,workspace_write; query-actions=file.delete,file.write,source_modification)\n- MAC-9c0dfa147afa [user_turn;active;project;workspace=/tmp/mac-trace-online-project;repo=project;agents=codex;conditional] Do not run git push until I approve it. (target=generated/core.py; actions=exec,git.push; tags=approval_required,external_write,publish_code)",
+          "expected": {
+            "matcher": "contains",
+            "value": "MAC reminders"
+          },
+          "name": "prompt context includes retrieved MAC reminders",
+          "passed": true
+        }
+      ],
+      "description": "Ten user turns trigger online extraction; durable user rules then appear in prompt-intake context.",
+      "memory_path": "online_user_turn_ingestion",
+      "outputs": {
+        "contract_count": 3,
+        "contract_texts": [
+          "Use uv for this repo from now on.",
+          "For this project, do not edit files under generated/** without asking.",
+          "Do not run git push until I approve it."
+        ],
+        "contracts": [
+          {
+            "authority": "user_explicit",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "prefer",
+            "id": "MAC-0f443b3b0f9d",
+            "kind": "preference",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": "until revoked",
+              "review_after": null,
+              "trigger_event": null,
+              "type": "until_revoked",
+              "until_revoked": true
+            },
+            "modality": "SHOULD",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "global",
+              "organization": null,
+              "path_globs": [],
+              "repo": null,
+              "task": null,
+              "user_id": "user-1",
+              "workspace": null
+            },
+            "semantics": {
+              "actions": [
+                "dependency.install",
+                "exec",
+                "package.manage",
+                "use.uv"
+              ],
+              "tags": [
+                "dependency_change",
+                "package_manager",
+                "repo_scope",
+                "shell",
+                "tooling"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "Use uv for this repo from now on.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Use uv for this repo from now on.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^(pip|poetry|pipenv|conda)(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "user_explicit",
+            "check_patterns": [],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "deny",
+            "id": "MAC-6d1f7166de3b",
+            "kind": "prohibition",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": null,
+              "review_after": null,
+              "trigger_event": null,
+              "type": "immediate",
+              "until_revoked": false
+            },
+            "modality": "MUST_NOT",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "path",
+              "organization": null,
+              "path_globs": [
+                "generated/**"
+              ],
+              "repo": "project",
+              "task": "task-online",
+              "user_id": "user-1",
+              "workspace": "/tmp/mac-trace-online-project"
+            },
+            "semantics": {
+              "actions": [
+                "file.delete",
+                "file.edit",
+                "file.write"
+              ],
+              "tags": [
+                "approval_required",
+                "file_write",
+                "generated_files",
+                "project_scope",
+                "source_modification",
+                "workspace_write"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "For this project, do not edit files under generated/** without asking me.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "For this project, do not edit files under generated/** without asking.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "patch": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": "generated/**",
+                    "path_glob": null,
+                    "regex": null
+                  }
+                },
+                "tool": "apply_patch"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "no_validator",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          },
+          {
+            "authority": "user_explicit",
+            "check_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^git\\s+push(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "confidence": 1.0,
+            "conflicts_with": [],
+            "effect": "deny",
+            "id": "MAC-9c0dfa147afa",
+            "kind": "prohibition",
+            "lifecycle": {
+              "effective_from": "2026-06-10T08:00:00Z",
+              "expires_at": null,
+              "original_text": "until I approve it",
+              "review_after": null,
+              "trigger_event": "I approve it",
+              "type": "conditional",
+              "until_revoked": false
+            },
+            "modality": "MUST_NOT",
+            "override": {
+              "allowed": true,
+              "requires": "explicit_user_confirmation",
+              "type": "explicit_user_current_turn"
+            },
+            "scope": {
+              "agent_family": [
+                "codex"
+              ],
+              "component": null,
+              "level": "project",
+              "organization": null,
+              "path_globs": [],
+              "repo": "project",
+              "task": null,
+              "user_id": "user-1",
+              "workspace": "/tmp/mac-trace-online-project"
+            },
+            "semantics": {
+              "actions": [
+                "exec",
+                "git.push"
+              ],
+              "tags": [
+                "approval_required",
+                "external_write",
+                "publish_code"
+              ]
+            },
+            "source": {
+              "conversation_id": null,
+              "created_at": "2026-06-10T08:00:00Z",
+              "fingerprint": null,
+              "kind": "user_turn",
+              "metadata": {},
+              "path": null,
+              "span": "Do not run git push until I approve it.",
+              "turn_id": "u-010"
+            },
+            "state_fields": [],
+            "status": "active",
+            "strength": "soft",
+            "supersedes": [],
+            "text": "Do not run git push until I approve it.",
+            "tool_patterns": [
+              {
+                "args": {
+                  "cmd": {
+                    "contains": null,
+                    "equals": null,
+                    "mentions_path_glob": null,
+                    "path_glob": null,
+                    "regex": "^git\\s+push(\\s|$)"
+                  }
+                },
+                "tool": "exec_command"
+              }
+            ],
+            "update_patterns": [],
+            "validator_enforcement_shape": "check_only",
+            "validity": {
+              "start": "2026-06-10T08:00:00Z",
+              "until": null
+            }
+          }
+        ],
+        "extracted_batches": [
+          [
+            "MAC-0f443b3b0f9d",
+            "MAC-6d1f7166de3b",
+            "MAC-9c0dfa147afa"
+          ]
+        ],
+        "pending_turns": 0,
+        "prompt_text": "MAC reminders\nPreferences:\n- MAC-0f443b3b0f9d [user_turn;active;global;agents=codex;until_revoked] Use uv for this repo from now on. (ambient scope match)\nLocal reminders:\n- MAC-6d1f7166de3b [user_turn;active;path;workspace=/tmp/mac-trace-online-project;repo=project;paths=generated/**;task=task-online;agents=codex;immediate] For this project, do not edit files under generated/** without asking. (target=generated/core.py; actions=file.delete,file.edit,file.write; tags=approval_required,file_write,generated_files,project_scope,source_modification,workspace_write; query-actions=file.delete,file.write,source_modification)\n- MAC-9c0dfa147afa [user_turn;active;project;workspace=/tmp/mac-trace-online-project;repo=project;agents=codex;conditional] Do not run git push until I approve it. (target=generated/core.py; actions=exec,git.push; tags=approval_required,external_write,publish_code)",
+        "statuses": {
+          "MAC-0f443b3b0f9d": "active",
+          "MAC-6d1f7166de3b": "active",
+          "MAC-9c0dfa147afa": "active"
+        }
+      },
+      "passed": 5,
+      "score": 1.0,
+      "total": 5,
+      "trace_id": "trace_id_ingestion_online_batch_to_prompt"
+    },
+    {
+      "checks": [
+        {
+          "actual": "conflicts_with",
+          "expected": {
+            "matcher": "equals",
+            "value": "conflicts_with"
+          },
+          "name": "candidate relation is conflict",
+          "passed": true
+        },
+        {
+          "actual": "active",
+          "expected": {
+            "matcher": "equals",
+            "value": "active"
+          },
+          "name": "higher-authority user rule is active",
+          "passed": true
+        },
+        {
+          "actual": "superseded",
+          "expected": {
+            "matcher": "equals",
+            "value": "superseded"
+          },
+          "name": "lower-authority project rule is superseded",
+          "passed": true
+        },
+        {
+          "actual": "conflicts_with",
+          "expected": {
+            "matcher": "equals",
+            "value": "conflicts_with"
+          },
+          "name": "edge records relation",
+          "passed": true
+        },
+        {
+          "actual": "/workspace/project",
+          "expected": {
+            "matcher": "equals",
+            "value": "/workspace/project"
+          },
+          "name": "edge remains scoped to project workspace",
+          "passed": true
+        }
+      ],
+      "description": "A user-explicit prohibition should supersede a conflicting lower-authority project requirement and preserve a scoped edge.",
+      "memory_path": "conflict_resolution_store",
+      "outputs": {
+        "contract_status": {
+          "MAC-project-push": "superseded",
+          "MAC-user-no-push": "active"
+        },
+        "edges": [
+          {
+            "from_contract": "MAC-user-no-push",
+            "relation": "conflicts_with",
+            "scope": {
+              "agent_family": [],
+              "component": null,
+              "level": "project",
+              "organization": null,
+              "path_globs": [],
+              "repo": "project",
+              "task": null,
+              "user_id": null,
+              "workspace": "/workspace/project"
+            },
+            "to_contract": "MAC-project-push"
+          }
+        ],
+        "inserted": [
+          {
+            "contract_id": "MAC-user-no-push",
+            "relation": "conflicts_with",
+            "status": "active"
+          }
+        ]
+      },
+      "passed": 5,
+      "score": 1.0,
+      "total": 5,
+      "trace_id": "trace_id_resolver_authority_conflict_edges"
+    },
+    {
+      "checks": [
+        {
+          "actual": [
+            "MAC-pref",
+            "MAC-generated"
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "MAC-pref"
+          },
+          "name": "global preference is retrieved",
+          "passed": true
+        },
+        {
+          "actual": [
+            "MAC-pref",
+            "MAC-generated"
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "MAC-generated"
+          },
+          "name": "path-specific generated rule is retrieved",
+          "passed": true
+        },
+        {
+          "actual": [
+            "MAC-pref",
+            "MAC-generated"
+          ],
+          "expected": {
+            "matcher": "not_contains",
+            "value": "MAC-other-workspace"
+          },
+          "name": "different workspace rule is filtered out",
+          "passed": true
+        },
+        {
+          "actual": "MAC reminders\nPreferences:\n- MAC-pref [user_profile;active;global;until_revoked] Prefer concise implementation notes. (ambient scope match)\nLocal reminders:\n- MAC-generated [user_turn;active;path;workspace=/workspace/project;repo=project;paths=generated/**;until_revoked] Do not edit files under generated/** without asking. (target=generated/core.py; actions=file.write; tags=file_write,workspace_write; query-actions=file.write,workspace_write)",
+          "expected": {
+            "matcher": "contains",
+            "value": "Local reminders"
+          },
+          "name": "rendered prompt is compact plain text",
+          "passed": true
+        },
+        {
+          "actual": "MAC reminders\nPreferences:\n- MAC-pref [user_profile;active;global;until_revoked] Prefer concise implementation notes. (ambient scope match)\nLocal reminders:\n- MAC-generated [user_turn;active;path;workspace=/workspace/project;repo=project;paths=generated/**;until_revoked] Do not edit files under generated/** without asking. (target=generated/core.py; actions=file.write; tags=file_write,workspace_write; query-actions=file.write,workspace_write)",
+          "expected": {
+            "matcher": "not_contains",
+            "value": "{\""
+          },
+          "name": "rendered prompt avoids JSON payload framing",
+          "passed": true
+        }
+      ],
+      "description": "Prompt intake should surface global preferences and path/action-relevant local rules while ignoring other workspaces.",
+      "memory_path": "prompt_intake_retrieval",
+      "outputs": {
+        "packet_channels": [
+          "preference",
+          "local-reminder"
+        ],
+        "packet_ids": [
+          "MAC-pref",
+          "MAC-generated"
+        ],
+        "rendered": "MAC reminders\nPreferences:\n- MAC-pref [user_profile;active;global;until_revoked] Prefer concise implementation notes. (ambient scope match)\nLocal reminders:\n- MAC-generated [user_turn;active;path;workspace=/workspace/project;repo=project;paths=generated/**;until_revoked] Do not edit files under generated/** without asking. (target=generated/core.py; actions=file.write; tags=file_write,workspace_write; query-actions=file.write,workspace_write)"
+      },
+      "passed": 5,
+      "score": 1.0,
+      "total": 5,
+      "trace_id": "trace_id_retrieval_scope_context_shift"
+    },
+    {
+      "checks": [
+        {
+          "actual": "reject",
+          "expected": {
+            "matcher": "equals",
+            "value": "ask"
+          },
+          "name": "validator initially asks",
+          "passed": false
+        },
+        {
+          "actual": [
+            {
+              "confidence": 1.0,
+              "contract_id": "MAC-test-before-push",
+              "decision": "reject",
+              "evidence_refs": [],
+              "reason": "git push attempted without a successful test run since the last push. Run tests (e.g., pytest) before pushing.",
+              "validator_version_id": "VV-da63c85dbd78"
+            }
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "Run tests before git push"
+          },
+          "name": "initial verdict mentions tests",
+          "passed": false
+        },
+        {
+          "actual": "allow",
+          "expected": {
+            "matcher": "equals",
+            "value": "allow"
+          },
+          "name": "after committed pytest action gate allows",
+          "passed": true
+        },
+        {
+          "actual": [
+            {
+              "confidence": 1.0,
+              "contract_id": "MAC-test-before-push",
+              "decision": "allow",
+              "evidence_refs": [
+                {
+                  "seq": 1,
+                  "tool_name": "Bash"
+                }
+              ],
+              "reason": "Found a successful test run after the last git push and before this push.",
+              "validator_version_id": "VV-da63c85dbd78"
+            }
+          ],
+          "expected": {
+            "matcher": "contains",
+            "value": "action_log_seq"
+          },
+          "name": "allow verdict carries action-log evidence",
+          "passed": false
+        },
+        {
+          "actual": "VV-da63c85dbd78",
+          "expected": {
+            "matcher": "regex",
+            "value": "^VV-"
+          },
+          "name": "installed validator id is present",
+          "passed": true
+        }
+      ],
+      "description": "A check-only validator should ask before git push until the Action Log contains a successful test run.",
+      "memory_path": "validator_check_only_gate",
+      "outputs": {
+        "after_decision": "allow",
+        "after_verdicts": [
+          {
+            "confidence": 1.0,
+            "contract_id": "MAC-test-before-push",
+            "decision": "allow",
+            "evidence_refs": [
+              {
+                "seq": 1,
+                "tool_name": "Bash"
+              }
+            ],
+            "reason": "Found a successful test run after the last git push and before this push.",
+            "validator_version_id": "VV-da63c85dbd78"
+          }
+        ],
+        "before_decision": "reject",
+        "before_verdicts": [
+          {
+            "confidence": 1.0,
+            "contract_id": "MAC-test-before-push",
+            "decision": "reject",
+            "evidence_refs": [],
+            "reason": "git push attempted without a successful test run since the last push. Run tests (e.g., pytest) before pushing.",
+            "validator_version_id": "VV-da63c85dbd78"
+          }
+        ],
+        "contract": {
+          "authority": "user_explicit",
+          "check_patterns": [
+            {
+              "args": {
+                "command": {
+                  "contains": null,
+                  "equals": null,
+                  "mentions_path_glob": null,
+                  "path_glob": null,
+                  "regex": "^git\\s+push(\\s|$)"
+                }
+              },
+              "tool": "Bash"
+            }
+          ],
+          "confidence": 1.0,
+          "conflicts_with": [],
+          "effect": "require",
+          "id": "MAC-test-before-push",
+          "kind": "requirement",
+          "lifecycle": {
+            "effective_from": "2026-06-10T06:05:51.301061Z",
+            "expires_at": null,
+            "original_text": null,
+            "review_after": null,
+            "trigger_event": null,
+            "type": "until_revoked",
+            "until_revoked": true
+          },
+          "modality": "MUST",
+          "override": {
+            "allowed": true,
+            "requires": "explicit_user_confirmation",
+            "type": "explicit_user_current_turn"
+          },
+          "scope": {
+            "agent_family": [],
+            "component": null,
+            "level": "task",
+            "organization": null,
+            "path_globs": [],
+            "repo": "project",
+            "task": "task-1",
+            "user_id": null,
+            "workspace": "/workspace/project"
+          },
+          "semantics": {
+            "actions": [],
+            "tags": []
+          },
+          "source": {
+            "conversation_id": null,
+            "created_at": "2026-06-10T08:00:00Z",
+            "fingerprint": null,
+            "kind": "user_turn",
+            "metadata": {},
+            "path": null,
+            "span": "Before git push, run tests.",
+            "turn_id": null
+          },
+          "state_fields": [],
+          "status": "active",
+          "strength": "hard",
+          "supersedes": [],
+          "text": "Before git push, run tests.",
+          "tool_patterns": [],
+          "update_patterns": [],
+          "validator_enforcement_shape": "check_only",
+          "validity": {
+            "start": "2026-06-10T06:05:51.301061Z",
+            "until": null
+          }
+        },
+        "generated_package": {
+          "initial_state": {},
+          "notes": [
+            "Detects git push via regex on Bash command. Requires a prior Bash action with a recognized test command and outcome=success occurring after the most recent previous git push. Returns ask if command argument is missing/unparsable."
+          ],
+          "snippet": "import re\n\nPUSH_RE = re.compile(r\"^\\s*git\\s+push(\\s|$)\")\nTEST_RE = re.compile(r\"pytest|unittest|npm\\s+test|yarn\\s+test|pnpm\\s+test|go\\s+test|cargo\\s+test|mvn\\s+test|gradle\\s+test|make\\s+test|tox|nox|jest|vitest|mocha|rspec|phpunit|ctest\", re.IGNORECASE)\n\n\ndef _is_git_push(action):\n    if action.get(\"tool_name\") != \"Bash\":\n        return False\n    args = action.get(\"arguments\") or {}\n    cmd = args.get(\"command\")\n    if not isinstance(cmd, str):\n        return None\n    return bool(PUSH_RE.search(cmd))\n\n\ndef check(action, state, log, context):\n    is_push = _is_git_push(action)\n    if is_push is None:\n        return ask(\"Bash command argument missing or unparsable; cannot verify pre-push test run.\")\n    if not is_push:\n        return allow(\"Not a git push command; rule does not apply.\")\n\n    # Look for a recent successful test run in this session/task.\n    results = log.search({\n        \"from\": \"actions\",\n        \"limit\": 50,\n        \"order_by\": [{\"field\": \"seq\", \"direction\": \"desc\"}],\n        \"select\": [\"seq\", \"tool_name\", \"arguments\", \"outcome\", \"result_text\"],\n        \"where\": {\n            \"tool_name\": {\"eq\": \"Bash\"},\n            \"outcome\": {\"eq\": \"success\"},\n            \"arguments.command\": {\"regex\": \"pytest|unittest|npm\\\\s+test|yarn\\\\s+test|pnpm\\\\s+test|go\\\\s+test|cargo\\\\s+test|mvn\\\\s+test|gradle\\\\s+test|make\\\\s+test|tox|nox|jest|vitest|mocha|rspec|phpunit|ctest\"}\n        }\n    }) or []\n\n    last_push_seq = -1\n    push_results = log.search({\n        \"from\": \"actions\",\n        \"limit\": 50,\n        \"order_by\": [{\"field\": \"seq\", \"direction\": \"desc\"}],\n        \"select\": [\"seq\", \"tool_name\", \"arguments\"],\n        \"where\": {\n            \"tool_name\": {\"eq\": \"Bash\"},\n            \"arguments.command\": {\"regex\": \"^\\\\s*git\\\\s+push(\\\\s|$)\"}\n        }\n    }) or []\n    for p in push_results:\n        seq = p.get(\"seq\")\n        if isinstance(seq, int) and seq > last_push_seq:\n            last_push_seq = seq\n\n    refs = []\n    for r in results:\n        seq = r.get(\"seq\")\n        if not isinstance(seq, int):\n            continue\n        if seq > last_push_seq:\n            refs.append({\"seq\": seq, \"tool_name\": r.get(\"tool_name\")})\n\n    if refs:\n        return allow(\"Found a successful test run after the last git push and before this push.\", evidence_refs=refs)\n\n    return reject(\"git push attempted without a successful test run since the last push. Run tests (e.g., pytest) before pushing.\")",
+          "status": "ready"
+        },
+        "validator": {
+          "action_log_search_spec_version": "ActionLogSearchSpecV1",
+          "check_patterns": [
+            {
+              "args": {
+                "command": {
+                  "contains": null,
+                  "equals": null,
+                  "mentions_path_glob": null,
+                  "path_glob": null,
+                  "regex": "^git\\s+push(\\s|$)"
+                }
+              },
+              "tool": "Bash"
+            }
+          ],
+          "contract_id": "MAC-test-before-push",
+          "created_at": "2026-06-10T06:06:05.927072Z",
+          "enforcement_shape": "check_only",
+          "id": "VV-da63c85dbd78",
+          "initial_state": {},
+          "sandbox_policy_version": "subprocess-v1",
+          "snippet": "import re\n\nPUSH_RE = re.compile(r\"^\\s*git\\s+push(\\s|$)\")\nTEST_RE = re.compile(r\"pytest|unittest|npm\\s+test|yarn\\s+test|pnpm\\s+test|go\\s+test|cargo\\s+test|mvn\\s+test|gradle\\s+test|make\\s+test|tox|nox|jest|vitest|mocha|rspec|phpunit|ctest\", re.IGNORECASE)\n\n\ndef _is_git_push(action):\n    if action.get(\"tool_name\") != \"Bash\":\n        return False\n    args = action.get(\"arguments\") or {}\n    cmd = args.get(\"command\")\n    if not isinstance(cmd, str):\n        return None\n    return bool(PUSH_RE.search(cmd))\n\n\ndef check(action, state, log, context):\n    is_push = _is_git_push(action)\n    if is_push is None:\n        return ask(\"Bash command argument missing or unparsable; cannot verify pre-push test run.\")\n    if not is_push:\n        return allow(\"Not a git push command; rule does not apply.\")\n\n    # Look for a recent successful test run in this session/task.\n    results = log.search({\n        \"from\": \"actions\",\n        \"limit\": 50,\n        \"order_by\": [{\"field\": \"seq\", \"direction\": \"desc\"}],\n        \"select\": [\"seq\", \"tool_name\", \"arguments\", \"outcome\", \"result_text\"],\n        \"where\": {\n            \"tool_name\": {\"eq\": \"Bash\"},\n            \"outcome\": {\"eq\": \"success\"},\n            \"arguments.command\": {\"regex\": \"pytest|unittest|npm\\\\s+test|yarn\\\\s+test|pnpm\\\\s+test|go\\\\s+test|cargo\\\\s+test|mvn\\\\s+test|gradle\\\\s+test|make\\\\s+test|tox|nox|jest|vitest|mocha|rspec|phpunit|ctest\"}\n        }\n    }) or []\n\n    last_push_seq = -1\n    push_results = log.search({\n        \"from\": \"actions\",\n        \"limit\": 50,\n        \"order_by\": [{\"field\": \"seq\", \"direction\": \"desc\"}],\n        \"select\": [\"seq\", \"tool_name\", \"arguments\"],\n        \"where\": {\n            \"tool_name\": {\"eq\": \"Bash\"},\n            \"arguments.command\": {\"regex\": \"^\\\\s*git\\\\s+push(\\\\s|$)\"}\n        }\n    }) or []\n    for p in push_results:\n        seq = p.get(\"seq\")\n        if isinstance(seq, int) and seq > last_push_seq:\n            last_push_seq = seq\n\n    refs = []\n    for r in results:\n        seq = r.get(\"seq\")\n        if not isinstance(seq, int):\n            continue\n        if seq > last_push_seq:\n            refs.append({\"seq\": seq, \"tool_name\": r.get(\"tool_name\")})\n\n    if refs:\n        return allow(\"Found a successful test run after the last git push and before this push.\", evidence_refs=refs)\n\n    return reject(\"git push attempted without a successful test run since the last push. Run tests (e.g., pytest) before pushing.\")",
+          "snippet_hash": "eb6feb5773f5ebb8f606f6925789dd38376bfa3d675863d6c938d7d3a56eed64",
+          "state_fields": [],
+          "state_schema_version": "state-v1",
+          "status": "active",
+          "update_patterns": [],
+          "verification_hash": "11494922d5fd621a6b665db69816289873b8c2b2a6869aace3e07a634448c7a7",
+          "verified_at": "2026-06-10T06:06:05.927004Z"
+        },
+        "validator_id": "VV-da63c85dbd78"
+      },
+      "passed": 2,
+      "score": 0.4,
+      "total": 5,
+      "trace_id": "trace_id_validator_check_only_test_before_push"
+    },
+    {
+      "checks": [
+        {
+          "actual": [
+            3,
+            4
+          ],
+          "expected": {
+            "matcher": "length",
+            "value": 2
+          },
+          "name": "both committed purchases recorded",
+          "passed": true
+        },
+        {
+          "actual": 8000,
+          "expected": {
+            "matcher": "equals",
+            "value": 8000
+          },
+          "name": "state accumulates eighty dollars",
+          "passed": true
+        },
+        {
+          "actual": 2,
+          "expected": {
+            "matcher": "equals",
+            "value": 2
+          },
+          "name": "state revision increments for updates",
+          "passed": true
+        },
+        {
+          "actual": "reject",
+          "expected": {
+            "matcher": "equals",
+            "value": "reject"
+          },
+          "name": "pending purchase is rejected",
+          "passed": true
+        },
+        {
+          "actual": "Pending action would bring total spend to $95.00 exceeding $90.00 limit (current $80.00, pending $15.00).",
+          "expected": {
+            "matcher": "contains",
+            "value": "Budget would exceed $90"
+          },
+          "name": "rejection explains budget cap",
+          "passed": false
+        }
+      ],
+      "description": "A check-update validator should update rule-local budget state from committed actions and reject a purchase that exceeds the cap.",
+      "memory_path": "validator_check_update_runtime",
+      "outputs": {
+        "contract": {
+          "authority": "user_explicit",
+          "check_patterns": [
+            {
+              "args": {},
+              "tool": "purchase"
+            },
+            {
+              "args": {},
+              "tool": "checkout"
+            }
+          ],
+          "confidence": 1.0,
+          "conflicts_with": [],
+          "effect": "deny",
+          "id": "MAC-budget",
+          "kind": "prohibition",
+          "lifecycle": {
+            "effective_from": "2026-06-10T06:06:05.998527Z",
+            "expires_at": null,
+            "original_text": null,
+            "review_after": null,
+            "trigger_event": null,
+            "type": "until_revoked",
+            "until_revoked": true
+          },
+          "modality": "MUST_NOT",
+          "override": {
+            "allowed": true,
+            "requires": "explicit_user_confirmation",
+            "type": "explicit_user_current_turn"
+          },
+          "scope": {
+            "agent_family": [],
+            "component": null,
+            "level": "task",
+            "organization": null,
+            "path_globs": [],
+            "repo": "project",
+            "task": "task-1",
+            "user_id": null,
+            "workspace": "/workspace/project"
+          },
+          "semantics": {
+            "actions": [],
+            "tags": []
+          },
+          "source": {
+            "conversation_id": null,
+            "created_at": "2026-06-10T08:00:00Z",
+            "fingerprint": null,
+            "kind": "user_turn",
+            "metadata": {},
+            "path": null,
+            "span": "Total cost must not exceed $90.",
+            "turn_id": null
+          },
+          "state_fields": [
+            "spent_cents",
+            "seen_entry_seqs",
+            "last_seen_seq"
+          ],
+          "status": "active",
+          "strength": "hard",
+          "supersedes": [],
+          "text": "Total cost must not exceed $90.",
+          "tool_patterns": [],
+          "update_patterns": [
+            {
+              "args": {},
+              "tool": "purchase"
+            },
+            {
+              "args": {},
+              "tool": "checkout"
+            }
+          ],
+          "validator_enforcement_shape": "check_update",
+          "validity": {
+            "start": "2026-06-10T06:06:05.998527Z",
+            "until": null
+          }
+        },
+        "generated_package": {
+          "initial_state": {
+            "last_seen_seq": null,
+            "seen_entry_seqs": [],
+            "spent_cents": 0
+          },
+          "notes": [
+            "Tracks cumulative purchase/checkout spend in cents; rejects pending actions whose projected total exceeds $90. Parses 'total', 'amount', 'price', 'cost' and aggregated 'items[*]' price-like fields; asks if unparseable. Update is idempotent via seen_entry_seqs and ignores failed outcomes."
+          ],
+          "snippet": "import re\n\nLIMIT_CENTS = 9000\n\n\ndef _to_cents(value):\n    if value is None:\n        return None\n    if isinstance(value, bool):\n        return None\n    if isinstance(value, (int, float)):\n        return int(round(float(value) * 100))\n    if isinstance(value, str):\n        s = value.strip()\n        if not s:\n            return None\n        m = re.search(r\"-?\\d+(?:\\.\\d+)?\", s.replace(\",\", \"\"))\n        if not m:\n            return None\n        try:\n            return int(round(float(m.group(0)) * 100))\n        except Exception:\n            return None\n    return None\n\n\ndef _extract_cents(args):\n    if not isinstance(args, dict):\n        return None, \"arguments missing\"\n    total_cents = 0\n    found = False\n    for key in (\"total\", \"amount\", \"price\", \"cost\"):\n        if key in args and args.get(key) is not None:\n            c = _to_cents(args.get(key))\n            if c is None:\n                return None, \"unparsable \" + key\n            total_cents += c\n            found = True\n    items = args.get(\"items\")\n    if isinstance(items, list):\n        for it in items:\n            if not isinstance(it, dict):\n                return None, \"item not object\"\n            c = None\n            for key in (\"amount\", \"price\", \"cost\", \"total\"):\n                if key in it and it.get(key) is not None:\n                    c = _to_cents(it.get(key))\n                    if c is None:\n                        return None, \"unparsable item \" + key\n                    break\n            if c is None:\n                return None, \"item missing price\"\n            total_cents += c\n            found = True\n    if not found:\n        return None, \"no price field\"\n    return total_cents, None\n\n\ndef check(action, state, log, context):\n    tool = action.get(\"tool_name\") or action.get(\"host_action\")\n    if tool not in (\"purchase\", \"checkout\"):\n        return allow(\"tool not in scope\")\n    args = action.get(\"arguments\")\n    cents, err = _extract_cents(args)\n    if cents is None:\n        return ask(\"cannot determine cost of pending action: \" + str(err))\n    spent = int(state.get(\"spent_cents\") or 0)\n    projected = spent + cents\n    if projected > LIMIT_CENTS:\n        return reject(\n            \"Pending action would bring total spend to $\"\n            + format(projected / 100.0, \".2f\")\n            + \" exceeding $90.00 limit (current $\"\n            + format(spent / 100.0, \".2f\")\n            + \", pending $\"\n            + format(cents / 100.0, \".2f\")\n            + \").\",\n        )\n    return allow(\n        \"Projected total $\"\n        + format(projected / 100.0, \".2f\")\n        + \" within $90.00 limit.\"\n    )\n\n\ndef update(state, entry, log, context):\n    new_state = dict(state) if isinstance(state, dict) else {}\n    seen = list(new_state.get(\"seen_entry_seqs\") or [])\n    new_state.setdefault(\"spent_cents\", 0)\n    new_state.setdefault(\"last_seen_seq\", None)\n    seq = entry.get(\"seq\")\n    if seq is not None and seq in seen:\n        new_state[\"seen_entry_seqs\"] = seen\n        return new_state\n    tool = entry.get(\"tool_name\") or entry.get(\"host_action\")\n    if tool not in (\"purchase\", \"checkout\"):\n        if seq is not None:\n            seen.append(seq)\n            new_state[\"seen_entry_seqs\"] = seen\n            last = new_state.get(\"last_seen_seq\")\n            if last is None or seq > last:\n                new_state[\"last_seen_seq\"] = seq\n        return new_state\n    if entry.get(\"outcome\") == \"failure\":\n        if seq is not None:\n            seen.append(seq)\n            new_state[\"seen_entry_seqs\"] = seen\n            last = new_state.get(\"last_seen_seq\")\n            if last is None or seq > last:\n                new_state[\"last_seen_seq\"] = seq\n        return new_state\n    args = entry.get(\"arguments\")\n    cents, _err = _extract_cents(args)\n    if cents is not None:\n        new_state[\"spent_cents\"] = int(new_state.get(\"spent_cents\") or 0) + cents\n    if seq is not None:\n        seen.append(seq)\n        new_state[\"seen_entry_seqs\"] = seen\n        last = new_state.get(\"last_seen_seq\")\n        if last is None or seq > last:\n            new_state[\"last_seen_seq\"] = seq\n    return new_state",
+          "status": "ready"
+        },
+        "recorded_seqs": [
+          3,
+          4
+        ],
+        "state": {
+          "last_seen_seq": 4,
+          "seen_entry_seqs": [
+            3,
+            4
+          ],
+          "spent_cents": 8000
+        },
+        "state_revision": 2,
+        "validator": {
+          "action_log_search_spec_version": "ActionLogSearchSpecV1",
+          "check_patterns": [
+            {
+              "args": {},
+              "tool": "purchase"
+            },
+            {
+              "args": {},
+              "tool": "checkout"
+            }
+          ],
+          "contract_id": "MAC-budget",
+          "created_at": "2026-06-10T06:06:24.435562Z",
+          "enforcement_shape": "check_update",
+          "id": "VV-61490df626e7",
+          "initial_state": {
+            "last_seen_seq": null,
+            "seen_entry_seqs": [],
+            "spent_cents": 0
+          },
+          "sandbox_policy_version": "subprocess-v1",
+          "snippet": "import re\n\nLIMIT_CENTS = 9000\n\n\ndef _to_cents(value):\n    if value is None:\n        return None\n    if isinstance(value, bool):\n        return None\n    if isinstance(value, (int, float)):\n        return int(round(float(value) * 100))\n    if isinstance(value, str):\n        s = value.strip()\n        if not s:\n            return None\n        m = re.search(r\"-?\\d+(?:\\.\\d+)?\", s.replace(\",\", \"\"))\n        if not m:\n            return None\n        try:\n            return int(round(float(m.group(0)) * 100))\n        except Exception:\n            return None\n    return None\n\n\ndef _extract_cents(args):\n    if not isinstance(args, dict):\n        return None, \"arguments missing\"\n    total_cents = 0\n    found = False\n    for key in (\"total\", \"amount\", \"price\", \"cost\"):\n        if key in args and args.get(key) is not None:\n            c = _to_cents(args.get(key))\n            if c is None:\n                return None, \"unparsable \" + key\n            total_cents += c\n            found = True\n    items = args.get(\"items\")\n    if isinstance(items, list):\n        for it in items:\n            if not isinstance(it, dict):\n                return None, \"item not object\"\n            c = None\n            for key in (\"amount\", \"price\", \"cost\", \"total\"):\n                if key in it and it.get(key) is not None:\n                    c = _to_cents(it.get(key))\n                    if c is None:\n                        return None, \"unparsable item \" + key\n                    break\n            if c is None:\n                return None, \"item missing price\"\n            total_cents += c\n            found = True\n    if not found:\n        return None, \"no price field\"\n    return total_cents, None\n\n\ndef check(action, state, log, context):\n    tool = action.get(\"tool_name\") or action.get(\"host_action\")\n    if tool not in (\"purchase\", \"checkout\"):\n        return allow(\"tool not in scope\")\n    args = action.get(\"arguments\")\n    cents, err = _extract_cents(args)\n    if cents is None:\n        return ask(\"cannot determine cost of pending action: \" + str(err))\n    spent = int(state.get(\"spent_cents\") or 0)\n    projected = spent + cents\n    if projected > LIMIT_CENTS:\n        return reject(\n            \"Pending action would bring total spend to $\"\n            + format(projected / 100.0, \".2f\")\n            + \" exceeding $90.00 limit (current $\"\n            + format(spent / 100.0, \".2f\")\n            + \", pending $\"\n            + format(cents / 100.0, \".2f\")\n            + \").\",\n        )\n    return allow(\n        \"Projected total $\"\n        + format(projected / 100.0, \".2f\")\n        + \" within $90.00 limit.\"\n    )\n\n\ndef update(state, entry, log, context):\n    new_state = dict(state) if isinstance(state, dict) else {}\n    seen = list(new_state.get(\"seen_entry_seqs\") or [])\n    new_state.setdefault(\"spent_cents\", 0)\n    new_state.setdefault(\"last_seen_seq\", None)\n    seq = entry.get(\"seq\")\n    if seq is not None and seq in seen:\n        new_state[\"seen_entry_seqs\"] = seen\n        return new_state\n    tool = entry.get(\"tool_name\") or entry.get(\"host_action\")\n    if tool not in (\"purchase\", \"checkout\"):\n        if seq is not None:\n            seen.append(seq)\n            new_state[\"seen_entry_seqs\"] = seen\n            last = new_state.get(\"last_seen_seq\")\n            if last is None or seq > last:\n                new_state[\"last_seen_seq\"] = seq\n        return new_state\n    if entry.get(\"outcome\") == \"failure\":\n        if seq is not None:\n            seen.append(seq)\n            new_state[\"seen_entry_seqs\"] = seen\n            last = new_state.get(\"last_seen_seq\")\n            if last is None or seq > last:\n                new_state[\"last_seen_seq\"] = seq\n        return new_state\n    args = entry.get(\"arguments\")\n    cents, _err = _extract_cents(args)\n    if cents is not None:\n        new_state[\"spent_cents\"] = int(new_state.get(\"spent_cents\") or 0) + cents\n    if seq is not None:\n        seen.append(seq)\n        new_state[\"seen_entry_seqs\"] = seen\n        last = new_state.get(\"last_seen_seq\")\n        if last is None or seq > last:\n            new_state[\"last_seen_seq\"] = seq\n    return new_state",
+          "snippet_hash": "7312d2e8e0f709943e887a800264181d7ce87ab80889342928d7514d324c9919",
+          "state_fields": [
+            "spent_cents",
+            "seen_entry_seqs",
+            "last_seen_seq"
+          ],
+          "state_schema_version": "state-v1",
+          "status": "active",
+          "update_patterns": [
+            {
+              "args": {},
+              "tool": "purchase"
+            },
+            {
+              "args": {},
+              "tool": "checkout"
+            }
+          ],
+          "verification_hash": "e70cc039357ed93dcf8a94744b05825973cc01f147aa20433e3d0d23bb6c1927",
+          "verified_at": "2026-06-10T06:06:24.435389Z"
+        },
+        "verdict": {
+          "confidence": 1.0,
+          "decision": "reject",
+          "evidence_refs": [],
+          "reason": "Pending action would bring total spend to $95.00 exceeding $90.00 limit (current $80.00, pending $15.00)."
+        }
+      },
+      "passed": 4,
+      "score": 0.8,
+      "total": 5,
+      "trace_id": "trace_id_validator_check_update_budget_state"
+    }
+  ],
+  "trace_count": 9
+}
