@@ -216,6 +216,10 @@ def test_llm_extractor_injects_tool_capsules_as_system_prompt() -> None:
             "Tool definitions available to the acting agent are read-only.\n"
             '{"tools":[{"name":"exec_command","input_schema":{"required":["cmd"]}}]}'
         ),
+        similar_rules_system_prompt=(
+            "Existing similar rules; do not re-emit duplicates.\n"
+            "1. [MAC-existing] prohibition scope=repo: Do not push without approval."
+        ),
     )
 
     CandidateJsonContractExtractor(response_provider).extract_online_turn(
@@ -227,11 +231,12 @@ def test_llm_extractor_injects_tool_capsules_as_system_prompt() -> None:
     assert "Represent every explicit durable rule" in seen["prompt"]
     assert "final internally consistent contract set" in seen["prompt"]
     assert "emit only the final effective version" in seen["prompt"]
-    assert "Do not compare against stored similar rules" in seen["prompt"]
+    assert "When existing similar rules are provided in the system prompt" in seen["prompt"]
     assert "source-coverage check" in seen["prompt"]
 
     assert "A MAC contract is" in (seen["system_prompt"] or "")
     assert "exec_command" in (seen["system_prompt"] or "")
+    assert "MAC-existing" in (seen["system_prompt"] or "")
     assert "Source text:" in (seen["prompt"] or "")
 
 

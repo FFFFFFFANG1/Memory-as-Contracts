@@ -24,6 +24,14 @@ from memory_as_contracts.models import (
     Strength,
     ToolPattern,
 )
+from memory_as_contracts.rule_surface import (
+    canonical_tool_patterns as _canonical_tool_patterns,
+    contract_dedup_fingerprint,
+    contract_pattern_surface_hash,
+    enforcement_equivalent as _enforcement_equivalent,
+    has_same_operational_surface,
+    lifecycle_equivalent as _lifecycle_equivalent,
+)
 from memory_as_contracts.store import ContractStore
 
 
@@ -68,6 +76,7 @@ equal-authority conflicts.
 
 DEFAULT_RELATION_SIMILARITY_THRESHOLD = 0.35
 DEFAULT_RELATION_TOP_K = 3
+STRICT_EDIT_DEDUP_SIMILARITY_THRESHOLD = 0.5
 TEXT_SIMILARITY_WEIGHT = 0.55
 SEMANTIC_SIMILARITY_WEIGHT = 0.30
 OPERATIONAL_PATTERN_SIMILARITY_WEIGHT = 0.15
@@ -154,6 +163,22 @@ class ConflictResolver:
         )
         result = ResolutionResult(contract=candidate)
 
+        strict_duplicate = self.find_indexed_dedup_candidate(candidate, existing_contracts)
+        if strict_duplicate is None:
+            strict_duplicate = self.find_strict_edit_dedup_candidate(candidate, existing_contracts)
+        if strict_duplicate is not None:
+            result.relation = strict_duplicate.relation
+            candidate, edge = self._apply_relation(
+                candidate,
+                strict_duplicate.existing,
+                strict_duplicate.relation,
+            )
+            result.contract = candidate
+            result.edges.append(edge)
+            self.store.add_contract(candidate)
+            self.store.add_edge(edge)
+            return result
+
         relation_decisions = self.classify_update_relations(candidate, existing_contracts)
         for decision in relation_decisions:
             if decision.relation == EdgeRelation.INDEPENDENT:
@@ -180,16 +205,37 @@ class ConflictResolver:
             [ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT],
             include_expired_status=False,
         )
+        relation_decisions: list[RelationDecision] = []
+        remaining_candidates: list[Contract] = []
+        for candidate in candidates:
+            strict_duplicate = self.find_indexed_dedup_candidate(candidate, existing_contracts)
+            if strict_duplicate is None:
+                strict_duplicate = self.find_strict_edit_dedup_candidate(candidate, existing_contracts)
+            if strict_duplicate is None:
+                remaining_candidates.append(candidate)
+                continue
+            relation_decisions.append(
+                RelationDecision(
+                    candidate=candidate,
+                    existing=strict_duplicate.existing,
+                    relation=strict_duplicate.relation,
+                    similarity=strict_duplicate.similarity,
+                    text_score=strict_duplicate.text_score,
+                    semantic_score=strict_duplicate.semantic_score,
+                    pattern_score=strict_duplicate.pattern_score,
+                )
+            )
         relation_candidates_by_new = {
             candidate.id: self.find_relation_candidates(candidate, existing_contracts)
-            for candidate in candidates
+            for candidate in remaining_candidates
         }
-        components = _relation_components(candidates, relation_candidates_by_new)
-        relation_decisions: list[RelationDecision] = []
+        components = _relation_components(remaining_candidates, relation_candidates_by_new)
         if len(components) == 1:
-            relation_decisions = self._classify_component(
-                components[0],
-                relation_candidates_by_new,
+            relation_decisions.extend(
+                self._classify_component(
+                    components[0],
+                    relation_candidates_by_new,
+                )
             )
         else:
             workers = max(1, min(self.max_relation_workers, len(components)))
@@ -264,6 +310,75 @@ class ConflictResolver:
                 )
             )
         return result
+
+    def find_indexed_dedup_candidate(
+        self,
+        candidate: Contract,
+        existing_contracts: list[Contract] | None = None,
+    ) -> DedupCandidate | None:
+        del existing_contracts
+        pool = self.store.find_contracts_by_surface_keys(
+            dedup_fingerprint=contract_dedup_fingerprint(candidate),
+            pattern_surface_hash=contract_pattern_surface_hash(candidate),
+            statuses=[ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT],
+        )
+        matches: list[DedupCandidate] = []
+        for existing in pool:
+            if existing.id == candidate.id:
+                continue
+            if not _same_direction(candidate, existing):
+                continue
+            if not has_same_operational_surface(candidate, existing):
+                continue
+            matches.append(
+                DedupCandidate(
+                    existing=existing,
+                    relation=EdgeRelation.DUPLICATE,
+                    similarity=1.0,
+                    text_score=0.0,
+                    semantic_score=1.0,
+                    pattern_score=1.0,
+                )
+            )
+        if not matches:
+            return None
+        return max(matches, key=lambda item: _compare_precedence(item.existing, candidate))
+
+    def find_strict_edit_dedup_candidate(
+        self,
+        candidate: Contract,
+        existing_contracts: list[Contract] | None = None,
+        *,
+        min_similarity: float = STRICT_EDIT_DEDUP_SIMILARITY_THRESHOLD,
+    ) -> DedupCandidate | None:
+        pool = existing_contracts
+        if pool is None:
+            pool = self.store.list_contracts(
+                [ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT],
+                include_expired_status=False,
+            )
+        matches: list[DedupCandidate] = []
+        for existing in pool:
+            if existing.id == candidate.id:
+                continue
+            if candidate.kind != existing.kind or candidate.scope != existing.scope:
+                continue
+            if not _semantic_surface_compatible(candidate, existing):
+                continue
+            similarity = _normalized_levenshtein_similarity(candidate.text, existing.text)
+            if similarity <= min_similarity:
+                continue
+            matches.append(
+                DedupCandidate(
+                    existing=existing,
+                    relation=EdgeRelation.DUPLICATE,
+                    similarity=similarity,
+                    text_score=similarity,
+                )
+            )
+        if not matches:
+            return None
+        return max(matches, key=lambda item: item.similarity)
 
     def find_relation_candidates(
         self,
@@ -808,6 +923,42 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower().rstrip(".。!！"))
 
 
+def _normalized_levenshtein_similarity(left: str, right: str) -> float:
+    left_normalized = _edit_distance_text(left)
+    right_normalized = _edit_distance_text(right)
+    if not left_normalized and not right_normalized:
+        return 1.0
+    if not left_normalized or not right_normalized:
+        return 0.0
+    distance = _levenshtein_distance(left_normalized, right_normalized)
+    return 1.0 - (distance / max(len(left_normalized), len(right_normalized)))
+
+
+def _edit_distance_text(text: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _levenshtein_distance(left: str, right: str) -> int:
+    if left == right:
+        return 0
+    if len(left) < len(right):
+        left, right = right, left
+    previous = list(range(len(right) + 1))
+    for left_index, left_char in enumerate(left, start=1):
+        current = [left_index]
+        for right_index, right_char in enumerate(right, start=1):
+            current.append(
+                min(
+                    previous[right_index] + 1,
+                    current[right_index - 1] + 1,
+                    previous[right_index - 1] + (left_char != right_char),
+                )
+            )
+        previous = current
+    return previous[-1]
+
+
 def _says_supersedes(text: str) -> bool:
     lower = text.lower()
     return "instead of" in lower or "replace" in lower or "supersede" in lower
@@ -1176,8 +1327,15 @@ def _has_narrower_action_binding(candidate: Contract, existing: Contract) -> boo
 def _is_generic_broader_clause(candidate_text: str, existing_text: str) -> bool:
     candidate_lower = candidate_text.lower()
     existing_lower = existing_text.lower()
-    generic_markers = ("anything", "any ", "do not publish", "do not browse")
-    specific_markers = ("without asking", "approve", "approval", "git push", "web search")
+    generic_markers = ("anything", "do not publish", "do not browse")
+    specific_markers = (
+        "without asking",
+        "asking",
+        "approve",
+        "approval",
+        "git push",
+        "web search",
+    )
     return any(marker in candidate_lower for marker in generic_markers) and any(
         marker in existing_lower for marker in specific_markers
     )
@@ -1216,37 +1374,6 @@ def _can_be_duplicate(left: Contract, right: Contract) -> bool:
     return (
         _normalize(left.text) == _normalize(right.text)
         or _contract_similarity(left, right) >= 0.62
-    )
-
-
-def _enforcement_equivalent(left: Contract, right: Contract) -> bool:
-    return (
-        left.validator_enforcement_shape == right.validator_enforcement_shape
-        and _canonical_tool_patterns(left.check_patterns)
-        == _canonical_tool_patterns(right.check_patterns)
-        and _canonical_tool_patterns(left.update_patterns)
-        == _canonical_tool_patterns(right.update_patterns)
-        and set(left.state_fields) == set(right.state_fields)
-    )
-
-
-def _lifecycle_equivalent(left: Contract, right: Contract) -> bool:
-    return (
-        left.lifecycle.type == right.lifecycle.type
-        and left.lifecycle.expires_at == right.lifecycle.expires_at
-        and left.lifecycle.until_revoked == right.lifecycle.until_revoked
-        and left.lifecycle.trigger_event == right.lifecycle.trigger_event
-        and left.lifecycle.review_after == right.lifecycle.review_after
-        and left.validity.until == right.validity.until
-    )
-
-
-def _canonical_tool_patterns(patterns: list[ToolPattern]) -> tuple[str, ...]:
-    return tuple(
-        sorted(
-            json.dumps(pattern.model_dump(mode="json"), sort_keys=True)
-            for pattern in patterns
-        )
     )
 
 

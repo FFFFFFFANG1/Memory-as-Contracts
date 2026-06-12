@@ -290,7 +290,6 @@ class ActionLogEntryV1(StrictModel):
     seq: int | None = None
     timestamp: datetime = Field(default_factory=utc_now)
     session_id: str
-    task_id: str | None = None
     agent_id: str
     adapter_id: str
     tool_call_id: str
@@ -304,7 +303,6 @@ class ActionLogEntryV1(StrictModel):
     conversation_id: str | None = None
     turn_id: str | None = None
     user_id: str | None = None
-    organization: str | None = None
     workspace: str | None = None
     repo: str | None = None
     branch: str | None = None

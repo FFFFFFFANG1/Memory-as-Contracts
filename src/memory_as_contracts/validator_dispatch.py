@@ -2,23 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from memory_as_contracts.compiler import PolicyCompiler
 from memory_as_contracts.matching import contract_applies_to_signature
 from memory_as_contracts.models import (
     ActionLogEntryV1,
     ActionSignature,
     Contract,
     ContractStatus,
-    MatchOutcome,
     PredicateStatus,
-    RulePatternVersion,
     SessionContext,
     TimeContext,
     ToolCall,
     ValidatorVersion,
     WorkspaceContext,
 )
-from memory_as_contracts.runtime_scope import validator_scope_key
+from memory_as_contracts.rule_surface import (
+    bind_validator_update,
+    validator_scope_key_for_entry,
+    validator_scope_key_for_signature,
+)
 from memory_as_contracts.store import ContractStore
 
 
@@ -37,11 +38,8 @@ class ValidatorDispatchPlanner:
     def __init__(
         self,
         store: ContractStore,
-        *,
-        compiler: PolicyCompiler | None = None,
     ) -> None:
         self.store = store
-        self.compiler = compiler or PolicyCompiler()
 
     def for_committed_entry(
         self,
@@ -86,18 +84,15 @@ class ValidatorDispatchPlanner:
             return None
         if not version.update_patterns:
             return None
-        update_pattern = RulePatternVersion(
-            contract_id=version.contract_id,
-            tool_patterns=version.update_patterns,
-        )
-        if self.compiler.evaluate(update_pattern, signature) != MatchOutcome.MATCHED:
+        binding = bind_validator_update(contract, version, entry, signature)
+        if not binding.matched or binding.scope_key is None:
             return None
         return ValidatorDispatchPlan(
             version=version,
             contract=contract,
             entry=entry,
             signature=signature,
-            scope_key=validator_scope_key_for_entry(contract, entry),
+            scope_key=binding.scope_key,
         )
 
 
@@ -109,7 +104,6 @@ def action_signature_from_log_entry(entry: ActionLogEntryV1) -> ActionSignature:
             session_id=entry.session_id,
             conversation_id=entry.conversation_id,
             turn_id=entry.turn_id,
-            task_id=entry.task_id,
             user_id=entry.user_id,
         ),
         time=TimeContext(now=entry.timestamp),
@@ -134,34 +128,3 @@ def action_signature_from_log_entry(entry: ActionLogEntryV1) -> ActionSignature:
     )
 
 
-def validator_scope_key_for_signature(
-    contract: Contract,
-    signature: ActionSignature,
-) -> str:
-    return validator_scope_key(
-        contract,
-        session_id=signature.session.session_id,
-        task_id=signature.session.task_id,
-        workspace=signature.workspace.cwd,
-        repo=signature.workspace.repo,
-        branch=signature.workspace.branch,
-        user_id=signature.session.user_id,
-        turn_id=signature.session.turn_id,
-    )
-
-
-def validator_scope_key_for_entry(
-    contract: Contract,
-    entry: ActionLogEntryV1,
-) -> str:
-    return validator_scope_key(
-        contract,
-        session_id=entry.session_id,
-        task_id=entry.task_id,
-        workspace=entry.workspace,
-        repo=entry.repo,
-        branch=entry.branch,
-        user_id=entry.user_id,
-        organization=entry.organization,
-        turn_id=entry.turn_id,
-    )

@@ -13,7 +13,6 @@ ACTION_LOG_FIELDS = {
     "seq",
     "timestamp",
     "session_id",
-    "task_id",
     "agent_id",
     "adapter_id",
     "tool_call_id",
@@ -27,7 +26,6 @@ ACTION_LOG_FIELDS = {
     "conversation_id",
     "turn_id",
     "user_id",
-    "organization",
     "workspace",
     "repo",
     "branch",
@@ -155,14 +153,12 @@ class ActionLogView:
         store: ContractStore,
         *,
         session_id: str,
-        task_id: str | None = None,
         max_limit: int = 100,
         max_candidates: int = 1000,
         translator: ActionLogSearchTranslator | None = None,
     ) -> None:
         self.store = store
         self.session_id = session_id
-        self.task_id = task_id
         self.max_limit = max_limit
         self.max_candidates = max_candidates
         self.translator = translator or ActionLogSearchTranslator()
@@ -180,7 +176,6 @@ class ActionLogView:
     def _candidate_entries(self, normalized: dict[str, Any]) -> list[ActionLogEntryV1]:
         return self.store.search_action_log_candidates(
             session_id=self.session_id,
-            task_id=self.task_id,
             where=normalized["where"],
             limit=self.max_candidates,
         )
@@ -191,9 +186,7 @@ class ActionLogView:
             for entry in self.store.list_action_log_entries()
             if entry.session_id == self.session_id
         ]
-        if self.task_id is None:
-            return entries
-        return [entry for entry in entries if entry.task_id == self.task_id]
+        return entries
 
 def _entry_matches(entry: ActionLogEntryV1, where: dict[str, dict[str, Any]]) -> bool:
     return all(_predicate_matches(_field_value(entry, field), predicate) for field, predicate in where.items())

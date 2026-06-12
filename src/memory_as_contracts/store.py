@@ -4,10 +4,15 @@ import hashlib
 import json
 import sqlite3
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from memory_as_contracts.rule_surface import (
+    contract_dedup_fingerprint,
+    contract_pattern_surface_hash,
+)
 from memory_as_contracts.models import (
     ActionLogEntryV1,
     ActionOutcome,
@@ -35,13 +40,12 @@ from memory_as_contracts.schema_compat import (
 )
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 11
 ASK_RESPONSE_TTL = timedelta(minutes=30)
 ACTION_LOG_SQL_COLUMNS = {
     "seq": "seq",
     "timestamp": "timestamp",
     "session_id": "session_id",
-    "task_id": "task_id",
     "agent_id": "agent_id",
     "adapter_id": "adapter_id",
     "tool_call_id": "tool_call_id",
@@ -53,13 +57,18 @@ ACTION_LOG_SQL_COLUMNS = {
     "conversation_id": "conversation_id",
     "turn_id": "turn_id",
     "user_id": "user_id",
-    "organization": "organization",
     "workspace": "workspace",
     "repo": "repo",
     "branch": "branch",
     "risk": "risk",
     "side_effect": "side_effect",
 }
+
+
+@dataclass(frozen=True)
+class RankedContractSearchResult:
+    contract: Contract
+    rank: float
 
 
 def _dump_model(model: Any) -> str:
@@ -166,6 +175,8 @@ class ContractStore:
                 semantics_json TEXT,
                 tool_patterns_json TEXT,
                 validity_json TEXT,
+                dedup_fingerprint TEXT,
+                pattern_surface_hash TEXT,
                 compiled_predicates_json TEXT,
                 override_json TEXT NOT NULL,
                 supersedes_json TEXT NOT NULL,
@@ -229,7 +240,6 @@ class ContractStore:
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
                 adapter_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
-                task_id TEXT,
                 agent_id TEXT NOT NULL,
                 tool_call_id TEXT NOT NULL,
                 tool_name TEXT NOT NULL,
@@ -242,7 +252,6 @@ class ContractStore:
                 conversation_id TEXT,
                 turn_id TEXT,
                 user_id TEXT,
-                organization TEXT,
                 workspace TEXT,
                 repo TEXT,
                 branch TEXT,
@@ -337,13 +346,16 @@ class ContractStore:
             self._migrate_schema(int(row["version"]))
         elif int(row["version"]) != SCHEMA_VERSION:
             raise RuntimeError(f"unsupported MAC schema version: {row['version']}")
+        self._ensure_contract_dedup_indexes()
         self.conn.commit()
 
     def _migrate_schema(self, version: int) -> None:
-        if version in {1, 2, 3, 4, 5, 6, 7, 8}:
+        if version in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}:
             self._ensure_contract_columns()
             self._ensure_action_log_columns()
+            self._rebuild_action_log_without_task_or_org()
             self._ensure_validator_state_schema()
+            self._backfill_contract_dedup_keys()
             self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS rule_pattern_versions (
@@ -398,10 +410,66 @@ class ContractStore:
             "semantics_json": "TEXT",
             "tool_patterns_json": "TEXT",
             "validity_json": "TEXT",
+            "dedup_fingerprint": "TEXT",
+            "pattern_surface_hash": "TEXT",
         }
         for name, column_type in additions.items():
             if name not in columns:
                 self.conn.execute(f"ALTER TABLE contracts ADD COLUMN {name} {column_type}")
+
+    def _ensure_contract_dedup_indexes(self) -> None:
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(contracts)").fetchall()
+        }
+        if "dedup_fingerprint" not in columns or "pattern_surface_hash" not in columns:
+            return
+        self.conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_contracts_dedup_fingerprint
+            ON contracts(dedup_fingerprint)
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_contracts_pattern_surface_hash
+            ON contracts(pattern_surface_hash)
+            """
+        )
+
+    def _backfill_contract_dedup_keys(self) -> None:
+        if not self._table_exists("contracts"):
+            return
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(contracts)").fetchall()
+        }
+        if "dedup_fingerprint" not in columns or "pattern_surface_hash" not in columns:
+            return
+        rows = self.conn.execute(
+            """
+            SELECT id, payload_json FROM contracts
+            WHERE payload_json IS NOT NULL
+              AND (dedup_fingerprint IS NULL OR pattern_surface_hash IS NULL)
+            """
+        ).fetchall()
+        for row in rows:
+            try:
+                contract = Contract.model_validate_json(row["payload_json"])
+            except (TypeError, ValueError):
+                continue
+            self.conn.execute(
+                """
+                UPDATE contracts
+                SET dedup_fingerprint = ?, pattern_surface_hash = ?
+                WHERE id = ?
+                """,
+                (
+                    contract_dedup_fingerprint(contract),
+                    contract_pattern_surface_hash(contract),
+                    row["id"],
+                ),
+            )
 
     def _ensure_action_log_columns(self) -> None:
         if not self._table_exists("action_log"):
@@ -414,7 +482,6 @@ class ContractStore:
             "conversation_id": "TEXT",
             "turn_id": "TEXT",
             "user_id": "TEXT",
-            "organization": "TEXT",
             "workspace": "TEXT",
             "repo": "TEXT",
             "branch": "TEXT",
@@ -425,6 +492,75 @@ class ContractStore:
         for name, column_type in additions.items():
             if name not in columns:
                 self.conn.execute(f"ALTER TABLE action_log ADD COLUMN {name} {column_type}")
+
+    def _rebuild_action_log_without_task_or_org(self) -> None:
+        if not self._table_exists("action_log"):
+            return
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(action_log)").fetchall()
+        }
+        if "task_id" not in columns and "organization" not in columns:
+            return
+        self.conn.executescript(
+            """
+            CREATE TABLE action_log_new (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                adapter_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                tool_call_id TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                host_action TEXT NOT NULL,
+                arguments_json TEXT NOT NULL,
+                result_json TEXT,
+                result_text TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                reasoning_text TEXT,
+                conversation_id TEXT,
+                turn_id TEXT,
+                user_id TEXT,
+                workspace TEXT,
+                repo TEXT,
+                branch TEXT,
+                targets_json TEXT NOT NULL DEFAULT '[]',
+                risk TEXT NOT NULL DEFAULT 'medium',
+                side_effect TEXT NOT NULL DEFAULT 'none',
+                timestamp TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                UNIQUE(adapter_id, session_id, tool_call_id)
+            );
+
+            INSERT INTO action_log_new (
+                seq, adapter_id, session_id, agent_id, tool_call_id,
+                tool_name, host_action, arguments_json, result_json, result_text,
+                outcome, reasoning_text, conversation_id, turn_id, user_id,
+                workspace, repo, branch, targets_json, risk, side_effect,
+                timestamp, payload_json
+            )
+            SELECT
+                seq, adapter_id, session_id, agent_id, tool_call_id,
+                tool_name, host_action, arguments_json, result_json, result_text,
+                outcome, reasoning_text, conversation_id, turn_id, user_id,
+                workspace, repo, branch, targets_json, risk, side_effect,
+                timestamp, payload_json
+            FROM action_log;
+
+            DROP TABLE action_log;
+            ALTER TABLE action_log_new RENAME TO action_log;
+            """
+        )
+        rows = self.conn.execute("SELECT seq, payload_json FROM action_log").fetchall()
+        for row in rows:
+            payload = _load_json(row["payload_json"]) or {}
+            if not isinstance(payload, dict):
+                continue
+            payload.pop("task_id", None)
+            payload.pop("organization", None)
+            self.conn.execute(
+                "UPDATE action_log SET payload_json = ? WHERE seq = ?",
+                (_dump_json(payload), row["seq"]),
+            )
 
     def _ensure_validator_state_schema(self) -> None:
         if not self._table_exists("validator_states"):
@@ -495,9 +631,10 @@ class ContractStore:
                     id, text, kind, modality, strength, status, confidence,
                     effect, authority, source_json, scope_json, lifecycle_json, action_constraints_json,
                     semantics_json, tool_patterns_json, validity_json,
+                    dedup_fingerprint, pattern_surface_hash,
                     compiled_predicates_json, override_json, supersedes_json,
                     conflicts_with_json, payload_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     contract.id,
@@ -520,6 +657,8 @@ class ContractStore:
                     _dump_model(contract.semantics),
                     _dump_json([pattern.model_dump(mode="json") for pattern in contract.tool_patterns]),
                     _dump_model(contract.validity),
+                    contract_dedup_fingerprint(contract),
+                    contract_pattern_surface_hash(contract),
                     None,
                     _dump_model(contract.override),
                     _dump_json(contract.supersedes),
@@ -559,6 +698,46 @@ class ContractStore:
             return contracts
         return [contract for contract in contracts if not contract.is_expired()]
 
+    def find_contracts_by_dedup_keys(
+        self,
+        contract: Contract,
+        statuses: Iterable[ContractStatus] | None = None,
+    ) -> list[Contract]:
+        return self.find_contracts_by_surface_keys(
+            dedup_fingerprint=contract_dedup_fingerprint(contract),
+            pattern_surface_hash=contract_pattern_surface_hash(contract),
+            statuses=statuses,
+        )
+
+    def find_contracts_by_surface_keys(
+        self,
+        *,
+        dedup_fingerprint: str,
+        pattern_surface_hash: str,
+        statuses: Iterable[ContractStatus] | None = None,
+    ) -> list[Contract]:
+        values: list[Any] = [
+            dedup_fingerprint,
+            pattern_surface_hash,
+        ]
+        status_clause = ""
+        if statuses is not None:
+            status_values = [status.value for status in statuses]
+            placeholders = ",".join("?" for _ in status_values)
+            status_clause = f"AND status IN ({placeholders})"
+            values.extend(status_values)
+        rows = self.conn.execute(
+            f"""
+            SELECT *
+            FROM contracts
+            WHERE (dedup_fingerprint = ? OR pattern_surface_hash = ?)
+              {status_clause}
+            ORDER BY created_at, id
+            """,
+            values,
+        ).fetchall()
+        return [self._row_to_contract(row) for row in rows]
+
     def update_contract_status(self, contract_id: str, status: ContractStatus) -> None:
         with self.conn:
             self.conn.execute(
@@ -593,6 +772,40 @@ class ContractStore:
             values,
         ).fetchall()
         return [self._row_to_contract(row) for row in rows]
+
+    def search_contracts_ranked_text(
+        self,
+        query: str,
+        *,
+        statuses: Iterable[ContractStatus] | None = None,
+        limit: int = 10,
+    ) -> list[RankedContractSearchResult]:
+        values: list[Any] = [query, limit]
+        status_clause = ""
+        if statuses is not None:
+            status_values = [status.value for status in statuses]
+            placeholders = ",".join("?" for _ in status_values)
+            status_clause = f"AND c.status IN ({placeholders})"
+            values = [query, *status_values, limit]
+        rows = self.conn.execute(
+            f"""
+            SELECT c.*, bm25(contracts_fts) AS fts_rank
+            FROM contracts_fts f
+            JOIN contracts c ON c.id = f.contract_id
+            WHERE contracts_fts MATCH ?
+            {status_clause}
+            ORDER BY fts_rank, c.created_at DESC
+            LIMIT ?
+            """,
+            values,
+        ).fetchall()
+        return [
+            RankedContractSearchResult(
+                contract=self._row_to_contract(row),
+                rank=float(row["fts_rank"]),
+            )
+            for row in rows
+        ]
 
     def add_edge(self, edge: ContractEdge) -> ContractEdge:
         with self.conn:
@@ -889,17 +1102,16 @@ class ContractStore:
             self.conn.execute(
                 """
                 INSERT INTO action_log (
-                    adapter_id, session_id, task_id, agent_id, tool_call_id,
+                    adapter_id, session_id, agent_id, tool_call_id,
                     tool_name, host_action, arguments_json, result_json, result_text,
                     outcome, reasoning_text, conversation_id, turn_id, user_id,
-                    organization, workspace, repo, branch, targets_json, risk,
+                    workspace, repo, branch, targets_json, risk,
                     side_effect, timestamp, payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.adapter_id,
                     entry.session_id,
-                    entry.task_id,
                     entry.agent_id,
                     entry.tool_call_id,
                     entry.tool_name,
@@ -912,7 +1124,6 @@ class ContractStore:
                     entry.conversation_id,
                     entry.turn_id,
                     entry.user_id,
-                    entry.organization,
                     entry.workspace,
                     entry.repo,
                     entry.branch,
@@ -942,15 +1153,11 @@ class ContractStore:
         self,
         *,
         session_id: str,
-        task_id: str | None,
         where: dict[str, dict[str, Any]],
         limit: int,
     ) -> list[ActionLogEntryV1]:
         clauses = ["session_id = ?"]
         params: list[Any] = [session_id]
-        if task_id is not None:
-            clauses.append("task_id = ?")
-            params.append(task_id)
         for field, predicate in where.items():
             column = ACTION_LOG_SQL_COLUMNS.get(field)
             if column is None or "regex" in predicate:
@@ -1577,7 +1784,6 @@ class ContractStore:
             seq=row["seq"],
             timestamp=row["timestamp"],
             session_id=row["session_id"],
-            task_id=row["task_id"],
             agent_id=row["agent_id"],
             adapter_id=row["adapter_id"],
             tool_call_id=row["tool_call_id"],
@@ -1591,7 +1797,6 @@ class ContractStore:
             conversation_id=row["conversation_id"],
             turn_id=row["turn_id"],
             user_id=row["user_id"],
-            organization=row["organization"],
             workspace=row["workspace"],
             repo=row["repo"],
             branch=row["branch"],

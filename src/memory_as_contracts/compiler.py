@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from fnmatch import fnmatch
 
 from memory_as_contracts.grounding_cache import GroundingCache
 from memory_as_contracts.models import (
@@ -12,6 +11,7 @@ from memory_as_contracts.models import (
     RulePatternVersion,
     ToolPattern,
 )
+from memory_as_contracts.rule_surface import evaluate_rule_pattern_version
 
 
 class PolicyCompiler:
@@ -74,13 +74,7 @@ class PolicyCompiler:
         predicate: RulePatternVersion,
         signature: ActionSignature,
     ) -> MatchOutcome:
-        if not predicate.has_binding_predicates():
-            return MatchOutcome.NOT_MATCHED
-        return (
-            MatchOutcome.MATCHED
-            if any(_tool_pattern_matches(pattern, signature) for pattern in predicate.tool_patterns)
-            else MatchOutcome.NOT_MATCHED
-        )
+        return evaluate_rule_pattern_version(predicate, signature)
 
 
 def _path_hints(text: str, compiler: PolicyCompiler) -> list[str]:
@@ -111,58 +105,6 @@ def _selected_bare_file_target(text: str, pattern: re.Pattern[str]) -> str | Non
         return matches[0].group(0).rstrip(".,;:")
     after_trigger = [match for match in matches if match.start() >= trigger.start()]
     return (after_trigger[0] if after_trigger else matches[0]).group(0).rstrip(".,;:")
-
-
-def _tool_pattern_matches(pattern: ToolPattern, signature: ActionSignature) -> bool:
-    if pattern.tool != "*" and pattern.tool != signature.tool.name:
-        return False
-    return all(
-        _arg_pattern_matches(signature.tool.raw_arguments.get(key), matcher)
-        for key, matcher in pattern.args.items()
-    )
-
-
-def _arg_pattern_matches(value, matcher: ArgPattern) -> bool:
-    if matcher.is_empty():
-        return True
-    if value is None:
-        return False
-    text = str(value)
-    if matcher.equals is not None and value != matcher.equals:
-        return False
-    if matcher.contains is not None and matcher.contains not in text:
-        return False
-    if matcher.regex is not None:
-        try:
-            if re.search(matcher.regex, text) is None:
-                return False
-        except re.error:
-            return False
-    if matcher.path_glob is not None and not _path_value_matches(text, matcher.path_glob):
-        return False
-    if matcher.mentions_path_glob is not None and not _text_mentions_path_glob(
-        text, matcher.mentions_path_glob
-    ):
-        return False
-    return True
-
-
-def _path_value_matches(value: str, glob: str) -> bool:
-    if fnmatch(value, glob):
-        return True
-    if glob.startswith("**/") and fnmatch(value, glob.removeprefix("**/")):
-        return True
-    if "/" not in glob and (value == glob or value.endswith(f"/{glob}")):
-        return True
-    return False
-
-
-def _text_mentions_path_glob(text: str, glob: str) -> bool:
-    prefix = glob.split("*", 1)[0].rstrip("/")
-    if prefix and prefix in text:
-        return True
-    candidates = re.findall(r"[A-Za-z0-9_./-]+", text)
-    return any(_path_value_matches(candidate, glob) for candidate in candidates)
 
 
 def _ground_seed_patterns(

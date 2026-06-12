@@ -441,6 +441,7 @@ class BaseAdapter:
                 timezone=context.timezone,
                 now=context.current_time(),
             ),
+            session_id=context.session_id,
             conversation_id=context.conversation_id,
             turn_id=context.turn_id,
             tool_capsule_system_prompt=self.tool_capsule_system_prompt(),

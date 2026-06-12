@@ -1135,7 +1135,7 @@ def test_conflict_resolver_batch_splits_disjoint_components() -> None:
     )
     tests_new = file_rule(
         "MAC-tests-new",
-        text="Run pytest before changing tests/** files.",
+        text="Pytest must run before editing tests/** files.",
         kind=ContractKind.REQUIREMENT,
         modality=Modality.MUST,
         path_glob="tests/**",
@@ -1205,6 +1205,101 @@ def test_conflict_resolver_runs_explicit_dedup_before_general_relations() -> Non
     assert store.get_contract("MAC-existing").status == ContractStatus.SUPERSEDED
     assert store.get_contract("MAC-candidate").status == ContractStatus.ACTIVE
     assert store.list_edges()[0].relation == EdgeRelation.DUPLICATE
+
+
+def test_conflict_resolver_dedups_high_edit_similarity_with_matching_scope_and_type() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-existing"))
+    candidate = push_prohibition("MAC-candidate").model_copy(
+        update={
+            "text": "Do not push code changes to Git without approval.",
+            "semantics": RuleSemantics(),
+            "tool_patterns": [],
+        }
+    )
+
+    result = ConflictResolver(store).insert(candidate)
+
+    assert result.relation == EdgeRelation.DUPLICATE
+    assert store.get_contract("MAC-candidate").status == ContractStatus.REJECTED
+    assert store.list_edges()[0].relation == EdgeRelation.DUPLICATE
+
+
+def test_conflict_resolver_dedups_matching_operational_surface_without_llm() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-existing"))
+    candidate = push_prohibition("MAC-candidate").model_copy(
+        update={
+            "text": "Publishing repository changes is blocked until explicit approval.",
+        }
+    )
+
+    def relation_provider(_prompt: str) -> str:
+        raise AssertionError("matching operational surface dedup must not ask the LLM")
+
+    result = ConflictResolver(
+        store,
+        relation_response_provider=relation_provider,
+    ).insert(candidate)
+
+    assert result.relation == EdgeRelation.DUPLICATE
+    assert store.get_contract("MAC-candidate").status == ContractStatus.REJECTED
+    assert store.list_edges()[0].relation == EdgeRelation.DUPLICATE
+
+
+def test_conflict_resolver_does_not_llm_dedup_medium_edit_similarity() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-existing"))
+    candidate = push_prohibition("MAC-candidate").model_copy(
+        update={
+            "text": "Do not push code after tests fail.",
+            "semantics": RuleSemantics(),
+            "tool_patterns": [],
+        }
+    )
+
+    def relation_provider(_prompt: str) -> str:
+        raise AssertionError("medium edit-distance dedup must not ask the LLM")
+
+    result = ConflictResolver(store, relation_response_provider=relation_provider).insert(candidate)
+
+    assert result.relation == EdgeRelation.INDEPENDENT
+    assert store.get_contract("MAC-existing").status == ContractStatus.ACTIVE
+    assert store.get_contract("MAC-candidate").status == ContractStatus.ACTIVE
+    assert store.list_edges() == []
+
+
+def test_conflict_resolver_does_not_edit_dedup_when_scope_or_type_differs() -> None:
+    store = make_store()
+    store.add_contract(push_prohibition("MAC-existing"))
+    different_scope = push_prohibition("MAC-scope").model_copy(
+        update={
+            "text": "Do not push code changes to Git without approval.",
+            "scope": project_scope("/workspace/other"),
+            "semantics": RuleSemantics(),
+            "tool_patterns": [],
+        }
+    )
+    different_type = push_prohibition("MAC-type").model_copy(
+        update={
+            "text": "Do not push code changes to Git without approval.",
+            "kind": ContractKind.PREFERENCE,
+            "effect": RuleEffect.PREFER,
+            "modality": Modality.SHOULD,
+            "strength": Strength.SOFT,
+            "semantics": RuleSemantics(),
+            "tool_patterns": [],
+        }
+    )
+
+    scope_result = ConflictResolver(store).insert(different_scope)
+    type_result = ConflictResolver(store).insert(different_type)
+
+    assert scope_result.relation == EdgeRelation.INDEPENDENT
+    assert type_result.relation == EdgeRelation.INDEPENDENT
+    assert store.get_contract("MAC-scope").status == ContractStatus.ACTIVE
+    assert store.get_contract("MAC-type").status == ContractStatus.ACTIVE
+    assert store.list_edges() == []
 
 
 def test_conflict_resolver_does_not_merge_rules_with_different_enforcement_state() -> None:

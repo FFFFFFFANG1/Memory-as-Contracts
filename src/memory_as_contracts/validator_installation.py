@@ -95,7 +95,8 @@ class ValidatorSnippetVerifier:
             state_fields=contract.state_fields,
             status=PredicateStatus.REJECTED,
         )
-        log = ActionLogView(store, session_id=session_id, task_id=task_id)
+        del task_id
+        log = ActionLogView(store, session_id=session_id)
         initial_state = json.loads(json.dumps(parsed.initial_state))
         for pending in pending_examples:
             try:
@@ -414,12 +415,10 @@ class ValidatorInstaller:
         scope_key = validator_scope_key(
             contract,
             session_id=session_id,
-            task_id=task_id,
             workspace=workspace or contract.scope.workspace,
             repo=repo or contract.scope.repo,
             branch=branch,
             user_id=user_id or contract.scope.user_id,
-            organization=organization or contract.scope.organization,
         )
         store.install_verified_validator_version(
             version,

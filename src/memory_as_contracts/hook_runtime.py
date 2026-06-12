@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from typing import Any
 
+from memory_as_contracts.extraction_dedup import build_similar_rule_context
 from memory_as_contracts.extractor import LLMCallError
 from memory_as_contracts.gate import ActionGate, GateResult
 from memory_as_contracts.logging_config import log_event
@@ -183,10 +185,23 @@ class MacHookRuntime:
                 turn_count=len(pending),
             )
             try:
+                batch_text = _render_user_turn_batch(pending)
+                extraction_context = self.adapter._extraction_context(context)
+                similar_rule_context = build_similar_rule_context(
+                    store,
+                    batch_text,
+                    extraction_context,
+                    limit=5,
+                )
+                if similar_rule_context:
+                    extraction_context = replace(
+                        extraction_context,
+                        similar_rules_system_prompt=similar_rule_context,
+                    )
                 candidates = factory().extract_online_turn(
                     role="user",
-                    text=_render_user_turn_batch(pending),
-                    context=self.adapter._extraction_context(context),
+                    text=batch_text,
+                    context=extraction_context,
                 )
             except LLMCallError as exc:
                 error = exc.as_dict()
@@ -248,7 +263,6 @@ class MacHookRuntime:
         entry = ActionLogEntryV1(
             adapter_id=self.adapter.host,
             session_id=signature.session.session_id,
-            task_id=signature.session.task_id,
             agent_id=self.adapter.agent_name,
             tool_call_id=str(tool_call_id),
             tool_name=signature.tool.name,
@@ -262,7 +276,6 @@ class MacHookRuntime:
             conversation_id=context.conversation_id,
             turn_id=context.turn_id,
             user_id=context.user_id,
-            organization=context.organization,
             workspace=str(context.workspace_path()),
             repo=context.repo,
             branch=context.branch,
@@ -276,7 +289,6 @@ class MacHookRuntime:
             "action.committed",
             adapter=self.adapter.host,
             session_id=stored.session_id,
-            task_id=stored.task_id,
             tool_name=stored.tool_name,
             action_log_seq=stored.seq,
             outcome=stored.outcome.value,

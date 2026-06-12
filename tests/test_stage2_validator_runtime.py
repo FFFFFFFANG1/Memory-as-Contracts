@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 
 import pytest
@@ -31,6 +32,10 @@ from memory_as_contracts.models import (
 )
 from memory_as_contracts.signatures import ActionSignatureBuilder, SignatureContext
 from memory_as_contracts.store import ContractStore
+from memory_as_contracts.validator_dispatch import (
+    ValidatorDispatchPlanner,
+    validator_scope_key_for_signature,
+)
 from memory_as_contracts.validator_installation import ValidatorInstaller
 from memory_as_contracts.validators import ValidatorRuntime, ValidatorSandboxError
 
@@ -118,7 +123,6 @@ def committed_pytest_action() -> ActionLogEntryV1:
     return ActionLogEntryV1(
         adapter_id="codex",
         session_id="sess-1",
-        task_id="task-1",
         agent_id="codex",
         tool_call_id="call-test",
         tool_name="Bash",
@@ -295,7 +299,6 @@ def purchase_entry(tool_call_id: str, amount: float) -> ActionLogEntryV1:
     return ActionLogEntryV1(
         adapter_id="codex",
         session_id="sess-1",
-        task_id="task-1",
         agent_id="codex",
         tool_call_id=tool_call_id,
         tool_name="purchase",
@@ -363,6 +366,99 @@ def test_check_update_validator_updates_budget_state_and_blocks_overspend() -> N
     assert state.state["seen_entry_seqs"] == [1]
     assert result.decision.decision.value == "reject"
     assert "Budget would exceed" in result.decision.reason
+
+
+def test_check_update_validator_catches_up_missing_post_action_update_before_check() -> None:
+    store = make_store()
+    version = install_budget_validator(store)
+    store.add_action_log_entry(purchase_entry("missed-post-hook", 12.0))
+
+    result = ActionGate(store).gate(checkout_signature(85.0))
+    state = store.get_validator_state(version.id)
+
+    assert result.decision.decision.value == "reject"
+    assert "Budget would exceed" in result.decision.reason
+    assert state is not None
+    assert state.state["spent_cents"] == 1200
+    assert state.last_applied_seq == 1
+
+
+def test_validator_check_and_update_bindings_share_tool_pattern_semantics() -> None:
+    store = make_store()
+    pattern = ToolPattern(
+        tool="Bash",
+        args={"command": ArgPattern(mentions_path_glob="docs/**")},
+    )
+    contract = store.add_contract(
+        budget_contract().model_copy(
+            update={
+                "id": "MAC-doc-command",
+                "text": "Track documentation commands.",
+                "check_patterns": [pattern],
+                "update_patterns": [pattern],
+                "state_fields": ["matched"],
+            }
+        )
+    )
+    snippet = """
+def update(state, entry, log, context):
+    state["matched"] = True
+    return state
+
+def check(action, state, log, context):
+    return ask("Documentation command matched.")
+"""
+    signature = ActionSignatureBuilder().build(
+        tool_name="Bash",
+        raw_arguments={"command": "python scripts/touch docs/guide.md"},
+        context=SignatureContext(
+            session_id="sess-1",
+            task_id="task-1",
+            cwd="/workspace/project",
+            repo="project",
+            now=datetime(2026, 6, 6, 12, tzinfo=timezone.utc),
+        ),
+    )
+    version = ValidatorVersion(
+        id="VV-doc-command",
+        contract_id=contract.id,
+        enforcement_shape=ValidatorEnforcementShape.CHECK_UPDATE,
+        snippet=snippet,
+        check_patterns=[pattern],
+        update_patterns=[pattern],
+        state_fields=["matched"],
+        initial_state={"matched": False},
+        snippet_hash=hashlib.sha256(snippet.encode("utf-8")).hexdigest(),
+        verification_hash="verified",
+    )
+    scope_key = validator_scope_key_for_signature(contract, signature)
+    store.install_verified_validator_version(
+        version,
+        initial_state=version.initial_state,
+        scope_key=scope_key,
+    )
+    entry = ActionLogEntryV1(
+        adapter_id="codex",
+        session_id="sess-1",
+        agent_id="codex",
+        tool_call_id="call-doc-command",
+        tool_name="Bash",
+        host_action="exec",
+        arguments={"command": "python scripts/touch docs/guide.md"},
+        result_text="updated docs",
+        outcome=ActionOutcome.SUCCESS,
+        timestamp=datetime(2026, 6, 6, 12, tzinfo=timezone.utc),
+        workspace="/workspace/project",
+        repo="project",
+    )
+
+    gate_result = ActionGate(store).gate(signature)
+    dispatch_plan = ValidatorDispatchPlanner(store).for_version_entry(version, entry)
+
+    assert gate_result.decision.decision.value == "ask"
+    assert gate_result.receipt.validator_verdicts[0]["contract_id"] == contract.id
+    assert dispatch_plan is not None
+    assert dispatch_plan.scope_key == scope_key
 
 
 def test_validator_unknown_evidence_does_not_allow_high_risk_action() -> None:
@@ -821,7 +917,7 @@ def test_project_validator_state_accumulates_across_sessions_but_not_other_repos
     runtime.record_committed_action(purchase_entry("scope-a", 12.0))
     runtime.record_committed_action(
         purchase_entry("scope-b", 25.0).model_copy(
-            update={"session_id": "sess-2", "task_id": "task-2"}
+            update={"session_id": "sess-2"}
         )
     )
     runtime.record_committed_action(
@@ -851,12 +947,12 @@ def test_global_validator_state_accumulates_by_user_across_sessions() -> None:
     )
     runtime.record_committed_action(
         purchase_entry("global-b", 25.0).model_copy(
-            update={"session_id": "sess-2", "task_id": "task-2", "user_id": "user-1"}
+            update={"session_id": "sess-2", "user_id": "user-1"}
         )
     )
     runtime.record_committed_action(
         purchase_entry("global-c", 30.0).model_copy(
-            update={"session_id": "sess-3", "task_id": "task-3", "user_id": "user-2"}
+            update={"session_id": "sess-3", "user_id": "user-2"}
         )
     )
 
@@ -876,17 +972,34 @@ def test_session_validator_state_accumulates_across_tasks_but_not_sessions() -> 
     runtime = ValidatorRuntime(store)
 
     runtime.record_committed_action(purchase_entry("session-a", 12.0))
-    runtime.record_committed_action(
-        purchase_entry("session-b", 25.0).model_copy(update={"task_id": "task-2"})
-    )
+    runtime.record_committed_action(purchase_entry("session-b", 25.0))
     runtime.record_committed_action(
         purchase_entry("session-c", 30.0).model_copy(
-            update={"session_id": "sess-2", "task_id": "task-3"}
+            update={"session_id": "sess-2"}
         )
     )
 
     states = store.list_validator_states(version.id)
     assert sorted(state.state["spent_cents"] for state in states) == [3000, 3700]
+
+
+def test_per_turn_scope_validator_shares_state_between_install_and_post_action_updates() -> None:
+    store = make_store()
+    contract = budget_contract().model_copy(
+        update={
+            "id": "MAC-per-turn-budget",
+            "scope": Scope(level=ScopeLevel.PER_TURN),
+        }
+    )
+    version = install_budget_validator(store, contract=contract)
+    runtime = ValidatorRuntime(store)
+
+    runtime.record_committed_action(purchase_entry("turn-a", 12.0))
+    runtime.record_committed_action(purchase_entry("turn-b", 25.0))
+
+    states = store.list_validator_states(version.id)
+    assert len(states) == 1
+    assert states[0].state["spent_cents"] == 3700
 
 
 def test_action_log_idempotency_key_rejects_conflicting_payload() -> None:
@@ -1000,3 +1113,8 @@ def check(action, state, log, context):
     assert len(errors) == 1
     assert errors[0].replay_required is True
     assert "validator.state_degraded" in log_path.read_text(encoding="utf-8")
+
+    gate_result = ActionGate(store).gate(checkout_signature(1.0))
+
+    assert gate_result.decision.decision.value == "ask"
+    assert "stale or degraded" in gate_result.decision.reason

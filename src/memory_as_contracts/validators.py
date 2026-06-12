@@ -104,10 +104,24 @@ class ValidatorRuntime:
             raise ValueError(f"validator contract not found: {version.contract_id}")
         scope_key = validator_scope_key_for_signature(contract, signature)
         state = self.store.get_validator_state(version.id, scope_key)
+        if version.update_patterns:
+            state = self._catch_up_state(version, scope_key, state)
+        if state is not None and state.degraded:
+            return ValidatorVerdict(
+                decision=GateDecisionType.ASK,
+                reason=f"Validator state for rule {version.contract_id} is stale or degraded.",
+                evidence_refs=[
+                    {
+                        "validator_version_id": version.id,
+                        "scope_key": scope_key,
+                        "last_applied_seq": state.last_applied_seq,
+                    }
+                ],
+                confidence=0.0,
+            )
         log = ActionLogView(
             self.store,
             session_id=signature.session.session_id,
-            task_id=signature.session.task_id,
         )
         return self.runner.check(
             version,
@@ -122,6 +136,74 @@ class ValidatorRuntime:
                 "scope_key": scope_key,
             },
         )
+
+    def _catch_up_state(
+        self,
+        version: ValidatorVersion,
+        scope_key: str,
+        state: ValidatorState | None,
+    ) -> ValidatorState | None:
+        last_applied_seq = state.last_applied_seq if state is not None else None
+        plans = [
+            plan
+            for plan in self.dispatch.for_replay(version, scope_key=scope_key)
+            if plan.entry.seq is not None
+            and (last_applied_seq is None or plan.entry.seq > last_applied_seq)
+        ]
+        if not plans:
+            return state
+        current = state
+        for plan in plans:
+            try:
+                current = self.update(version, plan.entry, scope_key=scope_key)
+            except (ValidatorSandboxError, ValueError, RuntimeError) as exc:
+                current = self._mark_state_degraded(
+                    version,
+                    scope_key,
+                    current,
+                    phase="pre_action_catchup",
+                    action_log_seq=plan.entry.seq,
+                    error=exc,
+                )
+                break
+        return current
+
+    def _mark_state_degraded(
+        self,
+        version: ValidatorVersion,
+        scope_key: str,
+        state: ValidatorState | None,
+        *,
+        phase: str,
+        action_log_seq: int | None,
+        error: Exception,
+    ) -> ValidatorState:
+        degraded = ValidatorState(
+            validator_version_id=version.id,
+            scope_key=scope_key,
+            contract_id=version.contract_id,
+            state=state.state if state is not None else version.initial_state,
+            revision=state.revision if state is not None else 0,
+            last_applied_seq=state.last_applied_seq if state is not None else None,
+            degraded=True,
+        )
+        stored = self.store.put_validator_state(
+            degraded,
+            expected_revision=state.revision if state is not None else None,
+        )
+        self.store.add_validator_runtime_error(
+            ValidatorRuntimeErrorRecord(
+                validator_version_id=version.id,
+                contract_id=version.contract_id,
+                scope_key=scope_key,
+                phase=phase,
+                action_log_seq=action_log_seq,
+                error_type=error.__class__.__name__,
+                message=str(error),
+                replay_required=True,
+            )
+        )
+        return stored
 
     def update(
         self,
@@ -138,7 +220,7 @@ class ValidatorRuntime:
             and entry.seq <= state.last_applied_seq
         ):
             return state
-        log = ActionLogView(self.store, session_id=entry.session_id, task_id=entry.task_id)
+        log = ActionLogView(self.store, session_id=entry.session_id)
         new_state = self.runner.update(
             version,
             state=state.state if state is not None else version.initial_state,
@@ -197,7 +279,7 @@ class ValidatorRuntime:
         last_applied_seq = None
         for plan in self.dispatch.for_replay(version, scope_key=scope_key):
             entry = plan.entry
-            log = ActionLogView(self.store, session_id=entry.session_id, task_id=entry.task_id)
+            log = ActionLogView(self.store, session_id=entry.session_id)
             state = self.runner.update(
                 version,
                 state=state,

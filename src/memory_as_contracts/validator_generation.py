@@ -167,6 +167,10 @@ def build_validator_generator_prompt(
         "update_patterns": [pattern.model_dump(mode="json") for pattern in contract.update_patterns],
         "state_fields": list(contract.state_fields),
     }
+    relevant_tool_capsules = _filter_tool_capsules_for_enforcement(
+        tool_capsules,
+        patterns=[*contract.check_patterns, *contract.update_patterns],
+    )
     sections = [
         "You are generating a validator for Memory-as-Contracts v4.",
         "",
@@ -193,13 +197,13 @@ def build_validator_generator_prompt(
         _sandbox_capabilities_doc(),
         "",
         "TOOL CAPSULES",
-        _json([_dump_capsule(capsule) for capsule in tool_capsules]),
+        _json([_dump_capsule(capsule) for capsule in relevant_tool_capsules]),
         "",
         "MATCHED COMMITTED ACTION EXAMPLES",
-        _json([entry.model_dump(mode="json") for entry in committed_examples]),
+        _json([_compact_action_signature_example(entry) for entry in committed_examples]),
         "",
         "PENDING ACTION EXAMPLES",
-        _json(list(pending_examples)),
+        _pending_examples_doc(pending_examples),
         "",
             "TASK",
         (
@@ -238,14 +242,83 @@ def _preflight(
         return ValidatorSnippetPackage(status="needs_refinement", notes=["missing check patterns"])
     if shape == ValidatorEnforcementShape.CHECK_UPDATE and not contract.update_patterns:
         return ValidatorSnippetPackage(status="needs_refinement", notes=["missing update patterns"])
-    if not pending_examples:
-        return ValidatorSnippetPackage(status="needs_refinement", notes=["missing pending examples"])
     if shape == ValidatorEnforcementShape.CHECK_UPDATE and not committed_examples:
         return ValidatorSnippetPackage(
             status="needs_refinement",
             notes=["missing committed action examples"],
         )
     return None
+
+
+def _pending_examples_doc(pending_examples: Sequence[dict[str, Any]]) -> str:
+    if pending_examples:
+        return _json(list(pending_examples))
+    return (
+        "[]\n"
+        "No pending action examples were available. Generate the validator from the "
+        "immutable rule, enforcement plan, runtime value shapes, and tool capsules. "
+        "Infer possible action argument locations from the tool capsule schemas, and "
+        "write defensive checks that return ask when a required runtime field is "
+        "missing, null, or unparsable."
+    )
+
+
+def _filter_tool_capsules_for_enforcement(
+    tool_capsules: Sequence[Any],
+    *,
+    patterns: Sequence[ToolPattern],
+) -> list[Any]:
+    requested_tools = {pattern.tool for pattern in patterns if pattern.tool and pattern.tool != "*"}
+    if not requested_tools or any(pattern.tool == "*" for pattern in patterns):
+        return list(tool_capsules)
+    filtered = [
+        capsule
+        for capsule in tool_capsules
+        if _capsule_name(capsule) in requested_tools
+    ]
+    # If pattern tool names do not match any capsule, an empty TOOL CAPSULES
+    # section would leave the generator blind; fall back to the full set.
+    return filtered or list(tool_capsules)
+
+
+def _capsule_name(capsule: Any) -> str | None:
+    if hasattr(capsule, "name"):
+        return str(capsule.name)
+    if isinstance(capsule, dict) and capsule.get("name") is not None:
+        return str(capsule["name"])
+    return None
+
+
+def _compact_action_signature_example(entry: ActionLogEntryV1) -> dict[str, Any]:
+    return {
+        "seq": entry.seq,
+        "tool_call_id": entry.tool_call_id,
+        "tool_name": entry.tool_name,
+        "host_action": entry.host_action,
+        "arguments": _compact_arguments(entry.arguments),
+        "targets": entry.targets,
+        "risk": entry.risk.value,
+        "side_effect": entry.side_effect.value,
+    }
+
+
+def _compact_arguments(arguments: Any) -> Any:
+    if not isinstance(arguments, dict):
+        return arguments
+    blocked = {"prompt", "observation", "metadata", "turn_session_id"}
+    compact: dict[str, Any] = {}
+    for key, value in arguments.items():
+        if key in blocked:
+            continue
+        if key == "normalized_action" and isinstance(value, dict):
+            compact[key] = {
+                nested_key: nested_value
+                for nested_key, nested_value in value.items()
+                if nested_key not in {"prompt", "observation", "metadata"}
+            }
+            continue
+        compact[key] = value
+    return compact
 
 
 def _with_default_initial_state(
@@ -278,9 +351,10 @@ def matched_action_examples(
     *,
     patterns: Sequence[ToolPattern],
     session_id: str,
-    task_id: str | None,
     limit_per_tool: int,
+    task_id: str | None = None,
 ) -> list[ActionLogEntryV1]:
+    del task_id
     tool_names = {pattern.tool for pattern in patterns if pattern.tool and pattern.tool != "*"}
     wildcard = any(pattern.tool == "*" for pattern in patterns)
     counts: dict[str, int] = {}
@@ -292,8 +366,6 @@ def matched_action_examples(
     )
     for entry in ordered_entries:
         if entry.session_id != session_id:
-            continue
-        if task_id is not None and entry.task_id != task_id:
             continue
         if not wildcard and entry.tool_name not in tool_names:
             continue
@@ -434,7 +506,7 @@ def _action_log_schema_doc() -> str:
             "ActionLogEntryV1 fields:",
             "- seq: committed action order, integer",
             "- timestamp: ISO datetime",
-            "- session_id, task_id, agent_id, adapter_id",
+            "- session_id, agent_id, adapter_id",
             "- tool_call_id, tool_name, host_action",
             "- arguments: raw assistant tool-call arguments",
             "- result: structured tool result when available",
@@ -528,6 +600,8 @@ def _verdict_api_doc() -> str:
 
 
 def _dump_capsule(capsule: Any) -> Any:
+    if hasattr(capsule, "as_dict"):
+        return capsule.as_dict()
     if hasattr(capsule, "model_dump"):
         return capsule.model_dump(mode="json")
     if isinstance(capsule, dict):

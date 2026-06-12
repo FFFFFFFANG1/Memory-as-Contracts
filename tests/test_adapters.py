@@ -542,6 +542,146 @@ def test_adapter_extracts_and_stores_rules_every_ten_user_turns(
     assert store.get_contract("MAC-periodic") is not None
 
 
+def test_periodic_extraction_receives_similar_rule_context(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    codex_home = tmp_path / "codex_home"
+    codex_home.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    store = make_store()
+    install_pattern_contract(store, push_prohibition(workspace))
+    extractor = RecordingExtractor()
+    adapter = CodexAdapter(online_extractor_factory=lambda: extractor)
+
+    for index in range(1, 10):
+        adapter.handle_user_prompt_submit(
+            store,
+            f"noise turn {index}: please continue the current task.",
+            context(workspace, turn_id=f"turn-{index}"),
+        )
+    adapter.handle_user_prompt_submit(
+        store,
+        (
+            "We need to finish this task. [SEP] For this project, never run git push "
+            "unless I approve it first."
+        ),
+        context(workspace, turn_id="turn-10"),
+    )
+
+    assert len(extractor.calls) == 1
+    similar_context = extractor.calls[0]["context"].similar_rules_system_prompt
+    assert similar_context is not None
+    assert "Existing similar rules" in similar_context
+    assert "Do not push any code changes to Git before asking me." in similar_context
+
+
+def test_periodic_extraction_filters_similar_rules_by_user_and_session_only(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    codex_home = tmp_path / "codex_home"
+    codex_home.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    store = make_store()
+    cross_workspace = push_prohibition(workspace).model_copy(
+        update={
+            "id": "MAC-cross-workspace",
+            "text": "Do not run git push unless I approve the release.",
+            "scope": Scope(
+                level=ScopeLevel.PROJECT,
+                workspace="/different/workspace",
+                repo="other-repo",
+            ),
+        }
+    )
+    other_user = push_prohibition(workspace).model_copy(
+        update={
+            "id": "MAC-other-user",
+            "text": "Do not run git push for another user's branch.",
+            "scope": Scope(
+                level=ScopeLevel.GLOBAL,
+                user_id="other-user",
+            ),
+        }
+    )
+    other_session = push_prohibition(workspace).model_copy(
+        update={
+            "id": "MAC-other-session",
+            "text": "Do not run git push during the old session.",
+            "source": push_prohibition(workspace).source.model_copy(
+                update={"metadata": {"session_id": "old-session"}}
+            ),
+        }
+    )
+    store.add_contract(cross_workspace)
+    store.add_contract(other_user)
+    store.add_contract(other_session)
+    extractor = RecordingExtractor()
+    adapter = CodexAdapter(online_extractor_factory=lambda: extractor)
+
+    for index in range(1, 10):
+        adapter.handle_user_prompt_submit(
+            store,
+            f"noise turn {index}: please continue the current task.",
+            context(workspace, turn_id=f"turn-{index}", user_id="user-1"),
+        )
+    adapter.handle_user_prompt_submit(
+        store,
+        "For this project, never run git push unless I approve it first.",
+        context(workspace, turn_id="turn-10", user_id="user-1"),
+    )
+
+    similar_context = extractor.calls[0]["context"].similar_rules_system_prompt
+    assert similar_context is not None
+    assert "Do not run git push unless I approve the release." in similar_context
+    assert "another user's branch" not in similar_context
+    assert "old session" not in similar_context
+
+
+def test_periodic_extraction_limits_similar_rule_context_to_top_five(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    codex_home = tmp_path / "codex_home"
+    codex_home.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    store = make_store()
+    for index in range(1, 7):
+        store.add_contract(
+            push_prohibition(workspace).model_copy(
+                update={
+                    "id": f"MAC-similar-{index}",
+                    "text": f"Do not run git push unless approval rule {index}.",
+                }
+            )
+        )
+    extractor = RecordingExtractor()
+    adapter = CodexAdapter(online_extractor_factory=lambda: extractor)
+
+    for index in range(1, 10):
+        adapter.handle_user_prompt_submit(
+            store,
+            f"noise turn {index}: please continue the current task.",
+            context(workspace, turn_id=f"turn-{index}"),
+        )
+    adapter.handle_user_prompt_submit(
+        store,
+        "For this project, never run git push unless I approve it first.",
+        context(workspace, turn_id="turn-10"),
+    )
+
+    similar_context = extractor.calls[0]["context"].similar_rules_system_prompt
+    assert similar_context is not None
+    assert similar_context.count("Do not run git push unless approval rule") == 5
+
+
 def test_periodic_extraction_provisions_validator_for_accepted_contract(
     tmp_path: Path,
     monkeypatch,

@@ -574,7 +574,6 @@ def run_validator_check_only(trace: dict[str, Any]) -> dict[str, Any]:
         ActionLogEntryV1(
             adapter_id="codex",
             session_id="sess-1",
-            task_id="task-1",
             agent_id="codex",
             tool_call_id="test-run-1",
             tool_name="Bash",
@@ -610,7 +609,6 @@ def run_validator_budget(trace: dict[str, Any]) -> dict[str, Any]:
         ActionLogEntryV1(
             adapter_id="codex",
             session_id="sess-1",
-            task_id="task-1",
             agent_id="codex",
             tool_call_id=f"generator-example-{i}",
             tool_name=action["tool_name"],
@@ -647,7 +645,6 @@ def run_validator_budget(trace: dict[str, Any]) -> dict[str, Any]:
         entry = ActionLogEntryV1(
             adapter_id="codex",
             session_id="sess-1",
-            task_id="task-1",
             agent_id="codex",
             tool_call_id=f"purchase-{i}",
             tool_name=action["tool_name"],

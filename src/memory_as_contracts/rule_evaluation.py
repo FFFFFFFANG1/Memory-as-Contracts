@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from memory_as_contracts.compiler import PolicyCompiler
 from memory_as_contracts.matching import (
     contract_applies_to_signature,
     edge_applies_to_signature,
@@ -17,8 +16,12 @@ from memory_as_contracts.models import (
     GateDecisionType,
     MatchOutcome,
     RuleEffect,
-    RulePatternVersion,
     ValidatorEnforcementShape,
+)
+from memory_as_contracts.rule_surface import (
+    bind_contract_check_patterns,
+    bind_tool_patterns,
+    bind_validator_check,
 )
 from memory_as_contracts.store import ContractStore
 from memory_as_contracts.validators import ValidatorRuntime, ValidatorSandboxError
@@ -45,11 +48,11 @@ class RuleEvaluator:
         self,
         store: ContractStore,
         *,
-        compiler: PolicyCompiler | None = None,
+        compiler: object | None = None,
         validator_runtime: ValidatorRuntime | None = None,
     ) -> None:
+        del compiler
         self.store = store
-        self.compiler = compiler or PolicyCompiler()
         self.validator_runtime = validator_runtime or ValidatorRuntime(store)
         self.active_edges = store.list_edges([ContractStatus.ACTIVE])
         self._contract_cache: dict[str, Contract | None] = {}
@@ -79,19 +82,15 @@ class RuleEvaluator:
 
         validator_version = self.store.get_active_validator_version(contract.id)
         if validator_version is not None:
-            check_pattern = RulePatternVersion(
-                contract_id=contract.id,
-                tool_patterns=validator_version.check_patterns,
-            )
-            if not check_pattern.has_binding_predicates():
+            if not validator_version.check_patterns:
                 return self._ignored(contract, "missing_validator_check_pattern")
-            outcome = self.compiler.evaluate(check_pattern, signature)
-            if outcome == MatchOutcome.NOT_MATCHED:
+            binding = bind_validator_check(contract, validator_version, signature)
+            if not binding.matched:
                 return self._ignored(contract, "validator_not_matched")
             response = self._ask_response_evaluation(
                 contract,
                 validator_version.id,
-                outcome,
+                binding.outcome,
                 ask_response,
             )
             if response is not None:
@@ -108,7 +107,7 @@ class RuleEvaluator:
                     contract_id=contract.id,
                     decision=GateDecisionType.ASK,
                     reason=f"Validator for rule {contract.id} could not be evaluated.",
-                    match_outcome=outcome,
+                    match_outcome=binding.outcome,
                     used=True,
                     validator_verdicts=(
                         {
@@ -127,7 +126,7 @@ class RuleEvaluator:
                 contract_id=contract.id,
                 decision=verdict.decision,
                 reason=verdict.reason,
-                match_outcome=outcome,
+                match_outcome=binding.outcome,
                 used=True,
                 validator_verdicts=(
                     {
@@ -147,19 +146,15 @@ class RuleEvaluator:
             )
 
         if contract.validator_enforcement_shape != ValidatorEnforcementShape.NO_VALIDATOR:
-            check_pattern = RulePatternVersion(
-                contract_id=contract.id,
-                tool_patterns=contract.check_patterns,
-            )
-            if not check_pattern.has_binding_predicates():
+            if not contract.check_patterns:
                 return self._ignored(contract, "validator_needs_refinement")
-            outcome = self.compiler.evaluate(check_pattern, signature)
-            if outcome == MatchOutcome.NOT_MATCHED:
+            binding = bind_contract_check_patterns(contract, signature)
+            if not binding.matched:
                 return self._ignored(contract, "validator_not_matched")
             response = self._ask_response_evaluation(
                 contract,
                 None,
-                outcome,
+                binding.outcome,
                 ask_response,
             )
             if response is not None:
@@ -168,7 +163,7 @@ class RuleEvaluator:
                 contract_id=contract.id,
                 decision=GateDecisionType.ASK,
                 reason=f"Rule {contract.id} requires a validator that is not available.",
-                match_outcome=outcome,
+                match_outcome=binding.outcome,
                 used=True,
                 validator_verdicts=(
                     {
@@ -186,13 +181,13 @@ class RuleEvaluator:
         pattern_version = self._active_pattern_version(contract)
         if pattern_version is None:
             return self._ignored(contract, "missing_tool_pattern")
-        outcome = self.compiler.evaluate(pattern_version, signature)
-        if outcome == MatchOutcome.NOT_MATCHED:
+        binding = bind_tool_patterns(contract, signature, pattern_version.tool_patterns)
+        if not binding.matched:
             return self._ignored(contract, "predicate_not_matched")
         response = self._ask_response_evaluation(
             contract,
             None,
-            outcome,
+            binding.outcome,
             ask_response,
         )
         if response is not None:
@@ -203,7 +198,7 @@ class RuleEvaluator:
                 contract_id=contract.id,
                 decision=GateDecisionType.ASK,
                 reason=_intervention_hint(contract),
-                match_outcome=outcome,
+                match_outcome=binding.outcome,
                 used=True,
                 edges_applied=edges_applied,
                 ask_rule_ids=(contract.id,),
@@ -222,7 +217,7 @@ class RuleEvaluator:
                 if decision != GateDecisionType.ALLOW
                 else f"matched non-blocking contract {contract.id}"
             ),
-            match_outcome=outcome,
+            match_outcome=binding.outcome,
             used=True,
             edges_applied=edges_applied,
         )
@@ -315,10 +310,11 @@ class RuleEvaluator:
             )
             if exception_pattern_version is None:
                 continue
-            if (
-                self.compiler.evaluate(exception_pattern_version, signature)
-                != MatchOutcome.MATCHED
-            ):
+            if not bind_tool_patterns(
+                exception_contract,
+                signature,
+                exception_pattern_version.tool_patterns,
+            ).matched:
                 continue
             if _exception_can_cover_contract(exception_contract, contract):
                 return True

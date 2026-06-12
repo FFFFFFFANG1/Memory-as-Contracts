@@ -26,6 +26,10 @@ from memory_as_contracts.models import (
     Strength,
     ToolPattern,
 )
+from memory_as_contracts.rule_surface import (
+    contract_dedup_fingerprint,
+    contract_pattern_surface_hash,
+)
 from memory_as_contracts.store import ContractStore
 
 
@@ -124,7 +128,7 @@ def test_fts_search_uses_contract_text() -> None:
     assert [contract.id for contract in results] == ["MAC-test"]
 
 
-def test_store_uses_schema_v9_without_targets_or_refinement_queue_tables() -> None:
+def test_store_uses_schema_v11_with_dedup_keys_without_legacy_tables() -> None:
     store = make_store()
     contract = store.add_contract(make_contract())
 
@@ -155,7 +159,7 @@ def test_store_uses_schema_v9_without_targets_or_refinement_queue_tables() -> No
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'action_log'"
     ).fetchone()
 
-    assert schema_version == 9
+    assert schema_version == 11
     assert action_log_table is not None
     assert {
         "effect",
@@ -163,6 +167,8 @@ def test_store_uses_schema_v9_without_targets_or_refinement_queue_tables() -> No
         "semantics_json",
         "tool_patterns_json",
         "validity_json",
+        "dedup_fingerprint",
+        "pattern_surface_hash",
     } <= columns
     assert "targets_json" not in columns
     assert "action_constraints" not in payload
@@ -188,7 +194,19 @@ def test_store_uses_schema_v9_without_targets_or_refinement_queue_tables() -> No
         )
 
 
-def test_schema_v6_validator_state_migrates_to_scoped_v9_state(tmp_path) -> None:
+def test_store_queries_contracts_by_kernel_surface_keys() -> None:
+    store = make_store()
+    contract = store.add_contract(make_contract())
+
+    matches = store.find_contracts_by_surface_keys(
+        dedup_fingerprint=contract_dedup_fingerprint(contract),
+        pattern_surface_hash=contract_pattern_surface_hash(contract),
+    )
+
+    assert [match.id for match in matches] == [contract.id]
+
+
+def test_schema_v6_validator_state_migrates_to_scoped_v10_state(tmp_path) -> None:
     path = tmp_path / "mac-v6.sqlite3"
     conn = sqlite3.connect(path)
     conn.executescript(
@@ -232,4 +250,4 @@ def test_schema_v6_validator_state_migrates_to_scoped_v9_state(tmp_path) -> None
     assert state.scope_key == "legacy"
     assert state.state == {"count": 1}
     assert state.revision == 0
-    assert store.conn.execute("SELECT version FROM schema_version").fetchone()["version"] == 9
+    assert store.conn.execute("SELECT version FROM schema_version").fetchone()["version"] == 11

@@ -73,7 +73,6 @@ def purchase_entry() -> ActionLogEntryV1:
     return ActionLogEntryV1(
         adapter_id="codex",
         session_id="sess-1",
-        task_id="task-1",
         agent_id="codex",
         tool_call_id="call-purchase-1",
         tool_name="purchase",
@@ -111,7 +110,6 @@ def pytest_entry() -> ActionLogEntryV1:
     return ActionLogEntryV1(
         adapter_id="codex",
         session_id="sess-1",
-        task_id="task-1",
         agent_id="codex",
         tool_call_id="call-pytest-1",
         tool_name="Bash",
@@ -155,7 +153,19 @@ def test_matched_action_examples_prefers_recent_entries_per_tool() -> None:
 def test_validator_generator_prompt_includes_shapes_apis_and_examples() -> None:
     store = make_store()
     contract = budget_contract()
-    store.add_action_log_entry(purchase_entry())
+    store.add_action_log_entry(
+        purchase_entry().model_copy(
+            update={
+                "arguments": {
+                    "item": "domain",
+                    "price": "$12.00",
+                    "prompt": "large prompt must not be included",
+                    "observation": "large observation must not be included",
+                    "metadata": {"debug": "must not be included"},
+                }
+            }
+        )
+    )
     seen: dict[str, str] = {}
 
     def response_provider(prompt: str) -> str:
@@ -181,7 +191,7 @@ def test_validator_generator_prompt_includes_shapes_apis_and_examples() -> None:
                 "arguments": {"items": [{"name": "hosting", "amount": 85.0}]},
             }
         ],
-        tool_capsules=[{"name": "checkout"}, {"name": "purchase"}],
+        tool_capsules=[{"name": "checkout"}, {"name": "purchase"}, {"name": "irrelevant_tool"}],
     )
 
     prompt = seen["prompt"]
@@ -193,10 +203,26 @@ def test_validator_generator_prompt_includes_shapes_apis_and_examples() -> None:
     assert "log.search(spec)" in prompt
     assert "VERDICT API" in prompt
     assert "MATCHED COMMITTED ACTION EXAMPLES" in prompt
-    assert "Purchased domain for $12.00" in prompt
+    assert '"price": "$12.00"' in prompt
+    assert "Purchased domain for $12.00" not in prompt
+    assert "large prompt must not be included" not in prompt
+    assert "large observation must not be included" not in prompt
+    assert "irrelevant_tool" not in prompt
     assert "PENDING ACTION EXAMPLES" in prompt
     assert "Do not hard-code literal values" in prompt
     assert "required argument or target is missing" in prompt
+
+
+def test_validator_prompt_falls_back_to_all_capsules_when_no_names_match_patterns() -> None:
+    prompt = build_validator_generator_prompt(
+        budget_contract(),
+        committed_examples=[],
+        pending_examples=[],
+        tool_capsules=[{"name": "webshop_step"}, {"name": "env.step"}],
+    )
+
+    assert "webshop_step" in prompt
+    assert "env.step" in prompt
 
 
 def test_validator_generator_prompt_defines_runtime_values_as_dicts() -> None:
@@ -289,25 +315,34 @@ def test_validator_sandbox_supports_documented_format_builtin() -> None:
     assert result.accepted, result.errors
 
 
-def test_validator_generator_needs_refinement_when_examples_are_missing() -> None:
-    called = False
+def test_validator_generator_uses_tool_capsules_when_pending_examples_are_missing() -> None:
+    store = make_store()
+    store.add_action_log_entry(purchase_entry())
+    seen: dict[str, str] = {}
 
     def response_provider(prompt: str) -> str:
-        nonlocal called
-        called = True
-        return "{}"
+        seen["prompt"] = prompt
+        return """
+        {
+          "status": "ready",
+          "initial_state": {"spent_cents": 0},
+          "snippet": "def update(state, entry, log, context):\\n    return state\\ndef check(action, state, log, context):\\n    return ask('need runtime fields')",
+          "notes": []
+        }
+        """
 
     package = ValidatorSnippetGenerator(response_provider).generate(
         budget_contract(),
-        store=make_store(),
+        store=store,
         session_id="sess-1",
         task_id="task-1",
         pending_examples=[],
         tool_capsules=[{"name": "checkout"}],
     )
 
-    assert package.status == "needs_refinement"
-    assert called is False
+    assert package.status == "ready"
+    assert "No pending action examples were available" in seen["prompt"]
+    assert "tool capsules" in seen["prompt"]
 
 
 def test_validator_generator_retries_with_verifier_feedback() -> None:

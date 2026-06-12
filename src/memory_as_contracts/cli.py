@@ -83,14 +83,13 @@ def action_log(limit: int = typer.Option(50, min=1, max=1000)) -> None:
 def search_actions(
     session_id: str = typer.Option(...),
     spec_json: str = typer.Option(..., "--spec-json"),
-    task_id: str | None = typer.Option(None),
 ) -> None:
     """Execute the production ActionLog search translator."""
 
     store = _open_store()
     try:
         spec = json.loads(spec_json)
-        rows = ActionLogView(store, session_id=session_id, task_id=task_id).search(spec)
+        rows = ActionLogView(store, session_id=session_id).search(spec)
         _echo_json(rows)
     finally:
         store.close()

@@ -137,9 +137,11 @@ ColdStartPromptBuilder = Callable[[str, SourceKind], str]
 @dataclass(frozen=True)
 class ExtractionContext:
     normalization: NormalizationContext
+    session_id: str | None = None
     conversation_id: str | None = None
     turn_id: str | None = None
     tool_capsule_system_prompt: str | None = None
+    similar_rules_system_prompt: str | None = None
 
 
 class HeuristicContractExtractor:
@@ -214,6 +216,7 @@ class HeuristicContractExtractor:
                 span=sentence,
                 path=path,
                 fingerprint=fingerprint,
+                metadata=_source_metadata(context) if source_kind == SourceKind.USER_TURN else {},
                 created_at=context.normalization.current_time(),
             )
             scope = self.scope_normalizer.normalize(sentence, context.normalization)
@@ -482,6 +485,7 @@ class CandidateJsonContractExtractor:
                 span=str(item.get("source_span") or contract_text),
                 path=path,
                 fingerprint=fingerprint,
+                metadata=_source_metadata(context) if source_kind == SourceKind.USER_TURN else {},
                 created_at=context.normalization.current_time(),
             )
             contracts.append(
@@ -908,7 +912,7 @@ Rules:
 - Return the final internally consistent contract set for this source. Merge duplicate restatements that impose the same behavior and scope, keeping the clearest and most complete version.
 - When this source contains incompatible instructions for the same scope and semantic action, treat the later explicit instruction as the final version and emit only the final effective version. Do not keep the superseded local version.
 - A concrete narrower allowance is an exception rather than an unresolved conflict. Emit both the broader rule and the narrower exception so the Conflict Resolver can create the scoped edge.
-- Do not compare against stored similar rules. They are intentionally absent from this extractor prompt; cross-source and historical deduplication/conflict resolution happens after extraction.
+- When existing similar rules are provided in the system prompt, use them only to avoid re-emitting duplicates. Cross-source and historical relation resolution still happens after extraction.
 - Before returning, perform a source-coverage check: every explicit durable prohibition, requirement, concrete exception, and future-facing preference must either appear in the contracts array or be intentionally omitted because it cannot be grounded to an available tool surface.
 - For hook matching, tool is exact native tool name. Parameter constraints match raw tool argument strings.
     Example: for Claude Code Bash git push, use {{"tool":"Bash","args":{{"command":{{"regex":"^git\\\\s+push(\\\\s|$)"}}}}}}.
@@ -922,9 +926,19 @@ Source text:
 
 
 def _system_prompt_for_context(context: ExtractionContext) -> str:
-    if not context.tool_capsule_system_prompt:
-        return CONTRACT_EXTRACTION_SYSTEM_PROMPT
-    return f"{CONTRACT_EXTRACTION_SYSTEM_PROMPT}\n\n{context.tool_capsule_system_prompt}"
+    parts = [CONTRACT_EXTRACTION_SYSTEM_PROMPT]
+    if context.tool_capsule_system_prompt:
+        parts.append(context.tool_capsule_system_prompt)
+    if context.similar_rules_system_prompt:
+        parts.append(context.similar_rules_system_prompt)
+    return "\n\n".join(parts)
+
+
+def _source_metadata(context: ExtractionContext) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    if context.session_id:
+        metadata["session_id"] = context.session_id
+    return metadata
 
 
 def _call_response_provider(
