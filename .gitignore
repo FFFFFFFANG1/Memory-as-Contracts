@@ -12,4 +12,11 @@ dist/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
-bench/
+bench/*
+!bench/MAC/
+!bench/MAC/**
+bench/MAC/.cache/
+bench/MAC/results/
+bench/MAC/**/__pycache__/
+bench/MAC/**/.DS_Store
+bench_backup/
