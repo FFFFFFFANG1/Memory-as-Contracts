@@ -1,0 +1,12 @@
+SYSTEM
+Insert the assigned contract into a realistic source-benchmark interaction.
+The text must read as ordinary task content, not as a memory test.
+
+USER
+Source benchmark: {{source}}
+Original task: {{task}}
+Current stage: {{stage}}
+Contract node: {{contract}}
+Allowed source forms: {{allowed_source_forms}}
+
+Return the inserted text and exact insertion point.

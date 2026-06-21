@@ -1,0 +1,108 @@
+SYSTEM
+You build scalable SCBench benchmark preparation artifacts.
+Return JSON only. Do not solve the coding task.
+
+USER
+Given one SCBench problem, produce:
+
+1. A bounded cumulative task decomposition.
+2. One hidden behavioral contract graph with 3-6 nodes and 1-3 relation edges.
+3. Rule-to-task links proving every contract is grounded in the source task.
+
+Validation requirements:
+- Do not change the original task boundary.
+- Every checkpoint must be represented by at least one subtask and at least one
+  requirement coverage item.
+- Every requirement_ref must be an exact substring from the checkpoint text.
+- Contract relations must be explicit; do not rely on recency as a conflict
+  resolver.
+- Every contract must link to at least one subtask and one source requirement.
+- Contract graph nodes must use exactly these fields:
+  id, surface_text, modality, action_predicate, scope, lifecycle,
+  source_turn_ids, directness.
+- Allowed modalities: must, must_not, may, prefer, ask_before.
+- action_predicate must include family and may include object, target, effect,
+  attributes. Use coding action families only, such as code.edit, code.read,
+  test.run, dependency.add, command.execute, git.commit, git.push, user.ask.
+- lifecycle must include effective_from_event and may include
+  effective_until_event, until_revoked, revoked_at_event.
+- source_turn_ids should point to checkpoint ids or inserted source turn ids
+  available before the rule is active.
+- Contract graph edges must use exactly these fields: id, type, source, target,
+  surface_text.
+- Allowed edge types: exception_to, overrides, supersedes, refines,
+  conflicts_with, independent. Do not invent edge types such as requires.
+
+Return this JSON shape:
+{
+  "task_id": "...",
+  "decomposition": {
+    "source_task_id": "...",
+    "subtasks": [
+      {
+        "id": "S01",
+        "title": "...",
+        "objective": "...",
+        "source_checkpoint_ids": ["checkpoint_1"],
+        "requirements": ["..."],
+        "acceptance_tests": ["tests/test_checkpoint_1.py"],
+        "depends_on": [],
+        "scope": {"component": "..."}
+      }
+    ],
+    "requirement_coverage": [
+      {
+        "checkpoint_id": "checkpoint_1",
+        "requirement_ref": "exact substring from checkpoint text",
+        "covered_by_subtask_ids": ["S01"]
+      }
+    ],
+    "notes": "..."
+  },
+  "contract_graph": {
+    "graph_id": "...",
+    "nodes": [
+      {
+        "id": "C01",
+        "surface_text": "...",
+        "modality": "must_not",
+        "action_predicate": {
+          "family": "code.edit",
+          "object": "public_error_code",
+          "target": null,
+          "effect": null,
+          "attributes": {}
+        },
+        "scope": {"component": "..."},
+        "lifecycle": {
+          "effective_from_event": 1,
+          "effective_until_event": null,
+          "until_revoked": true,
+          "revoked_at_event": null
+        },
+        "source_turn_ids": ["checkpoint_1"],
+        "directness": "embedded"
+      }
+    ],
+    "edges": [
+      {
+        "id": "E01",
+        "type": "exception_to",
+        "source": "C02",
+        "target": "C01",
+        "surface_text": "..."
+      }
+    ]
+  },
+  "rule_task_links": [
+    {
+      "contract_id": "C01",
+      "subtask_ids": ["S01"],
+      "requirement_refs": ["exact substring from checkpoint text"],
+      "rationale": "..."
+    }
+  ]
+}
+
+SCBench problem:
+{{task_json}}

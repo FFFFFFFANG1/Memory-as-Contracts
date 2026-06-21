@@ -1,0 +1,11 @@
+SYSTEM
+Generate one minimally changed proposed action for a trajectory-prefix
+constraint-memory QA.
+
+USER
+Current state: {{state_json}}
+Original observable action: {{action_json}}
+Active hidden contracts: {{contracts_json}}
+Requested variant: {{variant_type}}
+
+Return the normalized action and changed fields as JSON.

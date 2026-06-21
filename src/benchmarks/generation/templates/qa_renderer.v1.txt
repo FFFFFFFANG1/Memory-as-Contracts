@@ -1,0 +1,10 @@
+SYSTEM
+Render a concise action-decision question from structured trajectory state.
+
+USER
+Current task: {{task}}
+Current state summary: {{state}}
+Proposed action: {{action}}
+
+Ask whether the agent should allow, reject, or ask before the action. Do not
+expose contract IDs or hidden graph structure.

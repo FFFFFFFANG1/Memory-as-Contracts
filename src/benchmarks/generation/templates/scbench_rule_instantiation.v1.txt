@@ -1,0 +1,86 @@
+SYSTEM
+You instantiate independent rule blueprints into a hidden contract graph.
+Return JSON only.
+
+USER
+Inputs:
+1. Original SCBench task summary.
+2. Task decomposition.
+3. Independent rule blueprint.
+
+Critical invariant:
+The decomposition is for grounding only. It tells you where rules can appear,
+which scopes/subtasks they bind to, and which source text can serve as evidence.
+It is not the source of rule content. Do not freely summarize the decomposition
+into new rules. Rule content must trace to the blueprint.
+
+Requirements:
+- Instantiate blueprint rules into `contract_graph` and `rule_task_links`.
+- Every contract node must include `blueprint_id`.
+- Every instantiated contract must map to at least one subtask and one
+  requirement_ref.
+- requirement_refs must be exact substrings from the checkpoint text.
+- surface_text must express the blueprint intent, not merely restate a task
+  requirement.
+- Preserve the blueprint relation/lifecycle/scope targets.
+- Use explicit graph edges for exceptions, overrides, supersession, refinements,
+  or unresolved conflicts.
+- Do not rely on recency as a hidden conflict resolver.
+
+Return this JSON shape:
+{
+  "task_id": "...",
+  "contract_graph": {
+    "graph_id": "...",
+    "nodes": [
+      {
+        "id": "C01",
+        "blueprint_id": "B01",
+        "surface_text": "...",
+        "modality": "must_not",
+        "action_predicate": {
+          "family": "code.edit",
+          "object": "public_interface",
+          "target": null,
+          "effect": null,
+          "attributes": {}
+        },
+        "scope": {"component": "..."},
+        "lifecycle": {
+          "effective_from_event": 1,
+          "effective_until_event": null,
+          "until_revoked": true,
+          "revoked_at_event": null
+        },
+        "source_turn_ids": ["checkpoint_1"],
+        "directness": "embedded"
+      }
+    ],
+    "edges": [
+      {
+        "id": "E01",
+        "type": "exception_to",
+        "source": "C02",
+        "target": "C01",
+        "surface_text": "..."
+      }
+    ]
+  },
+  "rule_task_links": [
+    {
+      "contract_id": "C01",
+      "subtask_ids": ["S01"],
+      "requirement_refs": ["exact substring from checkpoint text"],
+      "rationale": "..."
+    }
+  ]
+}
+
+SCBench original task summary:
+{{task_metadata_json}}
+
+Task decomposition:
+{{decomposition_json}}
+
+Independent rule blueprint:
+{{blueprint_json}}

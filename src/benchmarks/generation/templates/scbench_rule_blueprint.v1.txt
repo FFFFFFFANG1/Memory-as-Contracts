@@ -1,0 +1,70 @@
+SYSTEM
+You independently sample behavioral contract-memory rule blueprints.
+Return JSON only. Do not decompose the task and do not write final contract graph nodes.
+
+USER
+Goal:
+Choose what rule structure this trajectory should test. These are additional
+benchmark constraints, not translations of the original task specification.
+
+Important:
+- You do not see the task decomposition. Do not infer rules from subtasks.
+- Use only coarse task metadata and available scope vocabulary.
+- Rules must be bindable later to concrete observable action predicates.
+- Rules should target specific action conditions, objects, scopes, or effects.
+- Do not produce broad style preferences such as "write clean code" or "be careful."
+- Include project/global/component/path/phase/tool scope diversity when useful.
+
+Distribution constraints:
+- Per trajectory: 3-6 contract nodes and 1-3 decisive edges.
+- Per trajectory: at least two scope levels.
+- Include at least one lifecycle change.
+- Include at least one semantically similar distractor.
+- Include at least one relation that changes the decision over time.
+- Relation-pattern targets across the released QA should be approximately
+  balanced: scope selection without conflict 20%, temporal activation/expiry/
+  revocation 20%, narrow exception 20%, override/supersession 20%, unresolved
+  conflict requiring ask 20%.
+- Contract placement target: at least 80% embedded in ordinary task/project
+  content, at most 20% direct memory instructions.
+- Final QA should be able to cover allow, reject, and ask labels across the
+  source.
+
+Return this JSON shape:
+{
+  "source_task_id": "...",
+  "target_relation_pattern": "narrow_exception",
+  "target_decision_mix": ["allow", "reject", "ask"],
+  "target_scope_levels": ["per_project", "per_component"],
+  "target_lifecycle_pattern": "expiry",
+  "placement_style": "embedded",
+  "quota_rationale": "...",
+  "blueprints": [
+    {
+      "blueprint_id": "B01",
+      "scope_level": "per_component",
+      "modality": "must_not",
+      "rule_intent": "Keep a public interface stable unless a scoped exception applies.",
+      "lifecycle_pattern": "task",
+      "relation_pattern": "narrow_exception",
+      "concrete_action_focus": "editing a public interface element that downstream callers observe",
+      "distractor_intent": null,
+      "why_this_tests_memory": "...",
+      "intended_decision": "reject",
+      "placement_style": "embedded",
+      "instantiate": true
+    }
+  ]
+}
+
+Allowed enum values:
+- scope_level: global, per_project, per_component, per_path, per_phase, per_tool
+- lifecycle_pattern: session, task, checkpoint, temporal_activation, expiry, revocation
+- relation_pattern: scope_selection_without_conflict,
+  temporal_activation_expiry_or_revocation, narrow_exception,
+  override_or_supersession, unresolved_conflict, independent_distractor
+- placement_style: embedded, direct
+- intended_decision: allow, reject, ask
+
+SCBench coarse task metadata:
+{{task_metadata_json}}

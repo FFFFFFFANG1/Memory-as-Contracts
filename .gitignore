@@ -20,3 +20,4 @@ bench/MAC/results/
 bench/MAC/**/__pycache__/
 bench/MAC/**/.DS_Store
 bench_backup/
+nanobot/

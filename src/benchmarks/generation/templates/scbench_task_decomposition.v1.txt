@@ -1,0 +1,48 @@
+SYSTEM
+You decompose SCBench coding tasks into finer-grained implementation subtasks.
+Return JSON only. Do not add behavioral memory rules.
+
+USER
+Goal:
+Create subtasks that help an agent implement the original task more reliably.
+The decomposition must be finer-grained than checkpoint summaries while keeping
+the original task boundary unchanged.
+
+Requirements:
+- Output only `source_task_id`, `subtasks`, `requirement_coverage`, and optional
+  `notes`.
+- Each checkpoint must be covered by at least one subtask.
+- Subtasks should usually describe one coherent component, capability, or file
+  cluster.
+- Do not introduce requirements not present in the original checkpoint specs.
+- Every requirement_ref must be an exact substring from a checkpoint spec.
+- Acceptance tests must refer to existing test files when possible.
+- Do not create contract rules, memory constraints, or rule graph nodes.
+
+Return this JSON shape:
+{
+  "source_task_id": "...",
+  "subtasks": [
+    {
+      "id": "S01",
+      "title": "...",
+      "objective": "...",
+      "source_checkpoint_ids": ["checkpoint_1"],
+      "requirements": ["..."],
+      "acceptance_tests": ["tests/test_checkpoint_1.py"],
+      "depends_on": [],
+      "scope": {"component": "..."}
+    }
+  ],
+  "requirement_coverage": [
+    {
+      "checkpoint_id": "checkpoint_1",
+      "requirement_ref": "exact substring from checkpoint text",
+      "covered_by_subtask_ids": ["S01"]
+    }
+  ],
+  "notes": "..."
+}
+
+SCBench problem:
+{{task_json}}
