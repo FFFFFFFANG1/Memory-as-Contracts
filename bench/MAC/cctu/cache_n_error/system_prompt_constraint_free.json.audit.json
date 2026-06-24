@@ -1,0 +1,10 @@
+{
+    "input": "/data2/junzhou2/Memory-as-Contracts/bench/CCTU/data/input_data.jsonl",
+    "output": "/data2/junzhou2/Memory-as-Contracts/bench/CCTU/data/system_prompt_constraint_free.json",
+    "audited_at": "2026-06-23T10:12:08.826461+00:00",
+    "task_count": 200,
+    "ok_count": 200,
+    "leak_count": 0,
+    "missing_count": 0,
+    "leaking_tasks": []
+}

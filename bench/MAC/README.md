@@ -1,112 +1,36 @@
-![Logo](images/logo.png)
+# MAC Benchmark Harness
 
-<p align="center">
-    🌐 <a href="https://agentif.github.io" target="_blank">Project Page</a> • 
-    📚 <a href="https://arxiv.org/abs/2505.16944" target="_blank">AgentIF Paper</a> • 
-    📊 <a href="https://huggingface.co/datasets/THU-KEG/AgentIF" target="_blank">AgentIF Dataset</a>
-</p>
+MAC is the project-owned runtime for evaluating memory systems on constraint benchmarks.
 
+## Layout
 
----
-
-We introduce **AgentIF**, the first benchmark for systematically **evaluating LLM instruction following ability in agentic scenarios**. AgentIF features three key characteristics: (1) **Realistic**, constructed from 50 real-world agentic applications. (2) **Long**, averaging 1,723 words with a maximum of 15,630 words. (3) **Complex**, averaging 11.9 constraints per instruction, covering diverse constraint types, such as tool specifications and condition constraints. Here is the instruction length distribution in AgentIF, along with the success rates of several representative LLMs across the constraint dimensions we propose:
-![Logo](images/fig1.png)
-An example instruction of AgentIF:
-![Logo](images/example_1.png)
-
-## Leaderboard
-
-#### Metrics
-- Constraint Success Rate (CSR) measures the proportion of individual constraints that are correctly satisfied by the model’s response. 
-- Instruction Success Rate (ISR) measures the proportion of instructions for which all constraints are satisfied. 
-
-#### Performance Across Constraint Categories
-
-![Logo](images/experiment.png)
-
-
-## Evaluation
-For each instruction, we annotate the associated constraints and corresponding evaluation metrics, including code-based evaluation, LLM-based evaluation, and hybrid code-LLM evaluation.
-
-### How to evaluation
-1. Clone the remote repository to your local environment. The necessary data is already included, so no further actions are needed.
-    ```
-    git clone https://github.com/THU-KEG/AgentIF.git
-    ```
-    
-2. (Optional) To evaluate a model hosted locally, deploy it using vLLM. Use a command similar to the following:
-    ```bash
-    CUDA_VISIBLE_DEVICES=<CUDA_ID> vllm serve "<your_model_path>" \
-        --served-model-name <your_model_name> \
-        --port 8008 \
-        --tensor-parallel-size <num_gpus> \
-        --max-model-len 32000 \
-        --gpu-memory-utilization 0.9
-    ```
-
-
-2. Specify the target model and the evaluator in the `run.sh` file. To reproduce our results, we recommend using `gpt-4o-2024-11-20`.
-
-   ```
-   Model_Name=""             # Name of the model to evaluate
-   Model_Name_URL=""         # Endpoint of the model (e.g., OpenAI API URL or local vLLM URL)
-   Model_Name_API_Key="EMPTY" # Set to "EMPTY" for local vLLM; otherwise, provide your API key
-
-   Evaluator_Model_Backbone=""  # Name of the evaluator model; use `gpt-4o-2024-11-20` for reproducibility
-   Evaluator_URL=""             # Base URL of the evaluator; use `https://api.openai.com/v1` to match our setup
-   Evaluator_API_Key=""         # API key for the evaluator
-   ```
-    
-3. Then run the script to start the evaluation.
-    
-    ```
-    sh run.sh
-    ```
-
-## Data Format
-Each data instance in AgentIF is structured as follows:
-```
-{
-  "input": [
-    { "role": "system", "content": "..." },
-    { "role": "user",   "content": "..." }
-  ],
-  "constraints": [
-    {
-      "id": 0,
-      "desc": "...",                // Constraint description
-      "other_info": {               // Auxiliary information for evaluation
-        "...": "..."
-      },
-      "dimension": "...",           // Constraint Presentation Type
-      "type": "...",                // Constraint Type
-      "is_meta": false,             // Whether it is a meta-constraint
-      "evaluation": [               // Evaluation Method
-        {
-          "type": "llm",            // LLM-based evaluation
-          "required_keys": ["response"],
-          "exec": "..."             // Evaluation prompt for LLM
-        },
-        {
-          "type": "code",           // Code-based evaluation
-          "exec": "..."             // Executable code snippet
-        }
-      ]
-    }
-  ]
-}
+```text
+bench/MAC/
+  agent/              # shared agent loop, memory providers, tool executors
+  construct/          # benchmark-specific data construction pipelines
+  scripts/            # run + grade entrypoints
+  shared/             # cross-benchmark helpers
+  cctu/               # CCTU adapter, data, mid_data, results
+  memoryarena/        # MemoryArena adapter, tasks, results
+  sopbench/           # SOPBench adapter placeholder
 ```
 
-## Citation
+## Running
 
+```bash
+source bench/.env
+bash bench/MAC/scripts/run.sh
 ```
-@misc{qi2025agentifbenchmarkinginstructionfollowing,
-      title={AGENTIF: Benchmarking Instruction Following of Large Language Models in Agentic Scenarios}, 
-      author={Yunjia Qi and Hao Peng and Xiaozhi Wang and Amy Xin and Youfeng Liu and Bin Xu and Lei Hou and Juanzi Li},
-      year={2025},
-      eprint={2505.16944},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI},
-      url={https://arxiv.org/abs/2505.16944}, 
-}
-```
+
+Environment variables:
+
+- `BENCH=cctu|memoryarena|sopbench`
+- `MEMORY_SYSTEM=no_memory|long_context`
+- `LIMIT`, `OFFSET`, `DRY_RUN`, `MAX_WORKER`
+
+Outputs are written under `bench/MAC/<bench>/results/`.
+
+## CCTU pipeline
+
+Construction scripts live under `bench/MAC/construct/cctu/`. Exports land in
+`bench/MAC/cctu/data/`; upstream validators remain in `bench/CCTU/`.

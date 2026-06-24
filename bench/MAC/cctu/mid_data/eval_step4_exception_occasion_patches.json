@@ -1,0 +1,222 @@
+{
+    "generated_at": "2026-06-24T04:12:30.544077+00:00",
+    "dry_run": false,
+    "patched_count": 21,
+    "applied": [
+        {
+            "task_uid": "mac-cctu-t-00018",
+            "local_id": "mac-cctu-t-00018-c0005-g7",
+            "occasion": "the question requires linking facts from more than one source",
+            "boundary_phrase": "For this multi-source lookup only, when the question requires linking facts from more than one source, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor the Historical Fact Verification project, specifically within the Multi-Hop Cross-Referencing phase, I need you to handle this lookup carefully: chain at least two distinct retrieval tools and present an intermediate evidence trail before the final answer, citing each tool name in order of use.\nQuestion: On what date did Israel formally declare war for the first time since the Yom Kippur War in 1973?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor the Historical Fact Verification project, specifically within the Multi-Hop Cross-Referencing phase, I need you to handle this lookup carefully since the question requires linking facts from more than one source: chain at least two distinct retrieval tools and present an intermediate evidence trail before the final answer, citing each tool name in order of use.\nQuestion: On what date did Israel formally declare war for the first time since the Yom Kippur War in 1973?",
+            "decision": "edit",
+            "review_note": "occasion woven into existing multi-hop sentence"
+        },
+        {
+            "task_uid": "mac-cctu-t-00038",
+            "local_id": "mac-cctu-t-00038-c0002-g4",
+            "occasion": "casualty enumeration for armed conflicts",
+            "boundary_phrase": "For the Military Conflict Casualty Project only, and only when handling casualty enumeration for armed conflicts, ",
+            "before": "I'm working on the Military Conflict Casualty Project and need to document a specific casualty record. Please call given tools to answer the question — for any casualty-related lookups on this project, use military_event_search as the primary retrieval tool and then corroborate every figure with historical_event_data_retriever. All information must come from tool calls, not from your own memory. If a call fails, correct it and retry until you reach an answer.\nQuestion: Who was killed by a suicide bomber on September 9, 2001?",
+            "after": "I'm working on the Military Conflict Casualty Project and need to document a specific casualty record. Please call given tools to answer the question — for any casualty-related lookups on this project, use military_event_search as the primary retrieval tool and then corroborate every figure with historical_event_data_retriever. All information must come from tool calls, not from your own memory. If a call fails, correct it and retry until you reach an answer.\nQuestion: Who was killed by a suicide bomber on September 9, 2001?",
+            "decision": "revert",
+            "review_note": "project + casualty context already clear; prepended clause redundant"
+        },
+        {
+            "task_uid": "mac-cctu-t-00044",
+            "local_id": "mac-cctu-t-00044-c0001-g3",
+            "occasion": "user asks a single-hop factual question answerable from one specialized tool",
+            "boundary_phrase": "For the HistoricalFactLookup project during QuickAnswerPhase only, and only when the user asks a single-hop factual question answerable from one specialized tool, ",
+            "before": "For the HistoricalFactLookup project, specifically within the QuickAnswerPhase, I need a fast single-fact lookup. Please call the provided tools to answer the question, keeping in mind you must not call tools more than twice, and your final response must end with a period and contain no exclamation marks. Question: What category was Hurricane Hilary when it struck the Baja California peninsula in August 2023?",
+            "after": "For the HistoricalFactLookup project, specifically within the QuickAnswerPhase, I have a single-hop factual question that should be answerable from one specialized tool. Please call the provided tools to answer the question, keeping in mind you must not call tools more than twice, and your final response must end with a period and contain no exclamation marks. Question: What category was Hurricane Hilary when it struck the Baja California peninsula in August 2023?",
+            "decision": "edit",
+            "review_note": "single-hop occasion woven into opening"
+        },
+        {
+            "task_uid": "mac-cctu-t-00044",
+            "local_id": "mac-cctu-t-00044-c0003-g4",
+            "occasion": "operating inside the deep research phase that requires corroboration",
+            "boundary_phrase": "For the HistoricalFactLookup project during DeepResearchPhase only, and only when operating inside the deep research phase that requires corroboration, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nThis request is part of the HistoricalFactLookup project, specifically inside the DeepResearchPhase, so please cross-verify every retrieved fact with at least two independent tool calls and produce a source-by-source comparison table in the response.\nQuestion: What category was Hurricane Hilary when it struck the Baja California peninsula in August 2023?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nThis request is part of the HistoricalFactLookup project, specifically inside the DeepResearchPhase where corroboration is required, so please cross-verify every retrieved fact with at least two independent tool calls and produce a source-by-source comparison table in the response.\nQuestion: What category was Hurricane Hilary when it struck the Baja California peninsula in August 2023?",
+            "decision": "edit",
+            "review_note": "corroboration occasion woven into phase description"
+        },
+        {
+            "task_uid": "mac-cctu-t-00061",
+            "local_id": "mac-cctu-t-00061-c0003-g6",
+            "occasion": "Award-winning chef profile validation pass",
+            "boundary_phrase": "For the AwardWinnerProfileBuild project during LandmarkCrossCheck only, and only for this award-winning chef profile validation pass, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor the AwardWinnerProfileBuild project, I'm working through the LandmarkCrossCheck phase right now and need you to cross-validate every chef finding with landmark_country_locator and award_winner_finder before reporting any conclusion about the chef's region.\nQuestion: What is the local spice of the city where the chef who cooks a new dish using the seafood from the port in the delta?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor the AwardWinnerProfileBuild project, I'm working through the LandmarkCrossCheck phase right now and need you to cross-validate every chef finding with landmark_country_locator and award_winner_finder before reporting any conclusion about the chef's region.\nQuestion: What is the local spice of the city where the chef who cooks a new dish using the seafood from the port in the delta?",
+            "decision": "revert",
+            "review_note": "chef profile validation pass already named in phase context"
+        },
+        {
+            "task_uid": "mac-cctu-t-00070",
+            "local_id": "mac-cctu-t-00070-c0006-g4",
+            "occasion": "auditing philanthropic disbursements for the FY2023 cycle",
+            "boundary_phrase": "For the Philanthropy Impact Review 2023 project during Donor Financial Audit only, and only when auditing philanthropic disbursements for the FY2023 cycle, ",
+            "before": "Please call the given tools to answer the question. All information must come from tool calls, not your internal knowledge. If a call fails, correct it and retry until you reach an answer.\n\nWe're kicking off the Donor Financial Audit phase of the Philanthropy Impact Review 2023, and I need you to trace a full philanthropy-to-culture chain for our FY2023 disbursement audit. Specifically: identify the philanthropist who donated a large sum to conservation efforts, then the zoo they founded, the aquarium exhibit at that zoo, the fish species featured, the coral reef ecosystem that hosts that species, the marine biologist who studied that reef, the island where that biologist is based, and finally the local dance of that island. As part of this audit phase, attach a donor contribution ledger with retrieval timestamps to every response and order donors by descending USD value.\n\nQuestion: What is the local dance of the island where the marine biologist who studied the coral reef ecosystem that is home to the fish species used in the aquarium exhibit of the zoo founded by the philanthropist who donated a large sum to conservation efforts?",
+            "after": "Please call the given tools to answer the question. All information must come from tool calls, not your internal knowledge. If a call fails, correct it and retry until you reach an answer.\n\nWe're kicking off the Donor Financial Audit phase of the Philanthropy Impact Review 2023, and I need you to trace a full philanthropy-to-culture chain for our FY2023 disbursement audit. Specifically: identify the philanthropist who donated a large sum to conservation efforts, then the zoo they founded, the aquarium exhibit at that zoo, the fish species featured, the coral reef ecosystem that hosts that species, the marine biologist who studied that reef, the island where that biologist is based, and finally the local dance of that island. As part of this audit phase, attach a donor contribution ledger with retrieval timestamps to every response and order donors by descending USD value.\n\nQuestion: What is the local dance of the island where the marine biologist who studied the coral reef ecosystem that is home to the fish species used in the aquarium exhibit of the zoo founded by the philanthropist who donated a large sum to conservation efforts?",
+            "decision": "revert",
+            "review_note": "FY2023 disbursement audit already explicit"
+        },
+        {
+            "task_uid": "mac-cctu-t-00072",
+            "local_id": "mac-cctu-t-00072-c0004-g4",
+            "occasion": "first reasoning turn after task intake",
+            "boundary_phrase": "For the CulturalBioInterdisciplinaryReport project during initial_parallel_dispatch only, and only on the first reasoning turn after task intake, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nWe're kicking off the CulturalBioInterdisciplinaryReport, and this is the initial_parallel_dispatch phase, so I want you to fire off at least three independent tool calls in parallel on this opening turn to maximize throughput across the medical-school, botanist, and traditional-music-genre subtasks simultaneously.\n\nQuestion: What is the traditional music genre of the country where the botanist who discovered the plant species used in the herbal remedy of the alternative medicine clinic founded by the doctor who graduated from the medical school known for its research on infectious diseases?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nWe're kicking off the CulturalBioInterdisciplinaryReport, and this is the initial_parallel_dispatch phase, so I want you to fire off at least three independent tool calls in parallel on this opening turn to maximize throughput across the medical-school, botanist, and traditional-music-genre subtasks simultaneously.\n\nQuestion: What is the traditional music genre of the country where the botanist who discovered the plant species used in the herbal remedy of the alternative medicine clinic founded by the doctor who graduated from the medical school known for its research on infectious diseases?",
+            "decision": "revert",
+            "review_note": "opening turn / initial_parallel_dispatch already clear"
+        },
+        {
+            "task_uid": "mac-cctu-t-00075",
+            "local_id": "mac-cctu-t-00075-c0002-g5",
+            "occasion": "geographic scoping rule for the highland folklore study",
+            "boundary_phrase": "For the HighlandFolkloreSurvey project only, and only under the geographic scoping rule for the highland folklore study, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor the HighlandFolkloreSurvey project I'm running, please limit all cultural lookups to highland districts and exclude any coastal or maritime regions from consideration as you work through this.\nQuestion: What is the traditional dance of the state where the choreographer who creates a new dance routine using the music from the local folk band in the coastal town?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor the HighlandFolkloreSurvey project I'm running, please limit all cultural lookups to highland districts and exclude any coastal or maritime regions from consideration as you work through this.\nQuestion: What is the traditional dance of the state where the choreographer who creates a new dance routine using the music from the local folk band in the coastal town?",
+            "decision": "revert",
+            "review_note": "highland folklore scoping already in body"
+        },
+        {
+            "task_uid": "mac-cctu-t-00082",
+            "local_id": "mac-cctu-t-00082-c0003-g3",
+            "occasion": "cross-checking tool outputs against each other",
+            "boundary_phrase": "For the MultiHopGeoFactResolution project during EvidenceVerification only, and only when cross-checking tool outputs against each other, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nWe're inside the MultiHopGeoFactResolution project, specifically the EvidenceVerification phase. For this phase, every multi-hop reasoning chain must be expanded into a numbered list of intermediate findings before the conclusion is written.\nQuestion: What is the main export product of the state where the scientist who conducts research on a new energy source in the laboratory on the campus of the well-known university?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nWe're inside the MultiHopGeoFactResolution project, specifically the EvidenceVerification phase. When cross-checking tool outputs against each other, expand every multi-hop reasoning chain into a numbered list of intermediate findings before the conclusion is written.\nQuestion: What is the main export product of the state where the scientist who conducts research on a new energy source in the laboratory on the campus of the well-known university?",
+            "decision": "edit",
+            "review_note": "cross-checking occasion was missing; woven into phase rule"
+        },
+        {
+            "task_uid": "mac-cctu-t-00082",
+            "local_id": "mac-cctu-t-00082-c0003-g4",
+            "occasion": "exporting traces after a task is closed",
+            "boundary_phrase": "For the MultiHopGeoFactResolution project during AuditTrailExport only, and only when exporting traces after a task is closed, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nThis request is for the AuditTrailExport phase of the MultiHopGeoFactResolution project, so as you work through the lookups, please append every tool invocation and its raw output to a JSON audit log that accompanies your response.\nQuestion: What is the main export product of the state where the scientist who conducts research on a new energy source in the laboratory on the campus of the well-known university?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nThis request is for the AuditTrailExport phase of the MultiHopGeoFactResolution project. As we export traces after the task closes, please append every tool invocation and its raw output to a JSON audit log that accompanies your response.\nQuestion: What is the main export product of the state where the scientist who conducts research on a new energy source in the laboratory on the campus of the well-known university?",
+            "decision": "edit",
+            "review_note": "export-after-close occasion woven naturally"
+        },
+        {
+            "task_uid": "mac-cctu-t-00086",
+            "local_id": "mac-cctu-t-00086-c0001-g5",
+            "occasion": "user explicitly requests a machine-readable JSON envelope",
+            "boundary_phrase": "From now on in this chat, and only when I explicitly request a machine-readable JSON envelope, ",
+            "before": "Please call the available tools to work through this question — don't answer from memory, and if a call fails, correct it and retry until you have a verified answer. For this whole chat I'll be pulling your outputs into a downstream pipeline, so for every response you give me I need it as a strict JSON object with the keys 'answer', 'sources', and 'tool_trace', and no surrounding prose at all. Here's the question to start with: What is the main dish of the cuisine of the region where the poet who wrote the epic poem that was adapted into an opera by the composer who worked with the conductor of the orchestra that performed at the concert hall in the city where the tech startup is based which won the recent innovation award?",
+            "after": "Please call the available tools to work through this question — don't answer from memory, and if a call fails, correct it and retry until you have a verified answer. For this whole chat I'll be pulling your outputs into a downstream pipeline, so for every response you give me I need it as a strict JSON object with the keys 'answer', 'sources', and 'tool_trace', and no surrounding prose at all. Here's the question to start with: What is the main dish of the cuisine of the region where the poet who wrote the epic poem that was adapted into an opera by the composer who worked with the conductor of the orchestra that performed at the concert hall in the city where the tech startup is based which won the recent innovation award?",
+            "decision": "revert",
+            "review_note": "JSON envelope requirement already stated"
+        },
+        {
+            "task_uid": "mac-cctu-t-00091",
+            "local_id": "mac-cctu-t-00091-c0001-g3",
+            "occasion": "delivering the single-fact answer to the user's multi-hop geography query",
+            "boundary_phrase": "For the GeoFactsQA project during concise-answer-delivery only, and only when delivering the single-fact answer to the user's multi-hop geography query, ",
+            "before": "Please call the given tools to answer the following question. Remember that every piece of information must come from tool calls, not from your own knowledge — if a call fails, correct it and retry until you reach an answer. This is for the GeoFactsQA project, specifically the concise-answer-delivery phase, so the final reply you give me must be at most 200 characters long to keep it short and focused.\n\nQuestion: What is the population of the town in the county where the national park is located that has the waterfall named after the explorer who discovered the Mississippi River?",
+            "after": "Please call the given tools to answer the following question. Remember that every piece of information must come from tool calls, not from your own knowledge — if a call fails, correct it and retry until you reach an answer. This is for the GeoFactsQA project, specifically the concise-answer-delivery phase: when you deliver the single-fact answer to this multi-hop geography query, keep the final reply at most 200 characters long.\n\nQuestion: What is the population of the town in the county where the national park is located that has the waterfall named after the explorer who discovered the Mississippi River?",
+            "decision": "edit",
+            "review_note": "delivery occasion woven into concise-answer instruction"
+        },
+        {
+            "task_uid": "mac-cctu-t-00109",
+            "local_id": "mac-cctu-t-00109-c0002-g2",
+            "occasion": "Any species-versus-species comparison handled inside this project.",
+            "boundary_phrase": "For the Primate Comparative Genomics project only, and only for any species-versus-species comparison handled inside this project, ",
+            "before": "I'm working on the Primate Comparative Genomics project and need a quick reference fact. For every comparative genomics question I send you in this project, please resolve it with exactly one consolidated call to comprehensive_biological_info_retriever, and reply with only the raw numerical result — no labels, no headers, no trailing punctuation.\nQuestion: How many more chromosomes does a human have compared to a chimpanzee?",
+            "after": "I'm working on the Primate Comparative Genomics project and need a quick reference fact. For every comparative genomics question I send you in this project, please resolve it with exactly one consolidated call to comprehensive_biological_info_retriever, and reply with only the raw numerical result — no labels, no headers, no trailing punctuation.\nQuestion: How many more chromosomes does a human have compared to a chimpanzee?",
+            "decision": "revert",
+            "review_note": "species-versus-species scope already in project rules"
+        },
+        {
+            "task_uid": "mac-cctu-t-00118",
+            "local_id": "mac-cctu-t-00118-c0002-g5",
+            "occasion": "transport and sports trivia auditing",
+            "boundary_phrase": "For the GlobalTransportAndSportsTriviaAudit project only, and only during transport and sports trivia auditing, ",
+            "before": "Quick tooling policy note for our GlobalTransportAndSportsTriviaAudit work: for any verification step in this audit, please rely on 'airport_info_retriever' and 'sports_event_info_retriever' as your primary sources, and do not invoke 'historical_event_tool' at any point. Keep this in mind across all the trivia checks coming through in this project.",
+            "after": "Quick tooling policy note for our GlobalTransportAndSportsTriviaAudit work: for any verification step in this audit, please rely on 'airport_info_retriever' and 'sports_event_info_retriever' as your primary sources, and do not invoke 'historical_event_tool' at any point. Keep this in mind across all the trivia checks coming through in this project.",
+            "decision": "revert",
+            "review_note": "transport/sports trivia audit already in policy note"
+        },
+        {
+            "task_uid": "mac-cctu-t-00127",
+            "local_id": "mac-cctu-t-00127-c0007-g4",
+            "occasion": "delivering the daily stand-up summary",
+            "boundary_phrase": "For the WideBody-Spec-Comparison project during morning operations stand-up reporting only, and only when delivering the daily stand-up summary, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nI need this one resolved: What is the difference in wingspan between Boeing 787-9 and Airbus A350-900 in centermeters? Since I'm reading this out loud at the stand-up, please condense the response into a single bullet line suitable for a verbal stand-up readout, omitting headings and any Markdown structure beyond a leading dash.",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nI need this one resolved: What is the difference in wingspan between Boeing 787-9 and Airbus A350-900 in centermeters? Since I'm reading this out loud at the stand-up, please condense the response into a single bullet line suitable for a verbal stand-up readout, omitting headings and any Markdown structure beyond a leading dash.",
+            "decision": "revert",
+            "review_note": "stand-up delivery context already natural in original"
+        },
+        {
+            "task_uid": "mac-cctu-t-00132",
+            "local_id": "mac-cctu-t-00132-c0003-c1",
+            "occasion": "any anatomy-related fact resolution inside the project",
+            "boundary_phrase": "For the HumanAnatomyFactLookup project only, and only for any anatomy-related fact resolution inside the project, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor this HumanAnatomyFactLookup project, resolve every anatomy lookup using anatomy_information_provider as the sole tool, and repeat the calls as needed until the answer stabilizes across at least three identical results.\nQuestion: What is the combined number of thoracic and sacral vertebrae in the human spine?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly.\nIf the call fails, you need to try to correct it and continue until you arrive at an answer.\nFor this HumanAnatomyFactLookup project, resolve every anatomy lookup using anatomy_information_provider as the sole tool, and repeat the calls as needed until the answer stabilizes across at least three identical results.\nQuestion: What is the combined number of thoracic and sacral vertebrae in the human spine?",
+            "decision": "revert",
+            "review_note": "anatomy project scope already clear"
+        },
+        {
+            "task_uid": "mac-cctu-t-00148",
+            "local_id": "mac-cctu-t-00148-c0006-g6",
+            "occasion": "validating aviation-related historical event dates",
+            "boundary_phrase": "For the AviationMilestones-Chronology project only, and only when validating aviation-related historical event dates, ",
+            "before": "For our AviationMilestones-Chronology project, I'm pulling in a couple of adjacent cultural/economic anchors to contextualize the postwar aviation timeline. Please call the given tools to answer the question below — remember, all information must come from tool calls, not your own knowledge, and if a call fails, keep correcting and retrying until you reach an answer. Also, while working on this project, cross-check each retrieved date against the `airport_info_retriever` records before computing the day difference. Question: How many days passed between the first networked TV broadcast and the establishment of COMECON?",
+            "after": "For our AviationMilestones-Chronology project, I'm pulling in a couple of adjacent cultural/economic anchors to contextualize the postwar aviation timeline. Please call the given tools to answer the question below — remember, all information must come from tool calls, not your own knowledge, and if a call fails, keep correcting and retrying until you reach an answer. Also, when validating aviation-related historical event dates on this project, cross-check each retrieved date against the `airport_info_retriever` records before computing the day difference. Question: How many days passed between the first networked TV broadcast and the establishment of COMECON?",
+            "decision": "edit",
+            "review_note": "aviation date validation occasion woven into cross-check rule"
+        },
+        {
+            "task_uid": "mac-cctu-t-00156",
+            "local_id": "mac-cctu-t-00156-c0001-g3",
+            "occasion": "producing public-facing biography summaries",
+            "boundary_phrase": "For the Polymath Biography Briefings project only, and only when producing public-facing biography summaries, ",
+            "before": "I'm putting together an entry for our Polymath Biography Briefings project and need your help resolving a comparison question. Please call given tools to answer — all information must come from tool calls, not your internal knowledge. If a call fails, correct it and try again until you reach a verified answer. For the final write-up, deliver the result as a single narrative paragraph of no more than 80 words, with no tables, bullet points, or markdown formatting. Question: What is larger: (a) the population of the city where the monument dedicated to the postal pioneer is located, or (b) the height of the waterfall near the valley known for its sparkling marbles, measured from the base to the top?",
+            "after": "I'm putting together a public-facing biography summary for our Polymath Biography Briefings project and need your help resolving a comparison question. Please call given tools to answer — all information must come from tool calls, not your internal knowledge. If a call fails, correct it and try again until you reach a verified answer. For the final write-up, deliver the result as a single narrative paragraph of no more than 80 words, with no tables, bullet points, or markdown formatting. Question: What is larger: (a) the population of the city where the monument dedicated to the postal pioneer is located, or (b) the height of the waterfall near the valley known for its sparkling marbles, measured from the base to the top?",
+            "decision": "edit",
+            "review_note": "public-facing biography occasion was the real gap"
+        },
+        {
+            "task_uid": "mac-cctu-t-00165",
+            "local_id": "mac-cctu-t-00165-c0001-g2",
+            "occasion": "Standard end-to-end resolution of a multi-hop interdisciplinary query",
+            "boundary_phrase": "For the Cross-Domain Knowledge Synthesis Initiative only, and only for the standard end-to-end resolution of a multi-hop interdisciplinary query, ",
+            "before": "Kicking off a new item under the Cross-Domain Knowledge Synthesis Initiative — please call the available tools to work this out (no answering from memory, and retry on any tool failure until you get a real result). Take as many interaction turns as you need, call each tool in its own action step, and once you've chained everything together give me the final synthesized result as a single concise prose sentence containing the numeric answer.\n\nQuestion: What is the sum of the seating capacity of the theater built by the man who painted the most renowned fresco in the dome of the church in the city famous for its canals, and the number of ocean species recorded in the coastal laboratory used by the scientist who decoded the first alien signal?",
+            "after": "Kicking off a new item under the Cross-Domain Knowledge Synthesis Initiative — please call the available tools to work this out (no answering from memory, and retry on any tool failure until you get a real result). Take as many interaction turns as you need, call each tool in its own action step, and once you've chained everything together give me the final synthesized result as a single concise prose sentence containing the numeric answer.\n\nQuestion: What is the sum of the seating capacity of the theater built by the man who painted the most renowned fresco in the dome of the church in the city famous for its canals, and the number of ocean species recorded in the coastal laboratory used by the scientist who decoded the first alien signal?",
+            "decision": "revert",
+            "review_note": "multi-hop interdisciplinary resolution already described"
+        },
+        {
+            "task_uid": "mac-cctu-t-00172",
+            "local_id": "mac-cctu-t-00172-c0002-g7",
+            "occasion": "resolving ambiguity between two bands with similar names",
+            "boundary_phrase": "For the Cultural Cross-Reference Synthesis project during Music Branch Disambiguation only, and only when resolving ambiguity between two bands with similar names, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nWe're in the Cultural Cross-Reference Synthesis project, and right now I need you to work the Music Branch Disambiguation phase of the chain. For any candidate band name you consider in this phase, please cross-check it with both `hit_song_finder` and `cultural_origin_locator` before you commit to a release year — I want to be sure we're not confusing two similarly named acts.\n\nQuestion: What is the sum of the number of species of the most common tree in the region where the novelist who wrote the book illustrated by an artist living near the river surrounded by cherry blossoms, and the release year of the hit song by the band that originated in the district known for its busy fish market?",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nWe're in the Cultural Cross-Reference Synthesis project, and right now I need you to work the Music Branch Disambiguation phase of the chain. For any candidate band name you consider in this phase, please cross-check it with both `hit_song_finder` and `cultural_origin_locator` before you commit to a release year — I want to be sure we're not confusing two similarly named acts.\n\nQuestion: What is the sum of the number of species of the most common tree in the region where the novelist who wrote the book illustrated by an artist living near the river surrounded by cherry blossoms, and the release year of the hit song by the band that originated in the district known for its busy fish market?",
+            "decision": "revert",
+            "review_note": "band disambiguation already explicit"
+        },
+        {
+            "task_uid": "mac-cctu-t-00186",
+            "local_id": "mac-cctu-t-00186-c0003-g5",
+            "occasion": "any laureate-centered multi-hop resolution",
+            "boundary_phrase": "For the Nobel Laureate Atlas project only, and only for any laureate-centered multi-hop resolution, ",
+            "before": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nI'm kicking off a new thread under the Nobel Laureate Atlas project. For all work on this project, please make sure you lead with the nobel_laureate_finder tool before reaching for any other research or location tool — that ordering is a hard requirement for everything we do here.\n\nQuestion: What is the sum of the area in square miles of the nature reserve where the scientist who discovered a new species of fish in the lake bordering the desert with wandering dunes conducted his research, and the number of floors in the country's tallest skyscraper.",
+            "after": "Please call given tools to answer the question. Please note that all your information must be obtained by calling tools and not by answering the question directly. If the call fails, you need to try to correct it and continue until you arrive at an answer.\n\nI'm kicking off a new thread under the Nobel Laureate Atlas project. For all work on this project, please make sure you lead with the nobel_laureate_finder tool before reaching for any other research or location tool — that ordering is a hard requirement for everything we do here.\n\nQuestion: What is the sum of the area in square miles of the nature reserve where the scientist who discovered a new species of fish in the lake bordering the desert with wandering dunes conducted his research, and the number of floors in the country's tallest skyscraper.",
+            "decision": "revert",
+            "review_note": "laureate-first workflow already clear"
+        }
+    ],
+    "reviewed_at": "2026-06-24Tmanual",
+    "summary": {
+        "revert": 13,
+        "edit": 8
+    }
+}

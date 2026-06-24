@@ -1,0 +1,1 @@
+"""Local benchmark workspace package."""
