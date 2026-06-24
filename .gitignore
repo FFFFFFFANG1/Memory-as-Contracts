@@ -1,3 +1,5 @@
+.cursor/
+.cursorignore
 .env
 .venv/
 .mac/
