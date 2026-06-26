@@ -94,7 +94,7 @@ def test_action_log_migration_removes_task_and_organization_columns(tmp_path) ->
     version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
     conn.close()
 
-    assert version == 11
+    assert version == 12
     assert "task_id" not in columns
     assert "organization" not in columns
     assert "task_id" not in payload

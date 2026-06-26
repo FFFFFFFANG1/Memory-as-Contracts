@@ -48,10 +48,9 @@ def make_contract(contract_id: str = "MAC-test") -> Contract:
         strength=Strength.HARD,
         source=ContractSource(
             kind=SourceKind.USER_TURN,
-            span="do not push",
             created_at=datetime(2026, 5, 23, tzinfo=timezone.utc),
         ),
-        scope=Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project"),
+        scope=Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project", project="/workspace/project"),
         lifecycle=Lifecycle(
             type=LifecycleType.BOUNDED_TIME,
             effective_from=datetime(2026, 5, 23, tzinfo=timezone.utc),
@@ -61,7 +60,7 @@ def make_contract(contract_id: str = "MAC-test") -> Contract:
             actions=["git.push"],
             tags=["external_write", "publish_code"],
         ),
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(
                 tool="exec",
                 args={"cmd": ArgPattern(regex=r"^\s*git\s+push(?:\s|$)")},
@@ -77,7 +76,7 @@ def test_store_round_trips_contract_edge_receipt_and_snapshot() -> None:
         RulePatternVersion(
             id="PV-test",
             contract_id=contract.id,
-            tool_patterns=contract.tool_patterns,
+            check_patterns=contract.check_patterns,
         )
     )
     edge = store.add_edge(
@@ -128,7 +127,7 @@ def test_fts_search_uses_contract_text() -> None:
     assert [contract.id for contract in results] == ["MAC-test"]
 
 
-def test_store_uses_schema_v11_with_dedup_keys_without_legacy_tables() -> None:
+def test_store_uses_schema_v12_with_dedup_keys_without_legacy_tables() -> None:
     store = make_store()
     contract = store.add_contract(make_contract())
 
@@ -159,13 +158,12 @@ def test_store_uses_schema_v11_with_dedup_keys_without_legacy_tables() -> None:
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'action_log'"
     ).fetchone()
 
-    assert schema_version == 11
+    assert schema_version == 12
     assert action_log_table is not None
     assert {
         "effect",
         "authority",
         "semantics_json",
-        "tool_patterns_json",
         "validity_json",
         "dedup_fingerprint",
         "pattern_surface_hash",
@@ -174,11 +172,13 @@ def test_store_uses_schema_v11_with_dedup_keys_without_legacy_tables() -> None:
     assert "action_constraints" not in payload
     assert "compiled_predicates" not in payload
     assert "pattern_version" not in payload
+    assert "tool_patterns" not in payload
     assert "from" in payload["validity"]
     assert "start" not in payload["validity"]
     assert "target_patterns" not in pattern_payload
     assert "targets" not in pattern_payload
     assert "host_action_patterns" not in pattern_payload
+    assert "tool_patterns" not in pattern_payload
     assert store.list_rule_pattern_versions(contract.id)[-1].id == "RPV-next"
     predicate_versions_table = store.conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'predicate_versions'"
@@ -250,4 +250,4 @@ def test_schema_v6_validator_state_migrates_to_scoped_v10_state(tmp_path) -> Non
     assert state.scope_key == "legacy"
     assert state.state == {"count": 1}
     assert state.revision == 0
-    assert store.conn.execute("SELECT version FROM schema_version").fetchone()["version"] == 11
+    assert store.conn.execute("SELECT version FROM schema_version").fetchone()["version"] == 12

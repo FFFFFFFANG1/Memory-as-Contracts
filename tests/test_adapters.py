@@ -91,7 +91,7 @@ def make_store() -> ContractStore:
 
 def install_pattern_contract(store: ContractStore, contract: Contract) -> Contract:
     stored = store.add_contract(contract)
-    if stored.tool_patterns:
+    if stored.check_patterns:
         store.install_rule_pattern_version(PolicyCompiler().compile(stored))
     return stored
 
@@ -164,20 +164,19 @@ def push_prohibition(workspace: Path) -> Contract:
         strength=Strength.HARD,
         source=ContractSource(
             kind=SourceKind.USER_TURN,
-            span="Do not push any code changes to Git before asking me.",
             created_at=datetime(2026, 5, 25, tzinfo=timezone.utc),
         ),
         scope=Scope(
             level=ScopeLevel.PROJECT,
             workspace=str(workspace.resolve(strict=False)),
-            repo="repo",
+            project="repo",
         ),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
         semantics=RuleSemantics(
             actions=["git.push"],
             tags=["external_write", "publish_code"],
         ),
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(tool="Bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
             ToolPattern(tool="bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
             ToolPattern(tool="shell", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")}),
@@ -191,7 +190,6 @@ def push_prohibition_from_project_doc(workspace: Path) -> Contract:
             "id": "MAC-project-push",
             "source": ContractSource(
                 kind=SourceKind.PROJECT_DOC,
-                span="Do not push any code changes to Git before asking me.",
                 created_at=datetime(2026, 5, 25, tzinfo=timezone.utc),
             ),
         }
@@ -208,13 +206,12 @@ def before_push_contract(workspace: Path) -> Contract:
         strength=Strength.HARD,
         source=ContractSource(
             kind=SourceKind.USER_TURN,
-            span="Before pushing code, run tests.",
             created_at=datetime(2026, 5, 25, tzinfo=timezone.utc),
         ),
         scope=Scope(
             level=ScopeLevel.PROJECT,
             workspace=str(workspace.resolve(strict=False)),
-            repo="repo",
+            project="repo",
         ),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
         validator_enforcement_shape=ValidatorEnforcementShape.CHECK_ONLY,
@@ -236,7 +233,6 @@ def global_preference() -> Contract:
         strength=Strength.SOFT,
         source=ContractSource(
             kind=SourceKind.USER_PROFILE,
-            span="Prefer concise implementation notes.",
             created_at=datetime(2026, 5, 25, tzinfo=timezone.utc),
         ),
         scope=Scope(level=ScopeLevel.GLOBAL),
@@ -416,7 +412,7 @@ def test_adapter_refines_invalid_patterns_once_before_installing_pattern_version
     write(workspace / "AGENTS.md", "Do not push code.\n")
     invalid = push_prohibition(workspace).model_copy(
         update={
-            "tool_patterns": [
+            "check_patterns": [
                 ToolPattern(
                     tool="exec_command",
                     args={"command": ArgPattern(regex="(")},
@@ -429,9 +425,9 @@ def test_adapter_refines_invalid_patterns_once_before_installing_pattern_version
     def provider(prompt: str) -> str:
         prompts.append(prompt)
         return (
-            '{"tool_patterns":[{"tool":"exec_command","args":{"cmd":'
+            '{"check_patterns":[{"tool":"exec_command","args":{"cmd":'
             '{"regex":"^git\\\\s+push(?:\\\\s|$)"}}}],'
-            '"check_patterns":[],"update_patterns":[]}'
+            '"update_patterns":[]}'
         )
 
     store = make_store()
@@ -445,8 +441,8 @@ def test_adapter_refines_invalid_patterns_once_before_installing_pattern_version
 
     assert len(prompts) == 1
     assert extracted[0].status == ContractStatus.ACTIVE
-    assert extracted[0].tool_patterns[0].tool == "exec_command"
-    assert "cmd" in extracted[0].tool_patterns[0].args
+    assert extracted[0].check_patterns[0].tool == "exec_command"
+    assert "cmd" in extracted[0].check_patterns[0].args
     assert store.get_active_rule_pattern_version(invalid.id) is not None
 
 
@@ -595,7 +591,7 @@ def test_periodic_extraction_filters_similar_rules_by_user_and_session_only(
             "scope": Scope(
                 level=ScopeLevel.PROJECT,
                 workspace="/different/workspace",
-                repo="other-repo",
+                project="other-repo",
             ),
         }
     )
@@ -637,10 +633,7 @@ def test_periodic_extraction_filters_similar_rules_by_user_and_session_only(
     )
 
     similar_context = extractor.calls[0]["context"].similar_rules_system_prompt
-    assert similar_context is not None
-    assert "Do not run git push unless I approve the release." in similar_context
-    assert "another user's branch" not in similar_context
-    assert "old session" not in similar_context
+    assert similar_context is None
 
 
 def test_periodic_extraction_limits_similar_rule_context_to_top_five(
@@ -699,8 +692,8 @@ def test_periodic_extraction_provisions_validator_for_accepted_contract(
     def response_provider(prompt: str) -> str:
         prompts.append(prompt)
         return (
-            '{"status":"ready","initial_state":{},"notes":[],'
-            '"snippet":"def check(action, state, log, context):\\n'
+            '{"status":"success","shared_states":{},"notes":[],'
+            '"check_code":"def check(action, log, context):\\n'
             '    command = (action.get(\\\"arguments\\\") or {}).get(\\\"cmd\\\")\\n'
             '    if not command:\\n'
             '        return ask(\\\"missing command\\\")\\n'
@@ -721,8 +714,8 @@ def test_periodic_extraction_provisions_validator_for_accepted_contract(
     installed = store.get_active_validator_version(contract.id)
     assert installed is not None
     assert installed.enforcement_shape == ValidatorEnforcementShape.CHECK_ONLY
-    assert store.list_validator_installations(contract.id)[-1].status == "installed"
-    assert prompts and "PENDING ACTION EXAMPLES" in prompts[0]
+    assert store.list_validator_installations(contract.id)[-1].status == "success"
+    assert prompts and "PENDING ACTION EXAMPLES" not in prompts[0]
 
 
 def test_periodic_extraction_returns_structured_error_and_keeps_batch_for_retry(

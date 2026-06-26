@@ -76,7 +76,7 @@ def test_heuristic_extraction_splits_mixed_agent_working_turns() -> None:
         ContractKind.PROHIBITION,
         ContractKind.PREFERENCE,
     ]
-    assert all(contract.scope.level == ScopeLevel.REPO for contract in contracts)
+    assert all(contract.scope.level == ScopeLevel.PROJECT for contract in contracts)
 
 
 def test_heuristic_extraction_binds_web_search_and_message_actions() -> None:
@@ -151,8 +151,8 @@ def test_cold_start_preserves_source_and_path() -> None:
     assert len(contracts) == 1
     assert contracts[0].source.kind == SourceKind.PROJECT_DOC
     assert contracts[0].source.path == "AGENTS.md"
-    assert contracts[0].scope.level == ScopeLevel.PATH
-    assert contracts[0].scope.path_globs == ["vendor/**"]
+    assert contracts[0].scope.level == ScopeLevel.PROJECT
+    assert contracts[0].scope.project == "project"
 
 
 def test_user_turn_ignores_single_turn_instruction_by_default() -> None:
@@ -190,17 +190,20 @@ def test_llm_user_turn_prompt_is_fixed_but_cold_start_prompt_is_adapter_owned() 
         path="AGENTS.md",
     )
 
-    assert "fixed user-turn extraction policy" in prompts[0]
+    # Simple providers receive the system contract spec folded in ahead of the user body.
     assert "confidence" not in prompts[0].lower()
+    assert "scoped beyond the current turn" in prompts[0]
     assert "validator_enforcement_shape" in prompts[0]
     assert "check_patterns" in prompts[0]
     assert "update_patterns" in prompts[0]
-    assert "incrementally maintained numeric or symbolic state" in prompts[0]
-    assert "only valid pattern surface that does not need to appear" in prompts[0]
-    assert prompts[1] == "CUSTOM project_doc: Do not edit files under vendor/**."
+    assert "state keys maintained by check_update validators" in prompts[0]
+    assert "native tool patterns for pending actions" in prompts[0]
+    assert "Extract candidate contracts that agent must obey" in prompts[0]
+    assert prompts[0].rstrip().endswith("Source text:\nFor this repo, use uv.")
+    assert prompts[1].endswith("CUSTOM project_doc: Do not edit files under vendor/**.")
 
 
-def test_llm_extractor_injects_tool_capsules_as_system_prompt() -> None:
+def test_llm_extractor_puts_tools_in_user_prompt_and_rules_in_system() -> None:
     seen: dict[str, str | None] = {}
 
     def response_provider(prompt: str, *, system_prompt: str | None = None) -> str:
@@ -228,19 +231,27 @@ def test_llm_extractor_injects_tool_capsules_as_system_prompt() -> None:
         context=extraction_context,
     )
 
-    assert "Represent every explicit durable rule" in seen["prompt"]
-    assert "final internally consistent contract set" in seen["prompt"]
-    assert "emit only the final effective version" in seen["prompt"]
-    assert "When existing similar rules are provided in the system prompt" in seen["prompt"]
-    assert "source-coverage check" in seen["prompt"]
+    prompt = seen["prompt"] or ""
+    system_prompt = seen["system_prompt"] or ""
 
-    assert "A MAC contract is" in (seen["system_prompt"] or "")
-    assert "exec_command" in (seen["system_prompt"] or "")
-    assert "MAC-existing" in (seen["system_prompt"] or "")
-    assert "Source text:" in (seen["prompt"] or "")
+    # All requirements live in the static system prompt.
+    assert "A MAC contract is" in system_prompt
+    assert "final effective form" in system_prompt
+    assert "internally resolve duplicates, conflicts" in system_prompt
+    assert "exec_command" not in system_prompt
+    assert "MAC-existing" not in system_prompt
+
+    # The user prompt only carries tool capsules (at the very top), similar rules, and source.
+    assert prompt.startswith("Tool definitions available to the acting agent are read-only.")
+    assert "exec_command" in prompt
+    assert "MAC-existing" in prompt
+    assert "Source text:" in prompt
+    assert prompt.index("exec_command") < prompt.index(
+        "Extract candidate contracts that agent must obey"
+    )
 
 
-def test_llm_extractor_falls_back_to_prompt_injection_for_simple_providers() -> None:
+def test_llm_extractor_folds_system_into_prompt_for_simple_providers() -> None:
     prompts: list[str] = []
 
     def response_provider(prompt: str) -> str:
@@ -258,18 +269,23 @@ def test_llm_extractor_falls_back_to_prompt_injection_for_simple_providers() -> 
         context=extraction_context,
     )
 
-    assert "Additional system context" in prompts[0]
+    # Providers without a system-prompt kwarg receive the system spec folded ahead of the body.
+    assert "A MAC contract is" in prompts[0]
     assert '"name":"Bash"' in prompts[0]
+    assert "Source text:" in prompts[0]
 
 
-def test_llm_extractor_reads_only_canonical_semantics_and_tool_patterns() -> None:
+def test_llm_extractor_reads_only_canonical_semantics_scope_and_check_patterns() -> None:
     def response_provider(prompt: str) -> str:
-        assert "tool_patterns" in prompt
+        assert "tool_patterns" not in prompt
+        assert "scope" in prompt
+        assert "check_patterns" in prompt
         assert "native tool name" in prompt
         return r'''
         {"contracts": [{
           "text": "For this repo, do not use web search without asking me first.",
-          "source_span": "do not use web search without asking me first",
+          "effect": "deny",
+          "scope": {"level": "project", "project": "project"},
           "kind": "prohibition",
           "modality": "MUST_NOT",
           "strength": "hard",
@@ -277,7 +293,7 @@ def test_llm_extractor_reads_only_canonical_semantics_and_tool_patterns() -> Non
             "actions": ["web.search"],
             "tags": ["network_read"]
           },
-          "tool_patterns": [{
+          "check_patterns": [{
             "tool": "web.search",
             "args": {}
           }]
@@ -293,7 +309,9 @@ def test_llm_extractor_reads_only_canonical_semantics_and_tool_patterns() -> Non
     contract = contracts[0]
     assert contract.semantics.actions == ["web.search"]
     assert contract.semantics.tags == ["network_read"]
-    assert any(pattern.tool == "web.search" for pattern in contract.tool_patterns)
+    assert contract.scope.level == ScopeLevel.PROJECT
+    assert contract.scope.project == "project"
+    assert any(pattern.tool == "web.search" for pattern in contract.check_patterns)
 
 
 def test_llm_extractor_downgrades_direct_rule_from_spurious_validator_shape() -> None:
@@ -301,12 +319,8 @@ def test_llm_extractor_downgrades_direct_rule_from_spurious_validator_shape() ->
         return r'''
         {"contracts": [{
           "text": "For this repo, never edit files under generated/**.",
-          "source_span": "never edit files under generated/**",
           "effect": "deny",
-          "tool_patterns": [{
-            "tool": "apply_patch",
-            "args": {"patch": {"mentions_path_glob": "generated/**"}}
-          }],
+          "scope": {"level": "project", "project": "project"},
           "validator_enforcement_shape": "check_only",
           "check_patterns": [{
             "tool": "apply_patch",
@@ -330,27 +344,27 @@ def test_llm_extractor_downgrades_direct_rule_from_spurious_validator_shape() ->
 def test_scope_and_lifecycle_normalizers_ground_relative_fields() -> None:
     normalization = context().normalization
 
-    scope = ScopeNormalizer().normalize("For this task, always ask before sending email.", normalization)
+    scope = ScopeNormalizer().normalize("For this task, ask before sending email.", normalization)
     lifecycle = LifecycleNormalizer().normalize("Today do not push.", normalization)
 
-    assert scope.level == ScopeLevel.TASK
+    assert scope.level == ScopeLevel.PROJECT
     assert lifecycle.type == LifecycleType.BOUNDED_TIME
     assert lifecycle.expires_at is not None
     assert lifecycle.expires_at.hour == 23
 
 
-def test_scope_normalizer_supports_per_turn_and_component_scope() -> None:
+def test_scope_normalizer_supports_session_and_module_scope() -> None:
     normalization = context().normalization
 
-    per_turn_scope = ScopeNormalizer().normalize("In this answer, use short bullets.", normalization)
-    component_scope = ScopeNormalizer().normalize(
+    session_scope = ScopeNormalizer().normalize("For this session, use short bullets.", normalization)
+    module_scope = ScopeNormalizer().normalize(
         "For component auth, do not edit generated files.",
         normalization,
     )
 
-    assert per_turn_scope.level == ScopeLevel.PER_TURN
-    assert component_scope.level == ScopeLevel.COMPONENT
-    assert component_scope.component == "auth"
+    assert session_scope.level == ScopeLevel.SESSION
+    assert module_scope.level == ScopeLevel.MODULE
+    assert module_scope.module == "auth"
 
 
 def test_scope_normalizer_does_not_treat_workspace_as_path() -> None:
@@ -365,10 +379,8 @@ def test_scope_normalizer_does_not_treat_workspace_as_path() -> None:
         normalization,
     )
 
-    assert workspace_scope.level == ScopeLevel.REPO
-    assert workspace_scope.path_globs == []
-    assert generated_scope.level == ScopeLevel.PATH
-    assert generated_scope.path_globs == ["generated/**"]
+    assert workspace_scope.level == ScopeLevel.PROJECT
+    assert generated_scope.level == ScopeLevel.PROJECT
 
 
 def test_scope_normalizer_extracts_bare_filename_targets() -> None:
@@ -377,8 +389,7 @@ def test_scope_normalizer_extracts_bare_filename_targets() -> None:
         context().normalization,
     )
 
-    assert scope.level == ScopeLevel.PATH
-    assert scope.path_globs == ["package-lock.json"]
+    assert scope.level == ScopeLevel.PROJECT
 
 
 def test_scope_normalizer_preserves_inline_relative_paths() -> None:
@@ -387,8 +398,7 @@ def test_scope_normalizer_preserves_inline_relative_paths() -> None:
         context().normalization,
     )
 
-    assert scope.level == ScopeLevel.PATH
-    assert scope.path_globs == ["docs/archive.md"]
+    assert scope.level == ScopeLevel.PROJECT
 
 
 def test_mixed_task_turn_targets_negated_bare_filename() -> None:
@@ -403,8 +413,7 @@ def test_mixed_task_turn_targets_negated_bare_filename() -> None:
 
     assert len(contracts) == 1
     assert contracts[0].text == "do not edit package-lock.json"
-    assert contracts[0].scope.level == ScopeLevel.PATH
-    assert contracts[0].scope.path_globs == ["package-lock.json"]
+    assert contracts[0].scope.level == ScopeLevel.PROJECT
 
 
 def test_live_extraction_system_prompt_defines_rule_boundaries() -> None:

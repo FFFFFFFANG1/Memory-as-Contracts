@@ -87,7 +87,6 @@ def contract_operational_surface(contract: Contract) -> dict[str, Any]:
         },
         "semantics_actions": sorted(contract.semantics.actions),
         "validator_enforcement_shape": contract.validator_enforcement_shape.value,
-        "tool_patterns": canonical_pattern_payloads(contract.tool_patterns),
         "check_patterns": canonical_pattern_payloads(contract.check_patterns),
         "update_patterns": canonical_pattern_payloads(contract.update_patterns),
         "state_fields": sorted(contract.state_fields),
@@ -125,8 +124,8 @@ def has_same_operational_surface(left: Contract, right: Contract) -> bool:
         and left.modality == right.modality
         and left.scope == right.scope
         and set(left.semantics.actions) == set(right.semantics.actions)
-        and canonical_tool_patterns(left.tool_patterns)
-        == canonical_tool_patterns(right.tool_patterns)
+        and canonical_tool_patterns(left.check_patterns)
+        == canonical_tool_patterns(right.check_patterns)
         and enforcement_equivalent(left, right)
         and lifecycle_equivalent(left, right)
     )
@@ -190,10 +189,10 @@ def evaluate_rule_pattern_version(
     predicate: RulePatternVersion,
     signature: ActionSignature,
 ) -> MatchOutcome:
-    return evaluate_patterns(predicate.tool_patterns, signature)
+    return evaluate_patterns(predicate.check_patterns, signature)
 
 
-def bind_tool_patterns(
+def bind_check_patterns(
     contract: Contract,
     signature: ActionSignature,
     patterns: list[ToolPattern],
@@ -343,31 +342,19 @@ def validator_scope_key(
         "scope_level": contract.scope.level.value,
     }
     level = contract.scope.level
-    if level == ScopeLevel.PER_TURN:
-        payload.update(session_id=session_id, turn_id=turn_id)
-    elif level == ScopeLevel.TASK:
-        payload.update(session_id=session_id, task_id=contract.scope.task)
-    elif level == ScopeLevel.SESSION:
+    if level == ScopeLevel.SESSION:
         payload["session_id"] = session_id
-    elif level == ScopeLevel.COMPONENT:
+    elif level == ScopeLevel.MODULE:
         payload.update(
             workspace=contract.scope.workspace or workspace,
-            repo=contract.scope.repo or repo,
-            component=contract.scope.component,
+            project=contract.scope.project or repo or workspace,
+            module=contract.scope.module,
         )
     elif level == ScopeLevel.PROJECT:
-        payload["workspace"] = contract.scope.workspace or workspace
-    elif level in {ScopeLevel.REPO, ScopeLevel.PATH}:
         payload.update(
             workspace=contract.scope.workspace or workspace,
-            repo=contract.scope.repo or repo,
+            project=contract.scope.project or repo or workspace,
         )
-        if level == ScopeLevel.PATH:
-            payload["path_globs"] = sorted(contract.scope.path_globs)
-    elif level == ScopeLevel.AGENT_FAMILY:
-        payload["agent_family"] = sorted(contract.scope.agent_family)
-    elif level == ScopeLevel.ORGANIZATION:
-        payload["organization"] = contract.scope.organization
     elif level == ScopeLevel.GLOBAL:
         payload["user_id"] = contract.scope.user_id or user_id
     else:

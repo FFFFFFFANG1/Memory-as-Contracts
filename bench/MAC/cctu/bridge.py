@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import importlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,17 @@ MAC_CCTU_RESULTS_DIR = MAC_CCTU_DIR / "results"
 MAC_CCTU_TASKS_FILE = "mac-cctu-tasks.json"
 MAC_CCTU_USER_TURN_FILE = "mac-cctu-user_turn.json"
 MAC_CCTU_TOOL_REGISTRY_FILE = "mac-cctu-tool_registry.json"
+
+CCTU_EVAL_TOOL_USE_INSTRUCTION = (
+    "Please call given tools to answer the question. Please note that all your information "
+    "must be obtained by calling tools and not by answering the question directly.\n"
+    "If the call fails, you need to try to correct it and continue until you arrive at an answer."
+)
+
+CCTU_EVAL_USER_PREFIX_RE = re.compile(
+    r"^(?:Please call given tools to answer the question\. Please note that all your information must be obtained by calling tools(?: and not by answering the question directly)?\.(?:\s*If the call fails, you need to try to correct it and continue until you arrive at an answer\.?)?\s*)+",
+    re.IGNORECASE,
+)
 
 
 def cctu_root() -> Path:
@@ -96,9 +108,23 @@ def import_cctu_attr(module_name: str, attr_name: str) -> Any:
     return getattr(module, attr_name)
 
 
-def cctu_call_function(name: str, arguments: dict[str, Any], code: str) -> str:
+def cctu_call_function(
+    name: str,
+    arguments: dict[str, Any],
+    code: str,
+    *,
+    match_mode: str | None = None,
+) -> str:
+    from bench.MAC.cctu.tool_match import cctu_call_function_with_match_mode
+
     call_function = import_cctu_attr("utils.utils", "call_function")
-    return call_function(name, arguments, code)
+    return cctu_call_function_with_match_mode(
+        name,
+        arguments,
+        code,
+        match_mode=match_mode,
+        call_function=call_function,
+    )
 
 
 def parse_cctu_tools(sample: dict[str, Any]) -> list[dict[str, Any]]:
@@ -190,6 +216,60 @@ def load_cctu_tool_registry(data_dir: Path | None = None) -> dict[str, Any]:
     return payload
 
 
+def normalize_cctu_user_turn_content(content: str) -> tuple[str, bool]:
+    """Strip repeated CCTU eval boilerplate and optional ``Question:`` wrapper."""
+    text = content.strip()
+    if not text:
+        return text, False
+    stripped = CCTU_EVAL_USER_PREFIX_RE.sub("", text).strip()
+    if stripped == text:
+        return text, False
+    if stripped.lower().startswith("question:"):
+        stripped = stripped.split(":", 1)[1].strip()
+    return stripped or text, True
+
+
+def ensure_cctu_eval_tool_use_instruction(system_prompt: str) -> str:
+    if CCTU_EVAL_TOOL_USE_INSTRUCTION.split(".", 1)[0] in system_prompt:
+        return system_prompt
+    prompt = system_prompt.rstrip()
+    if not prompt:
+        return CCTU_EVAL_TOOL_USE_INSTRUCTION
+    return f"{prompt}\n\n{CCTU_EVAL_TOOL_USE_INSTRUCTION}"
+
+
+def _iter_task_user_messages(task: dict[str, Any]) -> list[str]:
+    messages: list[str] = []
+    for key in ("input", "original_input", "messages"):
+        raw = task.get(key)
+        if not isinstance(raw, list):
+            continue
+        for message in raw:
+            if isinstance(message, dict) and message.get("role") == "user":
+                content = message.get("content")
+                if isinstance(content, str) and content.strip():
+                    messages.append(content)
+    return messages
+
+
+def task_uses_cctu_eval_tool_instruction(task: dict[str, Any]) -> bool:
+    return any(normalize_cctu_user_turn_content(content)[1] for content in _iter_task_user_messages(task))
+
+
+def normalize_cctu_user_turn(turn: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    if turn.get("role") != "user":
+        return turn, False
+    content = turn.get("content")
+    if not isinstance(content, str):
+        return turn, False
+    normalized, had_boilerplate = normalize_cctu_user_turn_content(content)
+    if not had_boilerplate or normalized == content:
+        return turn, False
+    updated = copy.deepcopy(turn)
+    updated["content"] = normalized
+    return updated, True
+
+
 def system_prompt_from_task_record(task: dict[str, Any], *, ensure_terminal_instruction: bool = True) -> str:
     from bench.MAC.shared.terminal_tools import ensure_terminal_tool_instruction
 
@@ -205,6 +285,8 @@ def system_prompt_from_task_record(task: dict[str, Any], *, ensure_terminal_inst
     if not prompt:
         domain = task.get("domain_context")
         prompt = domain.strip() if isinstance(domain, str) else ""
+    if task_uses_cctu_eval_tool_instruction(task):
+        prompt = ensure_cctu_eval_tool_use_instruction(prompt)
     if ensure_terminal_instruction:
         prompt = ensure_terminal_tool_instruction(prompt)
     return prompt
@@ -346,7 +428,14 @@ def build_cctu_eval_task(
 
     task_meta = tasks_by_uid[task_uid]
     history = histories_by_uid[task_uid]
-    turns = [copy.deepcopy(turn) for turn in history.get("turns", []) if isinstance(turn, dict)]
+    turns: list[dict[str, Any]] = []
+    uses_eval_tool_instruction = task_uses_cctu_eval_tool_instruction(task_meta)
+    for turn in history.get("turns", []):
+        if not isinstance(turn, dict):
+            continue
+        normalized_turn, had_boilerplate = normalize_cctu_user_turn(turn)
+        turns.append(normalized_turn)
+        uses_eval_tool_instruction = uses_eval_tool_instruction or had_boilerplate
     cctu_id = str(task_meta.get("cctu_id") or cctu_id_from_task_uid(task_uid))
     sample_lookup = samples_by_id if samples_by_id is not None else cctu_samples_by_id()
     sample = sample_lookup.get(cctu_id, {})
@@ -377,6 +466,7 @@ def build_cctu_eval_task(
             "current_user_turn": turns[-1] if turns else None,
             "past_user_turns": turns[:-1] if turns else [],
         },
+        "uses_cctu_eval_tool_instruction": uses_eval_tool_instruction,
     }
 
 

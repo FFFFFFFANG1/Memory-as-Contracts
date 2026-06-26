@@ -109,9 +109,6 @@ class PromptIntakeRetriever:
     ) -> list[PromptContractPacket]:
         prompt_context = _coerce_prompt_context(context, query=query)
         query_text = query if query is not None else prompt_context.user_turn
-        target_paths = _target_paths(prompt_context, query_text)
-        target_components = _target_components(prompt_context, query_text)
-        action_hints = _action_hints(query_text)
         contracts = self.store.list_contracts(
             [ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT],
             include_expired_status=False,
@@ -127,33 +124,22 @@ class PromptIntakeRetriever:
                 if include_soft_preferences and _prompt_scope_matches(
                     contract.scope,
                     prompt_context,
-                    target_paths,
-                    target_components,
-                    allow_local_without_target=True,
+                    query_text,
                 ):
                     preferences.append(contract)
                 continue
-            if _is_global_prompt_scope(contract.scope):
+            if contract.scope.level in {ScopeLevel.GLOBAL, ScopeLevel.SESSION}:
                 if _prompt_scope_matches(
                     contract.scope,
                     prompt_context,
-                    target_paths,
-                    target_components,
-                    allow_local_without_target=True,
+                    query_text,
                 ):
                     global_rules.append(contract)
-                continue
-            if not target_paths and not target_components and not _action_relevant(
-                contract.semantics,
-                action_hints,
-            ):
                 continue
             if _prompt_scope_matches(
                 contract.scope,
                 prompt_context,
-                target_paths,
-                target_components,
-                allow_local_without_target=bool(action_hints),
+                query_text,
             ):
                 local_rules.append(contract)
 
@@ -175,9 +161,9 @@ class PromptIntakeRetriever:
                 "local-reminder",
                 _target_reason(
                     contract.semantics,
-                    target_paths,
-                    target_components,
-                    action_hints,
+                    [],
+                    [],
+                    set(),
                 ),
             )
             for contract in local_rules[:local_reminder_limit]
@@ -285,65 +271,37 @@ def _minimal_signature(context: PromptRetrievalContext) -> ActionSignature:
 def _prompt_scope_matches(
     scope: Scope,
     context: PromptRetrievalContext,
-    target_paths: list[str],
-    target_components: list[str],
-    *,
-    allow_local_without_target: bool,
+    query_text: str,
 ) -> bool:
-    if scope.agent_family and context.agent_family not in scope.agent_family:
-        return False
     if scope.user_id and context.user_id and scope.user_id != context.user_id:
-        return False
-    if scope.organization and context.organization and scope.organization != context.organization:
         return False
     if scope.workspace and context.workspace and scope.workspace != context.workspace:
         return False
     if scope.workspace and not context.workspace:
         return False
-    if scope.repo and context.repo and scope.repo != context.repo:
-        return False
-    if scope.repo and not context.repo:
-        return False
-    if scope.task and context.task_id and scope.task != context.task_id:
-        return False
-    if scope.task and not context.task_id:
-        return False
 
     if scope.level == ScopeLevel.GLOBAL:
         return True
-    if scope.level == ScopeLevel.ORGANIZATION:
-        return bool(scope.organization)
-    if scope.level == ScopeLevel.AGENT_FAMILY:
-        return context.agent_family in scope.agent_family
     if scope.level == ScopeLevel.SESSION:
         return True
-    if scope.level == ScopeLevel.TASK:
-        return bool(scope.task and scope.task == context.task_id)
-    if scope.level in {ScopeLevel.PROJECT, ScopeLevel.REPO}:
-        if not allow_local_without_target and not (target_paths or target_components):
+    query_lower = query_text.lower()
+    if scope.level == ScopeLevel.PROJECT:
+        project = scope.project or scope.workspace
+        if not project:
             return False
-        if scope.level == ScopeLevel.REPO and scope.repo and context.repo:
-            return scope.repo == context.repo
-        return bool(scope.workspace and scope.workspace == context.workspace)
-    if scope.level == ScopeLevel.COMPONENT:
-        if not target_components:
-            return False
-        return bool(scope.component and scope.component.lower() in target_components)
-    if scope.level == ScopeLevel.PATH:
-        return any(_path_matches(target, glob) for target in target_paths for glob in scope.path_globs)
-    if scope.level == ScopeLevel.PER_TURN:
-        return True
+        return project.lower() in query_lower
+    if scope.level == ScopeLevel.MODULE:
+        project = scope.project or scope.workspace
+        return bool(
+            scope.module
+            and scope.module.lower() in query_lower
+            and (not project or project.lower() in query_lower)
+        )
     return False
 
 
 def _is_global_prompt_scope(scope: Scope) -> bool:
-    return scope.level in {
-        ScopeLevel.GLOBAL,
-        ScopeLevel.ORGANIZATION,
-        ScopeLevel.AGENT_FAMILY,
-        ScopeLevel.SESSION,
-        ScopeLevel.TASK,
-    }
+    return scope.level in {ScopeLevel.GLOBAL, ScopeLevel.SESSION}
 
 
 BACKTICK_HINT_PATTERN = re.compile(r"`([^`]+)`")
@@ -464,16 +422,10 @@ def _scope_label(scope: Scope) -> str:
     parts = [scope.level.value]
     if scope.workspace:
         parts.append(f"workspace={scope.workspace}")
-    if scope.repo:
-        parts.append(f"repo={scope.repo}")
-    if scope.path_globs:
-        parts.append("paths=" + ",".join(scope.path_globs))
-    if scope.component:
-        parts.append(f"component={scope.component}")
-    if scope.task:
-        parts.append(f"task={scope.task}")
-    if scope.agent_family:
-        parts.append("agents=" + ",".join(scope.agent_family))
+    if scope.project:
+        parts.append(f"project={scope.project}")
+    if scope.module:
+        parts.append(f"module={scope.module}")
     return ";".join(parts)
 
 

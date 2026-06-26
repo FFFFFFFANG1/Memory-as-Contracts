@@ -51,15 +51,9 @@ class SourceKind(StrEnum):
 
 
 class ScopeLevel(StrEnum):
-    PER_TURN = "per_turn"
-    TASK = "task"
     SESSION = "session"
-    COMPONENT = "component"
+    MODULE = "module"
     PROJECT = "project"
-    REPO = "repo"
-    PATH = "path"
-    AGENT_FAMILY = "agent_family"
-    ORGANIZATION = "organization"
     GLOBAL = "global"
 
 
@@ -177,7 +171,6 @@ class RuleSemantics(StrictModel):
 
 class ContractSource(StrictModel):
     kind: SourceKind
-    span: str
     created_at: datetime = Field(default_factory=utc_now)
     conversation_id: str | None = None
     turn_id: str | None = None
@@ -196,12 +189,8 @@ class ContractSource(StrictModel):
 class Scope(StrictModel):
     level: ScopeLevel
     workspace: str | None = None
-    repo: str | None = None
-    path_globs: list[str] = Field(default_factory=list)
-    task: str | None = None
-    component: str | None = None
-    agent_family: list[str] = Field(default_factory=list)
-    organization: str | None = None
+    project: str | None = None
+    module: str | None = None
     user_id: str | None = None
 
     @model_validator(mode="before")
@@ -210,17 +199,10 @@ class Scope(StrictModel):
         if not isinstance(data, dict):
             return data
         normalized = dict(data)
-        paths = normalized.pop("paths", None)
-        if paths is not None and "path_globs" not in normalized:
-            normalized["path_globs"] = paths
         if "level" not in normalized:
-            if normalized.get("path_globs"):
-                normalized["level"] = ScopeLevel.PATH.value
-            elif normalized.get("task"):
-                normalized["level"] = ScopeLevel.TASK.value
-            elif normalized.get("repo"):
-                normalized["level"] = ScopeLevel.REPO.value
-            elif normalized.get("workspace"):
+            if normalized.get("module"):
+                normalized["level"] = ScopeLevel.MODULE.value
+            elif normalized.get("workspace") or normalized.get("project"):
                 normalized["level"] = ScopeLevel.PROJECT.value
             else:
                 normalized["level"] = ScopeLevel.GLOBAL.value
@@ -228,20 +210,13 @@ class Scope(StrictModel):
 
     @model_validator(mode="after")
     def validate_scope_boundary(self) -> Self:
-        if self.level == ScopeLevel.PATH and not self.path_globs:
-            raise ValueError("path scope requires at least one path_glob")
-        if self.level == ScopeLevel.REPO and not (self.repo or self.workspace):
-            raise ValueError("repo scope requires repo or workspace")
-        if self.level == ScopeLevel.PROJECT and not self.workspace:
-            raise ValueError("project scope requires workspace")
-        if self.level == ScopeLevel.TASK and not self.task:
-            raise ValueError("task scope requires task")
-        if self.level == ScopeLevel.COMPONENT and not self.component:
-            raise ValueError("component scope requires component")
-        if self.level == ScopeLevel.AGENT_FAMILY and not self.agent_family:
-            raise ValueError("agent_family scope requires at least one agent family")
-        if self.level == ScopeLevel.ORGANIZATION and not self.organization:
-            raise ValueError("organization scope requires organization")
+        if self.level == ScopeLevel.PROJECT and not (self.workspace or self.project):
+            raise ValueError("project scope requires project or workspace")
+        if self.level == ScopeLevel.MODULE:
+            if not self.module:
+                raise ValueError("module scope requires module")
+            if not (self.workspace or self.project):
+                raise ValueError("module scope requires project or workspace")
         return self
 
 
@@ -364,13 +339,18 @@ class RulePatternVersion(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("PV"))
     contract_id: str | None = None
     version: str = "PV-001"
-    tool_patterns: list[ToolPattern] = Field(default_factory=list)
+    check_patterns: list[ToolPattern] = Field(default_factory=list)
     canonical_tags: list[str] = Field(default_factory=list)
     scope_predicate: dict[str, Any] = Field(default_factory=dict)
     lifecycle_predicate: dict[str, Any] = Field(default_factory=dict)
     refines: str | None = None
     status: PredicateStatus = PredicateStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_patterns(cls, data: Any) -> Any:
+        return data
 
     @field_validator("created_at")
     @classmethod
@@ -380,8 +360,7 @@ class RulePatternVersion(StrictModel):
         return value
 
     def has_binding_predicates(self) -> bool:
-        return bool(self.tool_patterns)
-
+        return bool(self.check_patterns)
 
 class OverridePolicy(StrictModel):
     allowed: bool = True
@@ -397,7 +376,6 @@ class Contract(StrictModel):
     authority: RuleAuthority = RuleAuthority.AGENT_INFERRED
     scope: Scope
     semantics: RuleSemantics = Field(default_factory=RuleSemantics)
-    tool_patterns: list[ToolPattern] = Field(default_factory=list)
     override: OverridePolicy = Field(default_factory=OverridePolicy)
     validity: RuleValidity = Field(default_factory=RuleValidity)
     validator_enforcement_shape: ValidatorEnforcementShape = ValidatorEnforcementShape.NO_VALIDATOR
@@ -451,7 +429,6 @@ class Contract(StrictModel):
         if source is None:
             normalized["source"] = {
                 "kind": _source_kind_for_authority(authority),
-                "span": normalized.get("text", ""),
             }
 
         lifecycle = normalized.get("lifecycle")
@@ -487,8 +464,8 @@ class Contract(StrictModel):
                 raise ValueError("fact contracts cannot use MUST or MUST_NOT modality")
             if self.semantics.actions or self.semantics.tags:
                 raise ValueError("fact contracts cannot bind rule semantics")
-            if self.tool_patterns:
-                raise ValueError("fact contracts cannot bind tool patterns")
+            if self.check_patterns or self.update_patterns:
+                raise ValueError("fact contracts cannot bind operational patterns")
         return self
 
     def is_expired(self, now: datetime | None = None) -> bool:
@@ -708,12 +685,13 @@ class ValidatorVersion(StrictModel):
     id: str = Field(default_factory=lambda: prefixed_id("VV"))
     contract_id: str
     enforcement_shape: ValidatorEnforcementShape
-    snippet: str
+    check_code: str
+    update_code: str | None = None
     check_patterns: list[ToolPattern] = Field(default_factory=list)
     update_patterns: list[ToolPattern] = Field(default_factory=list)
     state_schema_version: str = "state-v1"
     state_fields: list[str] = Field(default_factory=list)
-    initial_state: dict[str, Any] = Field(default_factory=dict)
+    shared_states: dict[str, Any] = Field(default_factory=dict)
     sandbox_policy_version: str = "subprocess-v1"
     action_log_search_spec_version: str = "ActionLogSearchSpecV1"
     snippet_hash: str = ""
@@ -721,6 +699,20 @@ class ValidatorVersion(StrictModel):
     verified_at: datetime | None = None
     status: PredicateStatus = PredicateStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_split_hook_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        migrated = dict(data)
+        if "check_code" not in migrated and migrated.get("snippet") is not None:
+            migrated["check_code"] = migrated["snippet"]
+        if "shared_states" not in migrated and isinstance(migrated.get("initial_state"), dict):
+            migrated["shared_states"] = migrated["initial_state"]
+        if not migrated.get("state_fields") and isinstance(migrated.get("shared_states"), dict):
+            migrated["state_fields"] = sorted(migrated["shared_states"])
+        return migrated
 
     @field_validator("created_at", "verified_at")
     @classmethod
@@ -782,9 +774,8 @@ class AskRequest(StrictModel):
 
 
 class ValidatorInstallationStatus(StrEnum):
-    INSTALLED = "installed"
-    NEEDS_REFINEMENT = "needs_refinement"
-    MANUAL_REVIEW = "manual_review"
+    SUCCESS = "success"
+    FAILED = "fail"
 
 
 class ValidatorInstallationRecord(StrictModel):

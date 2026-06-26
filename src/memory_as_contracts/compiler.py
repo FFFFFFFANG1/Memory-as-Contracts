@@ -40,24 +40,24 @@ class PolicyCompiler:
         version: str = "PV-001",
         refines: str | None = None,
     ) -> RulePatternVersion:
-        tool_patterns = list(contract.tool_patterns)
+        check_patterns = list(contract.check_patterns)
         tags = set(contract.semantics.tags)
         grounding = self._grounding_cache(contract)
         path_globs = grounding.ground_paths(
             text=contract.text,
             hint_paths=_path_hints(contract.text, self),
-            scope_globs=contract.scope.path_globs,
+            scope_globs=[],
         )
-        tool_patterns = _ground_seed_patterns(
+        check_patterns = _ground_seed_patterns(
             contract=contract,
-            tool_patterns=tool_patterns,
+            seed_patterns=check_patterns,
             path_globs=path_globs,
         )
 
         return RulePatternVersion(
             contract_id=contract.id,
             version=version,
-            tool_patterns=_dedupe_tool_patterns(tool_patterns),
+            check_patterns=_dedupe_tool_patterns(check_patterns),
             canonical_tags=sorted(tags),
             scope_predicate=contract.scope.model_dump(mode="json"),
             lifecycle_predicate=contract.lifecycle.model_dump(mode="json"),
@@ -110,12 +110,12 @@ def _selected_bare_file_target(text: str, pattern: re.Pattern[str]) -> str | Non
 def _ground_seed_patterns(
     *,
     contract: Contract,
-    tool_patterns: list[ToolPattern],
+    seed_patterns: list[ToolPattern],
     path_globs: list[str],
 ) -> list[ToolPattern]:
     actions = set(contract.semantics.actions)
     patterns: list[ToolPattern] = []
-    for pattern in tool_patterns:
+    for pattern in seed_patterns:
         if pattern.args:
             grounded = _ground_pattern_paths(pattern, path_globs)
             patterns.extend(grounded or [pattern])

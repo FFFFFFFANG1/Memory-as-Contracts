@@ -36,7 +36,7 @@ from memory_as_contracts.validator_dispatch import (
     ValidatorDispatchPlanner,
     validator_scope_key_for_signature,
 )
-from memory_as_contracts.validator_installation import ValidatorInstaller
+from memory_as_contracts.validator_installation import ValidatorInstaller, ValidatorSnippetVerifier
 from memory_as_contracts.validators import ValidatorRuntime, ValidatorSandboxError
 
 
@@ -48,19 +48,18 @@ def make_store() -> ContractStore:
 
 def install_pattern_contract(store: ContractStore, contract: Contract) -> Contract:
     stored = store.add_contract(contract)
-    if stored.tool_patterns:
+    if stored.check_patterns:
         store.install_rule_pattern_version(PolicyCompiler().compile(stored))
     return stored
 
 
 def project_scope() -> Scope:
-    return Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project", repo="project")
+    return Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project", project="project")
 
 
 def source() -> ContractSource:
     return ContractSource(
         kind=SourceKind.USER_TURN,
-        span="Before git push, run tests.",
         created_at=datetime(2026, 6, 6, tzinfo=timezone.utc),
     )
 
@@ -83,12 +82,9 @@ def git_push_check_contract() -> Contract:
     )
 
 
-CHECK_ONLY_SNIPPET = """
-def update(state, entry, log, context):
-    return state
-
-def check(action, state, log, context):
-    rows = log.search({
+CHECK_ONLY_CODE = """
+def check(action, log, context):
+    rows = log.read({
         "from": "actions",
         "select": ["seq"],
         "where": {
@@ -136,25 +132,23 @@ def committed_pytest_action() -> ActionLogEntryV1:
 
 def install_check_only_validator(store: ContractStore) -> None:
     contract = store.add_contract(git_push_check_contract())
-    result = ValidatorInstaller().install(
+    package = _verified_package(
+        store,
         contract,
-        {"status": "ready", "snippet": CHECK_ONLY_SNIPPET, "initial_state": {}},
+        {"status": "success", "check_code": CHECK_ONLY_CODE, "shared_states": {}},
+    )
+    result = ValidatorInstaller().register(
+        contract,
+        package,
         store=store,
         session_id="sess-1",
         task_id="task-1",
-        pending_examples=[
-            {
-                "tool_name": "Bash",
-                "host_action": "exec",
-                "arguments": {"command": "git push origin main"},
-            }
-        ],
     )
-    assert result.status == "installed", result.errors
+    assert result.status == "success", result.errors
 
 
-ASK_BEFORE_PUSH_SNIPPET = """
-def check(action, state, log, context):
+ASK_BEFORE_PUSH_CODE = """
+def check(action, log, context):
     return ask("Ask the user before pushing.")
 """
 
@@ -172,19 +166,17 @@ def install_ask_before_push_validator(
         }
     )
     store.add_contract(contract)
-    result = ValidatorInstaller().install(
+    package = _verified_package(
+        store,
         contract,
-        {"status": "ready", "snippet": ASK_BEFORE_PUSH_SNIPPET, "initial_state": {}},
+        {"status": "success", "check_code": ASK_BEFORE_PUSH_CODE, "shared_states": {}},
+    )
+    result = ValidatorInstaller().register(
+        contract,
+        package,
         store=store,
         session_id="sess-1",
         task_id="task-1",
-        pending_examples=[
-            {
-                "tool_name": "Bash",
-                "host_action": "exec",
-                "arguments": {"command": "git push origin main"},
-            }
-        ],
     )
     assert result.validator_version is not None, result.errors
     return result.validator_version
@@ -208,7 +200,7 @@ def budget_contract() -> Contract:
     )
 
 
-BUDGET_SNIPPET = """
+BUDGET_UPDATE_CODE = """
 def _amount_cents(payload):
     arguments = payload.get("arguments") or {}
     result = payload.get("result") or {}
@@ -233,30 +225,102 @@ def _amount_cents(payload):
         return int(float(value) * 100)
     return None
 
-def update(state, entry, log, context):
-    state.setdefault("spent_cents", 0)
-    state.setdefault("seen_entry_seqs", [])
-    state.setdefault("unknown_spend_entry_seqs", [])
+def update(entry, log, context):
+    state = log.state_read()
+    spent_cents = state.get("spent_cents") or 0
+    seen_entry_seqs = list(state.get("seen_entry_seqs") or [])
+    unknown_spend_entry_seqs = list(state.get("unknown_spend_entry_seqs") or [])
     seq = entry["seq"]
-    if seq in state["seen_entry_seqs"]:
-        return state
+    if seq in seen_entry_seqs:
+        return
     amount = _amount_cents(entry)
     if amount is None:
-        state["unknown_spend_entry_seqs"].append(seq)
-        return state
-    state["spent_cents"] += amount
-    state["seen_entry_seqs"].append(seq)
-    state["last_seen_seq"] = seq
-    return state
+        unknown_spend_entry_seqs.append(seq)
+        log.state_write({"unknown_spend_entry_seqs": unknown_spend_entry_seqs})
+        return
+    seen_entry_seqs.append(seq)
+    log.state_write({
+        "spent_cents": spent_cents + amount,
+        "seen_entry_seqs": seen_entry_seqs,
+        "last_seen_seq": seq,
+    })
+"""
 
-def check(action, state, log, context):
+
+BUDGET_CHECK_CODE = """
+def _amount_cents(payload):
+    arguments = payload.get("arguments") or {}
+    result = payload.get("result") or {}
+    candidates = [
+        arguments.get("amount"),
+        arguments.get("price"),
+        arguments.get("total"),
+        result.get("amount") if isinstance(result, dict) else None,
+        result.get("price") if isinstance(result, dict) else None,
+        result.get("total") if isinstance(result, dict) else None,
+    ]
+    items = arguments.get("items")
+    if items:
+        for item in items:
+            candidates.append(item.get("amount"))
+            candidates.append(item.get("price"))
+    for value in candidates:
+        if value is None:
+            continue
+        if isinstance(value, str):
+            value = value.replace("$", "").strip()
+        return int(float(value) * 100)
+    return None
+
+def check(action, log, context):
     proposed = _amount_cents(action)
     if proposed is None:
         return ask("Cannot determine proposed cost.")
-    if state.get("spent_cents", 0) + proposed > 9000:
+    if (log.state_read("spent_cents") or 0) + proposed > 9000:
         return reject("Budget would exceed $90.")
     return allow("Budget remains under $90.")
 """
+
+
+BUDGET_SHARED_STATES = {
+    "spent_cents": 0,
+    "seen_entry_seqs": [],
+    "unknown_spend_entry_seqs": [],
+    "last_seen_seq": None,
+}
+
+
+def _verified_package(
+    store: ContractStore,
+    contract: Contract,
+    package: dict,
+    *,
+    committed_examples: list[ActionLogEntryV1] | None = None,
+) -> dict:
+    result = ValidatorSnippetVerifier().verify(
+        contract,
+        package,
+        store=store,
+        session_id="sess-1",
+        task_id="task-1",
+        committed_examples=committed_examples or [],
+    )
+    assert result.accepted, result.errors
+    return {
+        **package,
+        "verification_hash": result.verification_hash,
+    }
+
+
+def _code_hash(check_code: str, update_code: str | None = None) -> str:
+    import json
+
+    return hashlib.sha256(
+        json.dumps(
+            {"check_code": check_code, "update_code": update_code},
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 def install_budget_validator(
@@ -266,29 +330,23 @@ def install_budget_validator(
     user_id: str | None = None,
 ) -> ValidatorVersion:
     contract = store.add_contract(contract or budget_contract())
-    result = ValidatorInstaller().install(
+    package = _verified_package(
+        store,
         contract,
         {
-            "status": "ready",
-            "snippet": BUDGET_SNIPPET,
-            "initial_state": {
-                "spent_cents": 0,
-                "seen_entry_seqs": [],
-                "unknown_spend_entry_seqs": [],
-                "last_seen_seq": None,
-            },
+            "status": "success",
+            "check_code": BUDGET_CHECK_CODE,
+            "update_code": BUDGET_UPDATE_CODE,
+            "shared_states": BUDGET_SHARED_STATES,
         },
+        committed_examples=[purchase_entry("verification-purchase", 1.0)],
+    )
+    result = ValidatorInstaller().register(
+        contract,
+        package,
         store=store,
         session_id="sess-1",
         task_id="task-1",
-        pending_examples=[
-            {
-                "tool_name": "checkout",
-                "host_action": "purchase",
-                "arguments": {"items": [{"name": "hosting", "amount": 10.0}]},
-            }
-        ],
-        committed_examples=[purchase_entry("verification-purchase", 1.0)],
         user_id=user_id,
     )
     assert result.validator_version is not None, result.errors
@@ -400,12 +458,13 @@ def test_validator_check_and_update_bindings_share_tool_pattern_semantics() -> N
             }
         )
     )
-    snippet = """
-def update(state, entry, log, context):
-    state["matched"] = True
-    return state
+    update_code = """
+def update(entry, log, context):
+    log.state_write({"matched": True})
+"""
 
-def check(action, state, log, context):
+    check_code = """
+def check(action, log, context):
     return ask("Documentation command matched.")
 """
     signature = ActionSignatureBuilder().build(
@@ -423,18 +482,18 @@ def check(action, state, log, context):
         id="VV-doc-command",
         contract_id=contract.id,
         enforcement_shape=ValidatorEnforcementShape.CHECK_UPDATE,
-        snippet=snippet,
+        check_code=check_code,
+        update_code=update_code,
         check_patterns=[pattern],
         update_patterns=[pattern],
         state_fields=["matched"],
-        initial_state={"matched": False},
-        snippet_hash=hashlib.sha256(snippet.encode("utf-8")).hexdigest(),
+        shared_states={"matched": False},
+        snippet_hash=_code_hash(check_code, update_code),
         verification_hash="verified",
     )
     scope_key = validator_scope_key_for_signature(contract, signature)
     store.install_verified_validator_version(
         version,
-        initial_state=version.initial_state,
         scope_key=scope_key,
     )
     entry = ActionLogEntryV1(
@@ -501,7 +560,7 @@ def test_missing_validator_and_multi_rule_aggregation_use_reject_over_ask() -> N
             source=source(),
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            tool_patterns=git_push_check_contract().check_patterns,
+            check_patterns=git_push_check_contract().check_patterns,
         )
     )
     aggregated = ActionGate(store).gate(git_push_signature())
@@ -606,7 +665,7 @@ def test_ask_response_only_skips_related_rule_and_other_reject_rule_still_wins()
             source=source(),
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            tool_patterns=git_push_check_contract().check_patterns,
+            check_patterns=git_push_check_contract().check_patterns,
         )
     )
 
@@ -803,7 +862,7 @@ def test_adapter_pre_action_denial_does_not_create_action_log_entry() -> None:
             source=source(),
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
-            tool_patterns=[
+            check_patterns=[
                 ToolPattern(tool="Bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
             ],
         )
@@ -831,8 +890,8 @@ def test_validator_sandbox_rejects_file_io_snippet() -> None:
         contract_id=contract.id,
         enforcement_shape=ValidatorEnforcementShape.CHECK_ONLY,
         check_patterns=contract.check_patterns,
-        snippet="""
-def check(action, state, log, context):
+        check_code="""
+def check(action, log, context):
     handle = open("leak.txt", "w")
     handle.write("not allowed")
     return allow("unsafe")
@@ -852,11 +911,11 @@ def test_validator_sandbox_exposes_rpc_log_proxy_not_full_action_log() -> None:
         enforcement_shape=ValidatorEnforcementShape.CHECK_ONLY,
         check_patterns=contract.check_patterns,
         status="rejected",
-        snippet="""
-def check(action, state, log, context):
+        check_code="""
+def check(action, log, context):
     if hasattr(log, "entries"):
         return reject("worker received the full action log")
-    rows = log.search({
+    rows = log.read({
         "from": "actions",
         "select": ["seq"],
         "where": {"arguments.command": {"regex": "pytest"}},
@@ -879,16 +938,90 @@ def test_validator_sandbox_enforces_search_query_budget() -> None:
         enforcement_shape=ValidatorEnforcementShape.CHECK_ONLY,
         check_patterns=contract.check_patterns,
         status="rejected",
-        snippet="""
-def check(action, state, log, context):
+        check_code="""
+def check(action, log, context):
     for _ in range(9):
-        log.search({"from": "actions", "select": ["seq"], "where": {}, "limit": 1})
+        log.read({"from": "actions", "select": ["seq"], "where": {}, "limit": 1})
     return allow("unreachable")
 """,
     )
 
     with pytest.raises(ValidatorSandboxError, match="query budget"):
         ValidatorRuntime(store).check(version, git_push_signature())
+
+
+def test_validator_check_cannot_write_shared_state() -> None:
+    store = make_store()
+    contract = store.add_contract(git_push_check_contract())
+    version = ValidatorVersion(
+        contract_id=contract.id,
+        enforcement_shape=ValidatorEnforcementShape.CHECK_ONLY,
+        check_patterns=contract.check_patterns,
+        shared_states={"seen": False},
+        check_code="""
+def check(action, log, context):
+    log.state_write({"seen": True})
+    return allow("unreachable")
+""",
+    )
+
+    with pytest.raises(ValidatorSandboxError, match="state_write is only available in update"):
+        ValidatorRuntime(store).check(version, git_push_signature())
+
+
+def test_validator_update_rejects_unknown_shared_state_key() -> None:
+    store = make_store()
+    contract = store.add_contract(budget_contract())
+    version = ValidatorVersion(
+        id="VV-unknown-state-key",
+        contract_id=contract.id,
+        enforcement_shape=ValidatorEnforcementShape.CHECK_UPDATE,
+        check_patterns=contract.check_patterns,
+        update_patterns=contract.update_patterns,
+        state_fields=["spent_cents"],
+        shared_states={"spent_cents": 0},
+        check_code="def check(action, log, context):\n    return allow('ok')",
+        update_code="""
+def update(entry, log, context):
+    log.state_write({"new_key": 1})
+""",
+    )
+
+    with pytest.raises(ValidatorSandboxError, match="unknown shared state key"):
+        ValidatorRuntime(store).update(
+            version,
+            purchase_entry("unknown-key", 1.0),
+            scope_key="validator:test",
+        )
+
+
+def test_validator_update_persists_state_write_without_return_value() -> None:
+    store = make_store()
+    contract = store.add_contract(budget_contract())
+    version = ValidatorVersion(
+        id="VV-state-write-no-return",
+        contract_id=contract.id,
+        enforcement_shape=ValidatorEnforcementShape.CHECK_UPDATE,
+        check_patterns=contract.check_patterns,
+        update_patterns=contract.update_patterns,
+        state_fields=["spent_cents"],
+        shared_states={"spent_cents": 0},
+        check_code="def check(action, log, context):\n    return allow('ok')",
+        update_code="""
+def update(entry, log, context):
+    spent = log.state_read("spent_cents") or 0
+    amount = (entry.get("arguments") or {}).get("amount") or 0
+    log.state_write({"spent_cents": spent + int(float(amount) * 100)})
+""",
+    )
+
+    state = ValidatorRuntime(store).update(
+        version,
+        purchase_entry("state-write", 1.25),
+        scope_key="validator:test",
+    )
+
+    assert state.state["spent_cents"] == 125
 
 
 def test_validator_state_rebuild_replays_action_log_deterministically() -> None:
@@ -983,12 +1116,12 @@ def test_session_validator_state_accumulates_across_tasks_but_not_sessions() -> 
     assert sorted(state.state["spent_cents"] for state in states) == [3000, 3700]
 
 
-def test_per_turn_scope_validator_shares_state_between_install_and_post_action_updates() -> None:
+def test_session_scope_validator_shares_state_between_install_and_post_action_updates() -> None:
     store = make_store()
     contract = budget_contract().model_copy(
         update={
-            "id": "MAC-per-turn-budget",
-            "scope": Scope(level=ScopeLevel.PER_TURN),
+            "id": "MAC-session-turn-budget",
+            "scope": Scope(level=ScopeLevel.SESSION),
         }
     )
     version = install_budget_validator(store, contract=contract)
@@ -1024,29 +1157,23 @@ def test_post_action_dispatch_skips_expired_or_out_of_scope_contract() -> None:
         }
     )
     store.add_contract(contract)
-    install_result = ValidatorInstaller().install(
+    package = _verified_package(
+        store,
         contract,
         {
-            "status": "ready",
-            "snippet": BUDGET_SNIPPET,
-            "initial_state": {
-                "spent_cents": 0,
-                "seen_entry_seqs": [],
-                "unknown_spend_entry_seqs": [],
-                "last_seen_seq": None,
-            },
+            "status": "success",
+            "check_code": BUDGET_CHECK_CODE,
+            "update_code": BUDGET_UPDATE_CODE,
+            "shared_states": BUDGET_SHARED_STATES,
         },
+        committed_examples=[purchase_entry("verify-expired", 1.0)],
+    )
+    install_result = ValidatorInstaller().register(
+        contract,
+        package,
         store=store,
         session_id="sess-1",
         task_id="task-1",
-        pending_examples=[
-            {
-                "tool_name": "checkout",
-                "host_action": "purchase",
-                "arguments": {"amount": 10.0},
-            }
-        ],
-        committed_examples=[purchase_entry("verify-expired", 1.0)],
     )
     version = install_result.validator_version
     assert version is not None
@@ -1064,41 +1191,45 @@ def test_post_action_runtime_failure_keeps_log_and_marks_state_degraded(tmp_path
     configure_logging(path=log_path)
     store = make_store()
     contract = store.add_contract(budget_contract())
-    snippet = """
-def update(state, entry, log, context):
-    state.setdefault("spent_cents", 0)
-    state.setdefault("seen_entry_seqs", [])
-    state.setdefault("unknown_spend_entry_seqs", [])
+    update_code = """
+def update(entry, log, context):
+    state = log.state_read()
+    spent_cents = state.get("spent_cents") or 0
+    seen_entry_seqs = list(state.get("seen_entry_seqs") or [])
     amount = (entry.get("arguments") or {}).get("amount")
     if amount == 13:
         raise ValueError("synthetic runtime failure")
-    if entry["seq"] not in state["seen_entry_seqs"]:
-        state["spent_cents"] += int(float(amount) * 100)
-        state["seen_entry_seqs"].append(entry["seq"])
-    return state
+    if entry["seq"] not in seen_entry_seqs:
+        seen_entry_seqs.append(entry["seq"])
+        log.state_write({
+            "spent_cents": spent_cents + int(float(amount) * 100),
+            "seen_entry_seqs": seen_entry_seqs,
+        })
+"""
 
-def check(action, state, log, context):
+    check_code = """
+def check(action, log, context):
     if not action.get("arguments"):
         return ask("missing action fields")
     return allow("ok")
 """
-    installed = ValidatorInstaller().install(
+    package = _verified_package(
+        store,
         contract,
         {
-            "status": "ready",
-            "snippet": snippet,
-            "initial_state": {
-                "spent_cents": 0,
-                "seen_entry_seqs": [],
-                "unknown_spend_entry_seqs": [],
-                "last_seen_seq": None,
-            },
+            "status": "success",
+            "check_code": check_code,
+            "update_code": update_code,
+            "shared_states": BUDGET_SHARED_STATES,
         },
+        committed_examples=[purchase_entry("verify-runtime-failure", 1.0)],
+    )
+    installed = ValidatorInstaller().register(
+        contract,
+        package,
         store=store,
         session_id="sess-1",
         task_id="task-1",
-        pending_examples=[{"tool_name": "checkout", "arguments": {"amount": 1}}],
-        committed_examples=[purchase_entry("verify-runtime-failure", 1.0)],
     )
     version = installed.validator_version
     assert version is not None

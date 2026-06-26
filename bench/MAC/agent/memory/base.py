@@ -14,6 +14,7 @@ class MemoryRequest:
     past_user_turns: list[dict[str, Any]]
     task: dict[str, Any]
     memory_llm: dict[str, Any] | None = None
+    agent_tools: list[dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)

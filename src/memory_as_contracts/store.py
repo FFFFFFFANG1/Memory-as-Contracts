@@ -40,7 +40,7 @@ from memory_as_contracts.schema_compat import (
 )
 
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 ASK_RESPONSE_TTL = timedelta(minutes=30)
 ACTION_LOG_SQL_COLUMNS = {
     "seq": "seq",
@@ -173,7 +173,6 @@ class ContractStore:
                 lifecycle_json TEXT NOT NULL,
                 action_constraints_json TEXT NOT NULL,
                 semantics_json TEXT,
-                tool_patterns_json TEXT,
                 validity_json TEXT,
                 dedup_fingerprint TEXT,
                 pattern_surface_hash TEXT,
@@ -187,7 +186,7 @@ class ContractStore:
             );
 
             CREATE VIRTUAL TABLE IF NOT EXISTS contracts_fts
-            USING fts5(contract_id UNINDEXED, text, source_span);
+            USING fts5(contract_id UNINDEXED, text);
 
             CREATE TABLE IF NOT EXISTS contract_edges (
                 id TEXT PRIMARY KEY,
@@ -350,7 +349,7 @@ class ContractStore:
         self.conn.commit()
 
     def _migrate_schema(self, version: int) -> None:
-        if version in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}:
+        if version in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}:
             self._ensure_contract_columns()
             self._ensure_action_log_columns()
             self._rebuild_action_log_without_task_or_org()
@@ -408,7 +407,6 @@ class ContractStore:
             "effect": "TEXT",
             "authority": "TEXT",
             "semantics_json": "TEXT",
-            "tool_patterns_json": "TEXT",
             "validity_json": "TEXT",
             "dedup_fingerprint": "TEXT",
             "pattern_surface_hash": "TEXT",
@@ -630,11 +628,11 @@ class ContractStore:
                 INSERT OR REPLACE INTO contracts (
                     id, text, kind, modality, strength, status, confidence,
                     effect, authority, source_json, scope_json, lifecycle_json, action_constraints_json,
-                    semantics_json, tool_patterns_json, validity_json,
+                    semantics_json, validity_json,
                     dedup_fingerprint, pattern_surface_hash,
                     compiled_predicates_json, override_json, supersedes_json,
                     conflicts_with_json, payload_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     contract.id,
@@ -655,7 +653,6 @@ class ContractStore:
                         )
                     ),
                     _dump_model(contract.semantics),
-                    _dump_json([pattern.model_dump(mode="json") for pattern in contract.tool_patterns]),
                     _dump_model(contract.validity),
                     contract_dedup_fingerprint(contract),
                     contract_pattern_surface_hash(contract),
@@ -670,8 +667,8 @@ class ContractStore:
             )
             self.conn.execute("DELETE FROM contracts_fts WHERE contract_id = ?", (contract.id,))
             self.conn.execute(
-                "INSERT INTO contracts_fts(contract_id, text, source_span) VALUES (?, ?, ?)",
-                (contract.id, contract.text, contract.source.span),
+                "INSERT INTO contracts_fts(contract_id, text) VALUES (?, ?)",
+                (contract.id, contract.text),
             )
         return contract
 
@@ -1206,10 +1203,17 @@ class ContractStore:
         self,
         version: ValidatorVersion,
         *,
-        initial_state: dict[str, Any],
         scope_key: str,
     ) -> ValidatorVersion:
-        expected_hash = hashlib.sha256(version.snippet.encode("utf-8")).hexdigest()
+        expected_hash = hashlib.sha256(
+            json.dumps(
+                {
+                    "check_code": version.check_code,
+                    "update_code": version.update_code,
+                },
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
         if not version.verification_hash or version.snippet_hash != expected_hash:
             raise ValueError("validator version is missing valid verification metadata")
         if version.status != PredicateStatus.ACTIVE:
@@ -1253,7 +1257,7 @@ class ContractStore:
                     validator_version_id=version.id,
                     scope_key=scope_key,
                     contract_id=version.contract_id,
-                    state=initial_state,
+                    state=version.shared_states,
                 )
                 self.conn.execute(
                     """
@@ -1758,8 +1762,6 @@ class ContractStore:
             payload["authority"] = row["authority"]
         if "semantics_json" in row_keys and row["semantics_json"]:
             payload["semantics"] = _load_json(row["semantics_json"])
-        if "tool_patterns_json" in row_keys and row["tool_patterns_json"]:
-            payload["tool_patterns"] = _load_json(row["tool_patterns_json"]) or []
         if "validity_json" in row_keys and row["validity_json"]:
             payload["validity"] = _load_json(row["validity_json"])
         return Contract.model_validate(normalize_rule_payload(payload))

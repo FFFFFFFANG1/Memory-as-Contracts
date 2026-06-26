@@ -57,7 +57,7 @@ class ValidatorRuntime:
                     validator_version_id=version.id,
                     scope_key=scope_key,
                     contract_id=version.contract_id,
-                    state=state.state if state is not None else version.initial_state,
+                    state=state.state if state is not None else version.shared_states,
                     revision=state.revision if state is not None else 0,
                     last_applied_seq=state.last_applied_seq if state is not None else None,
                     degraded=True,
@@ -126,7 +126,7 @@ class ValidatorRuntime:
         return self.runner.check(
             version,
             action=_pending_action_view(signature),
-            state=state.state if state is not None else version.initial_state,
+            state=state.state if state is not None else version.shared_states,
             log=log,
             context={
                 "contract_id": version.contract_id,
@@ -182,7 +182,7 @@ class ValidatorRuntime:
             validator_version_id=version.id,
             scope_key=scope_key,
             contract_id=version.contract_id,
-            state=state.state if state is not None else version.initial_state,
+            state=state.state if state is not None else version.shared_states,
             revision=state.revision if state is not None else 0,
             last_applied_seq=state.last_applied_seq if state is not None else None,
             degraded=True,
@@ -223,7 +223,7 @@ class ValidatorRuntime:
         log = ActionLogView(self.store, session_id=entry.session_id)
         new_state = self.runner.update(
             version,
-            state=state.state if state is not None else version.initial_state,
+            state=state.state if state is not None else version.shared_states,
             entry=entry.model_dump(mode="json"),
             log=log,
             context={
@@ -274,7 +274,7 @@ class ValidatorRuntime:
                 raise ValueError("scope_key is required when a validator has multiple states")
             scope_key = states[0].scope_key
         self.store.delete_validator_state(version.id, scope_key)
-        state: dict[str, Any] = dict(version.initial_state)
+        state: dict[str, Any] = dict(version.shared_states)
         revision = 0
         last_applied_seq = None
         for plan in self.dispatch.for_replay(version, scope_key=scope_key):
@@ -346,9 +346,10 @@ class ValidatorSandboxRunner:
                 self._run(
                     {
                         "mode": "check",
-                        "snippet": version.snippet,
+                        "code": version.check_code,
                         "action": action,
                         "state": state,
+                        "state_keys": list(version.shared_states),
                         "context": context,
                     },
                     log,
@@ -365,12 +366,15 @@ class ValidatorSandboxRunner:
         log: ActionLogView,
         context: dict[str, Any],
     ) -> dict[str, Any]:
+        if not version.update_code:
+            raise ValueError("validator update_code is not installed")
         result = self._run(
             {
                 "mode": "update",
-                "snippet": version.snippet,
+                "code": version.update_code,
                 "entry": entry,
                 "state": state,
+                "state_keys": list(version.shared_states),
                 "context": context,
             },
             log,
@@ -391,9 +395,10 @@ class ValidatorSandboxRunner:
         result = self._run(
             {
                 "mode": "check_inspect",
-                "snippet": version.snippet,
+                "code": version.check_code,
                 "action": action,
                 "state": state,
+                "state_keys": list(version.shared_states),
                 "context": context,
             },
             log,
@@ -451,7 +456,7 @@ class ValidatorSandboxRunner:
                         raise ValidatorSandboxError(
                             "validator sandbox returned invalid protocol JSON"
                         ) from exc
-                    if message.get("type") == "search":
+                    if message.get("type") in {"read", "search"}:
                         query_count += 1
                         if query_count > self.max_queries:
                             self._send_search_response(
@@ -548,23 +553,44 @@ SANDBOX_WORKER = textwrap.dedent(
         sys.stdout.write(json.dumps(message, separators=(",", ":")) + "\n")
         sys.stdout.flush()
 
-    class ActionLogView:
-        def __init__(self):
+    class ValidatorLog:
+        def __init__(self, state, state_keys, mode):
             self.request_id = 0
+            self.state = state
+            self.state_keys = set(state_keys)
+            self.mode = mode
 
-        def search(self, spec):
+        def read(self, spec):
             self.request_id += 1
             request_id = self.request_id
-            send({"type": "search", "id": request_id, "spec": spec})
+            send({"type": "read", "id": request_id, "spec": spec})
             line = sys.stdin.readline()
             if not line:
-                raise RuntimeError("action log search parent disconnected")
+                raise RuntimeError("action log read parent disconnected")
             response = json.loads(line)
             if response.get("type") != "search_result" or response.get("id") != request_id:
-                raise RuntimeError("invalid action log search response")
+                raise RuntimeError("invalid action log read response")
             if not response.get("ok"):
-                raise ValueError(response.get("error") or "action log search failed")
+                raise ValueError(response.get("error") or "action log read failed")
             return response.get("rows") or []
+
+        def state_read(self, key=None):
+            if key is None:
+                return dict(self.state)
+            if key not in self.state_keys:
+                raise KeyError(f"unknown shared state key: {key}")
+            return self.state.get(key)
+
+        def state_write(self, updates):
+            if self.mode != "update":
+                raise RuntimeError("state_write is only available in update")
+            if not isinstance(updates, dict):
+                raise TypeError("state_write expects a dict of updates")
+            unknown = set(updates) - self.state_keys
+            if unknown:
+                raise KeyError(f"unknown shared state key: {sorted(unknown)[0]}")
+            self.state.update(updates)
+            return dict(self.state)
 
     def verdict(decision):
         def make(reason, evidence_refs=None, confidence=1.0):
@@ -625,20 +651,23 @@ SANDBOX_WORKER = textwrap.dedent(
         "re": re,
     }
     try:
-        exec(payload["snippet"], namespace, namespace)
-        log = ActionLogView()
+        exec(payload["code"], namespace, namespace)
         state = dict(payload.get("state") or {})
+        log = ValidatorLog(state, payload.get("state_keys") or [], payload.get("mode"))
         context = dict(payload.get("context") or {})
         if payload["mode"] in {"check", "check_inspect"}:
             check = namespace.get("check")
             if not callable(check):
                 raise ValueError("validator snippet must define check")
-            result = check(payload.get("action") or {}, state, log, context)
+            result = check(payload.get("action") or {}, log, context)
             if payload["mode"] == "check_inspect":
                 result = {"verdict": result, "state": state}
         elif payload["mode"] == "update":
             update = namespace.get("update")
-            result = update(state, payload.get("entry") or {}, log, context) if callable(update) else state
+            if not callable(update):
+                raise ValueError("validator snippet must define update")
+            update(payload.get("entry") or {}, log, context)
+            result = state
         else:
             raise ValueError(f"unknown sandbox mode: {payload['mode']}")
         send({"type": "result", "ok": True, "result": result})

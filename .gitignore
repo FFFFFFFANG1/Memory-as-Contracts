@@ -21,6 +21,7 @@ bench/*
 !bench/MAC/**
 bench/CCTU/
 bench/MemoryArena/
+bench/MAC/agent/memory/repo/
 bench/SOPBench/
 bench/MAC/.cache/
 bench/MAC/**/results/

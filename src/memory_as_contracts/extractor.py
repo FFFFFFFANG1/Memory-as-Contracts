@@ -23,6 +23,8 @@ from memory_as_contracts.models import (
     Modality,
     RuleEffect,
     RuleSemantics,
+    Scope,
+    ScopeLevel,
     SourceKind,
     Strength,
     ToolPattern,
@@ -85,49 +87,59 @@ class LLMCallError(RuntimeError):
 
 
 CONTRACT_EXTRACTION_SYSTEM_PROMPT = """
-You extract agent behavior constraint candidates from user message histories and turn
-them into agent contracts.
+You turn source text (user messages, project docs, or memory exports) into durable
+behavioral contracts for an AI agent. A contract governs the agent's FUTURE actions; it is
+never one-off task content. The source text and any tool capsules are given in the user
+message.
 
+# What a MAC contract is
 A MAC contract is a user-stated or source-stated behavioral constraint that can
-legitimately influence future agent behavior. It is not merely useful context.
+legitimately shape future agent behavior. Recognize these kinds:
+- prohibition: forbids an action or class of actions. ("Do not push code without asking.")
+- requirement: requires an action, check, or condition before/after work. ("Run all tests before committing.")
+- procedure: specifies a workflow, command, or process. ("Use uv for this repo.")
+- preference: soft, behavior-shaping style or workflow guidance. ("Always include a block diagram when explaining code structure.")
+- exception: a concrete, narrower, temporary allowance overriding a broader rule in a bounded scope. ("For this module only, you may edit generated/sandbox/**.")
 
-Count as a contract when the text creates one of these future-facing constraints:
-1. Prohibition: forbids an action or class of actions.
-   Example: "Do not push code without asking."
-2. Requirement: requires an action, check, or condition before/after work.
-   Example: "Run all tests before committing."
-3. Procedure: specifies a workflow, command, or process.
-   Example: "Use uv for this repo."
-4. Preference: soft but behavior-shaping style or workflow guidance.
-   Example: "When explaining code structure, always include a block diagram."
-5. Exception: a concrete, narrower, temporary allowance that overrides a broader
-   rule in a bounded scope/lifecycle.
-   Example: "For this module only, you may edit generated/sandbox/**."
-6. Fact: stable contextual information that may help reasoning but must not
-   authorize, block, or require an action by itself.
-   Example: "This repo uses torch==2.5.1."
-
+# Durability filter
+Extract only durable constraints. A user-turn instruction is durable when it is repeated,
+or scoped beyond the current turn (global, session, project, or module within one project).
 Do not extract:
-- Ordinary task content that does not constrain future behavior.
-- Background facts as action-binding rules.
-- Single-turn instructions for only the current answer, reply, message, or tool
-  call. Ignore them by default; if an adapter intentionally keeps them, they may
-  only be non-durable preferences with immediate/per-turn scope.
-- Meta-statements about possible future exceptions, such as "unless a narrower
-  exception says so", unless the source states a concrete allowed action and
-  concrete scope.
-- Duplicate paraphrases as separate contracts when they express the same rule in
-  the same scope; choose the clearest wording and preserve the duplicate source
-  span if useful.
+- One-off instructions meant only for the current answer, reply, message, or tool call.
+- Ordinary task content, or background facts treated as action-binding rules.
+- Meta-statements about possible future exceptions (e.g. "unless a narrower exception says so") unless a concrete allowed action and scope are named.
+- Duplicate paraphrases of a rule already captured in the same scope; keep the clearest wording.
 
-Before returning, produce the final internally consistent contract set for this
-source only. Merge duplicate restatements. When the source gives incompatible
-instructions for the same scope and semantic action, treat the later explicit
-instruction as the final version and do not emit the superseded version. A
-concrete narrower allowance is an exception, not an unresolved conflict, so emit
-both the broader rule and the narrower exception. Do not compare against stored
-similar rules; cross-source and historical relations are handled after extraction.
-Return only valid JSON, no markdown.
+# Your task
+Read the user message history and return every durable contract it states. Inspect each bullet of a
+list independently. You propose the contract text, scope, semantics, enforcement shape, and
+tool patterns.
+
+# Output fields (return ONLY valid JSON, no markdown)
+Return one object: {"contracts": [<contract>, ...]}. Each <contract> has:
+- text: concise contract text, copied or tightly paraphrased from the source.
+- effect: one of deny, allow, require, prefer.
+- scope: {"level": one of global|session|project|module, ...}. For project/module include "project"; for module also include "module".
+- semantics: {"actions": [...], "tags": [...]} — retrieval/dedup/relation labels only; they do not enforce anything.
+- validator_enforcement_shape: one of no_validator, check_only, check_update.
+- check_patterns: native tool patterns for pending actions, using only tool names and arg names from the user-provided tool capsules.
+- update_patterns: native tool patterns for committed actions that update validator state.
+- state_fields: state keys maintained by check_update validators.
+
+# Enforcement plan
+Choose the lightest enforcement shape that can represent the contract:
+- no_validator: no generated validator and no action-time gate. Use for prompt-only contracts such as response style, planning/reporting preferences, or durable guidance that should be retrieved into the agent prompt. Set check_patterns, update_patterns, and state_fields to [].
+- check_only: action-time enforcement that can be decided from the pending action plus a bounded action-log lookup. Requires non-empty check_patterns; update_patterns and state_fields must be [].
+- check_update: stateful action-time enforcement. Use only when enforcement needs maintained state across committed actions. Requires non-empty check_patterns, non-empty update_patterns, and explicit state_fields.
+- If a deny/allow/require contract needs action-time enforcement but cannot be grounded to a native tool from the capsules, omit it rather than inventing tools or args.
+
+# Consistency
+- Before output, internally resolve duplicates, conflicts, superseded instructions, and
+  narrower exceptions; output only each contract's final effective form for this user
+  history, not the intermediate reasoning or discarded versions.
+
+# Output shape
+{"contracts": [{"text": "...", "effect": "require", "scope": {"level": "project", "project": "..."}, "semantics": {"actions": ["..."], "tags": ["..."]}, "validator_enforcement_shape": "check_only", "check_patterns": [{"tool": "<native tool name>", "args": {"<arg name>": {"regex": "..."}}}], "update_patterns": [], "state_fields": []}]}
 """.strip()
 
 
@@ -213,7 +225,6 @@ class HeuristicContractExtractor:
                 kind=source_kind,
                 conversation_id=context.conversation_id,
                 turn_id=context.turn_id,
-                span=sentence,
                 path=path,
                 fingerprint=fingerprint,
                 metadata=_source_metadata(context) if source_kind == SourceKind.USER_TURN else {},
@@ -221,8 +232,11 @@ class HeuristicContractExtractor:
             )
             scope = self.scope_normalizer.normalize(sentence, context.normalization)
             semantics = _infer_semantics(sentence)
-            tool_patterns = _infer_tool_patterns(sentence, scope.path_globs)
             validator_shape = _infer_validator_enforcement_shape(sentence)
+            check_patterns = _infer_check_patterns(sentence, validator_shape) or _infer_tool_patterns(
+                sentence,
+                [],
+            )
             contracts.append(
                 Contract(
                     text=sentence,
@@ -233,12 +247,11 @@ class HeuristicContractExtractor:
                     scope=scope,
                     lifecycle=self.lifecycle_normalizer.normalize(sentence, context.normalization),
                     semantics=semantics,
-                    tool_patterns=tool_patterns,
+                    check_patterns=check_patterns,
                     validator_enforcement_shape=validator_shape,
-                    check_patterns=_infer_check_patterns(sentence, validator_shape),
                     update_patterns=_infer_update_patterns(sentence, validator_shape),
                     state_fields=_infer_state_fields(sentence, validator_shape),
-                    status=_status_for_patterns(kind, tool_patterns),
+                    status=_status_for_patterns(kind, check_patterns),
                 )
             )
         return contracts
@@ -375,7 +388,7 @@ class CandidateJsonContractExtractor:
 
     def extract_user_turn(self, *, text: str, context: ExtractionContext) -> list[Contract]:
         return self._extract_candidates(
-            prompt=_user_turn_candidate_prompt(text),
+            prompt=_user_turn_candidate_prompt(text, context),
             text=text,
             source_kind=SourceKind.USER_TURN,
             context=context,
@@ -419,7 +432,7 @@ class CandidateJsonContractExtractor:
         candidates = _parse_candidate_payload(raw)
         contracts: list[Contract] = []
         for item in candidates:
-            contract_text = str(item.get("text") or item.get("source_span") or "").strip()
+            contract_text = str(item.get("text") or "").strip()
             if not contract_text:
                 continue
             if source_kind == SourceKind.USER_TURN and _is_single_turn_instruction(contract_text):
@@ -450,10 +463,7 @@ class CandidateJsonContractExtractor:
                     *inferred_semantics.tags,
                 }
             )
-            scope = self.scope_normalizer.normalize(contract_text, context.normalization)
-            tool_patterns = _parse_tool_patterns(item.get("tool_patterns"))
-            if not tool_patterns:
-                tool_patterns = _infer_tool_patterns(contract_text, scope.path_globs)
+            scope = _parse_scope(item.get("scope"), contract_text, context, self.scope_normalizer)
             proposed_validator_shape = _parse_validator_shape(
                 item.get("validator_enforcement_shape") or item.get("enforcement_shape")
             )
@@ -465,6 +475,8 @@ class CandidateJsonContractExtractor:
             update_patterns = _parse_tool_patterns(item.get("update_patterns"))
             if validator_shape != ValidatorEnforcementShape.NO_VALIDATOR and not check_patterns:
                 check_patterns = _infer_check_patterns(contract_text, validator_shape)
+            if not check_patterns:
+                check_patterns = _infer_tool_patterns(contract_text, [])
             if validator_shape == ValidatorEnforcementShape.CHECK_UPDATE and not update_patterns:
                 update_patterns = _infer_update_patterns(contract_text, validator_shape)
             state_fields = _string_list(item.get("state_fields")) or _infer_state_fields(
@@ -482,7 +494,6 @@ class CandidateJsonContractExtractor:
                 kind=source_kind,
                 conversation_id=context.conversation_id,
                 turn_id=context.turn_id,
-                span=str(item.get("source_span") or contract_text),
                 path=path,
                 fingerprint=fingerprint,
                 metadata=_source_metadata(context) if source_kind == SourceKind.USER_TURN else {},
@@ -501,12 +512,11 @@ class CandidateJsonContractExtractor:
                         contract_text, context.normalization
                     ),
                     semantics=RuleSemantics(actions=semantic_actions, tags=semantic_tags),
-                    tool_patterns=tool_patterns,
                     validator_enforcement_shape=validator_shape,
                     check_patterns=check_patterns,
                     update_patterns=update_patterns,
                     state_fields=state_fields,
-                    status=_status_for_patterns(kind, tool_patterns),
+                    status=_status_for_patterns(kind, check_patterns),
                 )
             )
         return contracts
@@ -622,8 +632,8 @@ def _infer_semantics(text: str) -> RuleSemantics:
     return RuleSemantics(actions=sorted(host_actions), tags=sorted(tags))
 
 
-def _status_for_patterns(kind: ContractKind, tool_patterns: list[ToolPattern]) -> ContractStatus:
-    if kind == ContractKind.PROHIBITION and not tool_patterns:
+def _status_for_patterns(kind: ContractKind, check_patterns: list[ToolPattern]) -> ContractStatus:
+    if kind == ContractKind.PROHIBITION and not check_patterns:
         return ContractStatus.CANDIDATE
     return ContractStatus.ACTIVE
 
@@ -739,6 +749,49 @@ def _parse_tool_patterns(value) -> list[ToolPattern]:
     return patterns
 
 
+def _parse_scope(
+    value: object,
+    contract_text: str,
+    context: ExtractionContext,
+    normalizer: ScopeNormalizer,
+) -> Scope:
+    fallback = normalizer.normalize(contract_text, context.normalization)
+    if not isinstance(value, dict):
+        return fallback
+    level = str(value.get("level") or "").strip().lower()
+    if level not in {item.value for item in ScopeLevel}:
+        return fallback
+    project = str(value.get("project") or "").strip() or fallback.project or fallback.workspace
+    module = str(value.get("module") or "").strip() or None
+    try:
+        if level == ScopeLevel.GLOBAL.value:
+            return Scope(level=ScopeLevel.GLOBAL, user_id=context.normalization.user_id)
+        if level == ScopeLevel.SESSION.value:
+            return Scope(
+                level=ScopeLevel.SESSION,
+                workspace=context.normalization.workspace,
+                user_id=context.normalization.user_id,
+            )
+        if level == ScopeLevel.PROJECT.value:
+            return Scope(
+                level=ScopeLevel.PROJECT,
+                workspace=context.normalization.workspace or project,
+                project=project,
+                user_id=context.normalization.user_id,
+            )
+        if level == ScopeLevel.MODULE.value:
+            return Scope(
+                level=ScopeLevel.MODULE,
+                workspace=context.normalization.workspace or project,
+                project=project,
+                module=module,
+                user_id=context.normalization.user_id,
+            )
+    except ValueError:
+        return fallback
+    return fallback
+
+
 def _infer_tool_patterns(text: str, path_globs: list[str]) -> list[ToolPattern]:
     semantics = _infer_semantics(text)
     patterns: list[ToolPattern] = []
@@ -851,87 +904,35 @@ def _dedupe_tool_patterns(patterns: list[ToolPattern]) -> list[ToolPattern]:
     return result
 
 
-def _user_turn_candidate_prompt(text: str) -> str:
-    return _candidate_prompt(
-        text=text,
-        source_kind=SourceKind.USER_TURN,
-        source_instruction=(
-            "This is an online user turn. Use the fixed user-turn extraction policy: "
-            "durable contracts only come from repeated instructions or instructions "
-            "with task, session, project, repo, file/path, component/module, "
-            "organization, or global scope."
-        ),
-    )
+_EXTRACTION_TASK_LINE = (
+    "Extract candidate contracts that agent must obey in later actions from the source text."
+)
+
+
+def _user_turn_candidate_prompt(text: str, context: ExtractionContext | None = None) -> str:
+    """Build the user message: tool capsules first (KV-cache stable), then the source text.
+
+    All extraction requirements live in CONTRACT_EXTRACTION_SYSTEM_PROMPT. The user message
+    only carries the per-agent tool capsules, any similar-rule context, and the source text.
+    """
+    sections: list[str] = []
+    if context is not None and context.tool_capsule_system_prompt:
+        sections.append(context.tool_capsule_system_prompt)
+    sections.append(_EXTRACTION_TASK_LINE)
+    if context is not None and context.similar_rules_system_prompt:
+        sections.append(context.similar_rules_system_prompt)
+    sections.append(f"Source text:\n{text}")
+    return "\n\n".join(sections)
 
 
 def _cold_start_candidate_prompt(text: str, source_kind: SourceKind) -> str:
-    return _candidate_prompt(
-        text=text,
-        source_kind=source_kind,
-        source_instruction=(
-            "This is a cold-start source. Host adapters may replace this prompt for "
-            "agent-specific instruction files, memory exports, and project docs. "
-            "Preserve source provenance and avoid treating stale or descriptive text "
-            "as current user-turn authority."
-        ),
-    )
-
-
-def _candidate_prompt(text: str, source_kind: SourceKind, source_instruction: str) -> str:
-    return f"""
-Extract candidate contracts that agent must obey in later actions from the source text.
-
-Return exactly one JSON object with a "contracts" array. Each contract object must use:
-- text: concise behavioral contract text copied or tightly paraphrased from the source
-- source_span: exact source span when possible
-- effect: one of deny, allow, require, prefer
-- semantics.actions: compact semantic action labels for retrieval, dedup, and relation analysis
-- semantics.tags: compact semantic tags for retrieval, dedup, and relation analysis
-- tool_patterns: required non-empty deterministic operational patterns using native tool names and raw argument names from the provided tool capsules. Each item is {{"tool":"NativeToolName","args":{{"arg_name":{{"regex":"...", "path_glob":"...", "mentions_path_glob":"..."}}}}}}.
-- validator_enforcement_shape: one of no_validator, check_only, check_update
-- check_patterns: native tool patterns for pending actions that require validator check
-- update_patterns: native tool patterns for committed actions that update materialized state
-- state_fields: state keys maintained by check_update validators
-
-Rules:
-- Source kind is {source_kind.value}. {source_instruction}
-- Add durable user-turn contracts only when the text is repeated across turns/sources or clearly scopes beyond the current turn, such as task, session, project, repo, file/path, component/module, organization, or global scope.
-- Semantics is only the behavioral summary used for retrieval and relation checks. It does not replace tool_patterns.
-- For non-gated preferences or procedures about planning, explanations, reports, summaries, or final answers, use the reserved MAC prompt-intake surface {{"tool":"agent.response"}}. `agent.response` is the only valid pattern surface that does not need to appear in host tool capsules. Do not omit a durable response/planning preference merely because it has no host tool, and do not use agent.response for deny/allow hook enforcement.
-- Every returned contract must include at least one valid tool_patterns entry. If a deny/allow/require rule cannot be grounded to a native tool pattern from the available tool capsules, omit that item from this extraction response.
-- Extractor proposes patterns and enforcement shape only; it never writes Python.
-- Use check_only when enforcement needs only the Pending Action plus a bounded Action Log search.
-- Use check_update only when enforcement needs an incrementally maintained numeric or symbolic state. A simple prior-action query such as "run tests before push" must not use update_patterns.
-- For no_validator, return empty check_patterns, update_patterns, and state_fields.
-- For check_only, return non-empty check_patterns and empty update_patterns/state_fields.
-- For check_update, return non-empty check_patterns/update_patterns and explicit state_fields.
-- Tool names and argument fields in all patterns must come from the provided adapter tool capsules.
-- Temporary/narrow allowance that overrides a broader rule must use effect "allow", but only when the source names a concrete allowed action and concrete scope. Do not extract meta exception language such as "unless a narrower exception says so" as its own exception.
-- Non-obvious workflow preferences still count if they constrain future behavior.
-- Represent every explicit durable rule in the source that can be grounded to a valid tool pattern. For bullet lists, inspect every bullet independently before returning.
-- Return the final internally consistent contract set for this source. Merge duplicate restatements that impose the same behavior and scope, keeping the clearest and most complete version.
-- When this source contains incompatible instructions for the same scope and semantic action, treat the later explicit instruction as the final version and emit only the final effective version. Do not keep the superseded local version.
-- A concrete narrower allowance is an exception rather than an unresolved conflict. Emit both the broader rule and the narrower exception so the Conflict Resolver can create the scoped edge.
-- When existing similar rules are provided in the system prompt, use them only to avoid re-emitting duplicates. Cross-source and historical relation resolution still happens after extraction.
-- Before returning, perform a source-coverage check: every explicit durable prohibition, requirement, concrete exception, and future-facing preference must either appear in the contracts array or be intentionally omitted because it cannot be grounded to an available tool surface.
-- For hook matching, tool is exact native tool name. Parameter constraints match raw tool argument strings.
-    Example: for Claude Code Bash git push, use {{"tool":"Bash","args":{{"command":{{"regex":"^git\\\\s+push(\\\\s|$)"}}}}}}.
-
-Return JSON shape:
-{{"contracts": [{{"text": "Do not run git push until I approve it.", "source_span": "do not run git push until I approve it", "effect": "deny", "semantics": {{"actions": ["git.push"], "tags": ["publish_code", "external_write"]}}, "tool_patterns": [{{"tool": "Bash", "args": {{"command": {{"regex": "^git\\\\s+push(\\\\s|$)"}}}}}}], "validator_enforcement_shape": "check_only", "check_patterns": [{{"tool": "Bash", "args": {{"command": {{"regex": "^git\\\\s+push(\\\\s|$)"}}}}}}], "update_patterns": [], "state_fields": []}}]}}
-
-Source text:
-{text}
-""".strip()
+    del source_kind
+    return f"{_EXTRACTION_TASK_LINE}\n\nSource text:\n{text}"
 
 
 def _system_prompt_for_context(context: ExtractionContext) -> str:
-    parts = [CONTRACT_EXTRACTION_SYSTEM_PROMPT]
-    if context.tool_capsule_system_prompt:
-        parts.append(context.tool_capsule_system_prompt)
-    if context.similar_rules_system_prompt:
-        parts.append(context.similar_rules_system_prompt)
-    return "\n\n".join(parts)
+    del context
+    return CONTRACT_EXTRACTION_SYSTEM_PROMPT
 
 
 def _source_metadata(context: ExtractionContext) -> dict[str, str]:
@@ -949,14 +950,7 @@ def _call_response_provider(
 ) -> str:
     if _accepts_system_prompt(response_provider):
         return response_provider(prompt, system_prompt=system_prompt)  # type: ignore[call-arg]
-    if system_prompt == CONTRACT_EXTRACTION_SYSTEM_PROMPT:
-        return response_provider(prompt)
-    return response_provider(
-        "Additional system context for this extraction call:\n"
-        f"{system_prompt}\n\n"
-        "Extraction task prompt:\n"
-        f"{prompt}"
-    )
+    return response_provider(f"{system_prompt}\n\n{prompt}")
 
 
 def _accepts_system_prompt(response_provider: Callable[[str], str]) -> bool:

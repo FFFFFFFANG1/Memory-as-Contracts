@@ -13,7 +13,7 @@ def test_mac_logging_writes_structured_json_without_protocol_stdout(tmp_path) ->
         logger,
         "validator.installation",
         contract_id="MAC-1",
-        status="installed",
+        status="success",
     )
     for handler in logging.getLogger("memory_as_contracts").handlers:
         handler.flush()
@@ -21,5 +21,5 @@ def test_mac_logging_writes_structured_json_without_protocol_stdout(tmp_path) ->
     payload = json.loads(log_path.read_text(encoding="utf-8").strip())
     assert payload["event"] == "validator.installation"
     assert payload["contract_id"] == "MAC-1"
-    assert payload["status"] == "installed"
+    assert payload["status"] == "success"
     assert payload["level"] == "INFO"

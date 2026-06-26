@@ -31,7 +31,7 @@ from memory_as_contracts.store import ContractStore
 from memory_as_contracts.tool_capsules import ToolCapabilityCapsule, object_schema
 
 
-def _contract(*, tool_patterns: list[ToolPattern]) -> Contract:
+def _contract(*, check_patterns: list[ToolPattern]) -> Contract:
     return Contract(
         id="MAC-pattern",
         text="Do not push code.",
@@ -40,13 +40,12 @@ def _contract(*, tool_patterns: list[ToolPattern]) -> Contract:
         strength=Strength.HARD,
         source=ContractSource(
             kind=SourceKind.USER_TURN,
-            span="Do not push code.",
             created_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
         ),
-        scope=Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project"),
+        scope=Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project", project="project"),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
         semantics=RuleSemantics(actions=["git.push"]),
-        tool_patterns=tool_patterns,
+        check_patterns=check_patterns,
     )
 
 
@@ -66,7 +65,7 @@ def _bash_capsule() -> ToolCapabilityCapsule:
 
 def test_rule_schema_has_no_declarative_targets() -> None:
     rule = _contract(
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(
                 tool="Bash",
                 args={"command": ArgPattern(regex=r"^git\s+push(?:\s|$)")},
@@ -82,7 +81,7 @@ def test_pattern_verifier_checks_tool_schema_and_regex() -> None:
 
     accepted = verifier.verify(
         _contract(
-            tool_patterns=[
+            check_patterns=[
                 ToolPattern(
                     tool="Bash",
                     args={"command": ArgPattern(regex=r"^git\s+push(?:\s|$)")},
@@ -92,7 +91,7 @@ def test_pattern_verifier_checks_tool_schema_and_regex() -> None:
     )
     rejected = verifier.verify(
         _contract(
-            tool_patterns=[
+            check_patterns=[
                 ToolPattern(
                     tool="Bash",
                     args={"cmd": ArgPattern(regex="(")},
@@ -117,9 +116,9 @@ def test_pattern_provisioner_refines_at_most_once() -> None:
     def provider(prompt: str) -> str:
         calls.append(prompt)
         return (
-            '{"tool_patterns":[{"tool":"Bash","args":{"command":'
+            '{"check_patterns":[{"tool":"Bash","args":{"command":'
             '{"regex":"^git\\\\s+push(?:\\\\s|$)"}}}],'
-            '"check_patterns":[],"update_patterns":[]}'
+            '"update_patterns":[]}'
         )
 
     result = PatternProvisioner(
@@ -127,7 +126,7 @@ def test_pattern_provisioner_refines_at_most_once() -> None:
         response_provider=provider,
     ).provision(
         _contract(
-            tool_patterns=[
+            check_patterns=[
                 ToolPattern(tool="Bash", args={"cmd": ArgPattern(regex="(")})
             ]
         )
@@ -136,7 +135,7 @@ def test_pattern_provisioner_refines_at_most_once() -> None:
     assert result.verification.accepted is True
     assert result.refined is True
     assert result.contract.status == ContractStatus.ACTIVE
-    assert result.contract.tool_patterns[0].args["command"].regex
+    assert result.contract.check_patterns[0].args["command"].regex
     assert len(calls) == 1
     assert "invalid_regex" in calls[0]
     assert "unknown_argument" in calls[0]
@@ -149,15 +148,15 @@ def test_pattern_provisioner_keeps_invalid_rule_non_hookable_after_one_refine() 
         nonlocal calls
         calls += 1
         return (
-            '{"tool_patterns":[{"tool":"Bash","args":{"missing":'
-            '{"regex":"("}}}],"check_patterns":[],"update_patterns":[]}'
+            '{"check_patterns":[{"tool":"Bash","args":{"missing":'
+            '{"regex":"("}}}],"update_patterns":[]}'
         )
 
     result = PatternProvisioner(
         verifier=PatternVerifier([_bash_capsule()]),
         response_provider=provider,
     ).provision(
-        _contract(tool_patterns=[ToolPattern(tool="UnknownTool")])
+        _contract(check_patterns=[ToolPattern(tool="UnknownTool")])
     )
 
     assert result.verification.accepted is False
@@ -169,7 +168,7 @@ def test_pattern_matching_has_only_matched_and_not_matched() -> None:
     compiler = PolicyCompiler()
     predicate = compiler.compile(
         _contract(
-            tool_patterns=[
+            check_patterns=[
                 ToolPattern(
                     tool="Bash",
                     args={"command": ArgPattern(regex=r"^git\s+push(?:\s|$)")},
@@ -198,7 +197,7 @@ def test_gate_does_not_materialize_unverified_contract_patterns() -> None:
     store.init_db()
     store.add_contract(
         _contract(
-            tool_patterns=[
+            check_patterns=[
                 ToolPattern(
                     tool="Bash",
                     args={"command": ArgPattern(regex=r"^git\s+push(?:\s|$)")},
@@ -214,6 +213,7 @@ def test_gate_does_not_materialize_unverified_contract_patterns() -> None:
             agent_family="claude_code",
             session_id="sess-1",
             cwd="/workspace/project",
+            repo="project",
         ),
     )
 
@@ -227,7 +227,7 @@ def test_pattern_installer_is_the_only_verify_compile_store_path() -> None:
     store = ContractStore(":memory:")
     store.init_db()
     contract = _contract(
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(
                 tool="Bash",
                 args={"command": ArgPattern(regex=r"^git\s+push(?:\s|$)")},
@@ -246,6 +246,7 @@ def test_pattern_installer_is_the_only_verify_compile_store_path() -> None:
             agent_family="claude_code",
             session_id="sess-1",
             cwd="/workspace/project",
+            repo="project",
         ),
     )
 

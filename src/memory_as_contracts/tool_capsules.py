@@ -33,7 +33,7 @@ def render_tool_capsule_system_prompt(
     return (
         "Tool definitions available to the acting agent are provided below as read-only "
         "environment context. Do not extract contracts from these tool definitions. Use "
-        "them only to ground tool_patterns with exact native tool names and "
+        "them only to ground check_patterns with exact native tool names and "
         "raw parameter names when the source text states a user or source contract.\n\n"
         f"{json.dumps(payload, indent=2, sort_keys=True)}"
     )

@@ -122,7 +122,7 @@ def test_live_llm_effectiveness_boundary_for_overlap_conflict_duplicates_and_pre
     for contract in store.list_contracts(
         [ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT]
     ):
-        if contract.tool_patterns:
+        if contract.check_patterns:
             pattern_installer.install(contract)
 
     edges = store.list_edges()
@@ -207,17 +207,17 @@ def test_live_llm_repairs_invalid_native_pattern_once() -> None:
                     "authority": "user_explicit",
                     "source": {
                         "kind": "user_turn",
-                        "span": "Do not run git push.",
                     },
                     "scope": {
                         "level": "project",
                         "workspace": "/workspace/project",
+                        "project": "project",
                     },
                     "semantics": {
                         "actions": ["git.push"],
                         "tags": ["publish_code"],
                     },
-                    "tool_patterns": [
+                    "check_patterns": [
                         ToolPattern(
                             tool="exec_command",
                             args={"command": ArgPattern(regex="(")},
@@ -235,7 +235,7 @@ def test_live_llm_repairs_invalid_native_pattern_once() -> None:
     assert result.verification.accepted is True, [
         issue.__dict__ for issue in result.verification.issues
     ]
-    assert result.contract.tool_patterns
+    assert result.contract.check_patterns
 
 
 def _live_provider_or_skip() -> OpenAIChatResponseProvider:
@@ -256,7 +256,7 @@ def _diagnostics(contracts: list[Contract]) -> list[dict]:
             "source": contract.source.kind.value,
             "scope": contract.scope.model_dump(mode="json"),
             "semantics": contract.semantics.model_dump(mode="json"),
-            "tool_patterns": [pattern.model_dump(mode="json") for pattern in contract.tool_patterns],
+            "check_patterns": [pattern.model_dump(mode="json") for pattern in contract.check_patterns],
         }
         for contract in contracts
     ]

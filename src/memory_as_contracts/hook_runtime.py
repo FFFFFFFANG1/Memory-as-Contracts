@@ -376,7 +376,7 @@ class MacHookRuntime:
                 store.add_validator_installation(
                     ValidatorInstallationRecord(
                         contract_id=contract.id,
-                        status=ValidatorInstallationStatus.MANUAL_REVIEW,
+                        status=ValidatorInstallationStatus.FAILED,
                         errors=[str(exc)],
                     )
                 )
@@ -385,7 +385,7 @@ class MacHookRuntime:
                     "validator.installation",
                     level=logging.ERROR,
                     contract_id=contract.id,
-                    status=ValidatorInstallationStatus.MANUAL_REVIEW.value,
+                    status=ValidatorInstallationStatus.FAILED.value,
                     error_type=exc.__class__.__name__,
                 )
                 continue

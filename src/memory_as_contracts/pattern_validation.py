@@ -25,8 +25,8 @@ Return only valid JSON.
 
 The rule text, effect, authority, scope, semantics, validity, source, lifecycle,
 status, and validator enforcement shape are immutable. You may only rewrite
-tool_patterns, check_patterns, and update_patterns. Tool names and argument
-names must exist in the provided tool capsules. Every regex must compile.
+check_patterns and update_patterns. Tool names and argument names must exist in
+the provided tool capsules. Every regex must compile.
 """.strip()
 
 
@@ -69,28 +69,17 @@ class PatternVerifier:
         issues: list[PatternValidationIssue] = []
         if (
             contract.kind != ContractKind.FACT
-            and contract.validator_enforcement_shape
-            == ValidatorEnforcementShape.NO_VALIDATOR
-            and not contract.tool_patterns
+            and not contract.check_patterns
         ):
-            issues.append(
-                PatternValidationIssue(
-                    code="missing_tool_patterns",
-                    field="tool_patterns",
-                    message="non-fact rules require at least one operational tool pattern",
-                )
-            )
-        self._verify_group("tool_patterns", contract.tool_patterns, issues)
-
-        shape = contract.validator_enforcement_shape
-        if shape != ValidatorEnforcementShape.NO_VALIDATOR and not contract.check_patterns:
             issues.append(
                 PatternValidationIssue(
                     code="missing_check_patterns",
                     field="check_patterns",
-                    message="validator rules require at least one check pattern",
+                    message="non-fact rules require at least one check pattern",
                 )
             )
+
+        shape = contract.validator_enforcement_shape
         self._verify_group("check_patterns", contract.check_patterns, issues)
 
         if shape == ValidatorEnforcementShape.CHECK_UPDATE and not contract.update_patterns:
@@ -232,10 +221,6 @@ class PatternProvisioner:
             )
             refined = contract.model_copy(
                 update={
-                    "tool_patterns": [
-                        ToolPattern.model_validate(item)
-                        for item in payload["tool_patterns"]
-                    ],
                     "check_patterns": [
                         ToolPattern.model_validate(item)
                         for item in payload["check_patterns"]
@@ -304,7 +289,7 @@ class PatternInstaller:
         provisioned = self.provisioner.provision(contract)
         installed_contract = self.store.add_contract(provisioned.contract)
         pattern_version = None
-        if provisioned.verification.accepted and installed_contract.tool_patterns:
+        if provisioned.verification.accepted and installed_contract.check_patterns:
             compiled = self.compiler.compile(installed_contract)
             if compiled.has_binding_predicates():
                 pattern_version = self.store.install_rule_pattern_version(compiled)
@@ -334,9 +319,6 @@ def _pattern_refinement_prompt(
             "state_fields": contract.state_fields,
         },
         "current_patterns": {
-            "tool_patterns": [
-                pattern.model_dump(mode="json") for pattern in contract.tool_patterns
-            ],
             "check_patterns": [
                 pattern.model_dump(mode="json") for pattern in contract.check_patterns
             ],
@@ -357,7 +339,7 @@ def _pattern_refinement_prompt(
     return (
         f"{PATTERN_REFINEMENT_SYSTEM_PROMPT}\n\n"
         "Repair only the pattern fields listed in verification_errors. Return exactly:\n"
-        '{"tool_patterns":[],"check_patterns":[],"update_patterns":[]}\n\n'
+        '{"check_patterns":[],"update_patterns":[]}\n\n'
         f"Input:\n{json.dumps(payload, sort_keys=True)}"
     )
 
@@ -374,7 +356,7 @@ def _load_pattern_payload(raw: str) -> dict[str, list[dict[str, Any]]]:
     if not isinstance(payload, dict):
         raise ValueError("pattern refinement response must be a JSON object")
     result: dict[str, list[dict[str, Any]]] = {}
-    for key in ("tool_patterns", "check_patterns", "update_patterns"):
+    for key in ("check_patterns", "update_patterns"):
         value = payload.get(key)
         if not isinstance(value, list):
             raise ValueError(f"{key} must be a list")

@@ -60,10 +60,10 @@ supersedes when the new text explicitly replaces/corrects the old rule. Never
 classify such a pair as duplicate, refinement, or independent.
 
 Classify semantic rule relations from text, effect, authority, scope, validity,
-semantics.actions, and semantics.tags. tool_patterns are operational
+semantics.actions, and semantics.tags. check_patterns are operational
 hook matchers; use them only as weak auxiliary evidence about the same target or
-invocation surface. Different native tool patterns do not make overlapping
-rules independent, and similar tool patterns do not by themselves prove a
+invocation surface. Different native check patterns do not make overlapping
+rules independent, and similar check patterns do not by themselves prove a
 duplicate or conflict when the semantics differ.
 Never infer override. Override edges are created by explicit runtime/user events,
 not by semantic relation classification.
@@ -489,19 +489,21 @@ class ConflictResolver:
             return None
         by_id = {item.existing.id: item for item in relation_candidates}
         decisions: list[RelationDecision] = []
+        seen_existing_ids: set[str] = set()
         for row in rows:
             if not isinstance(row, dict):
                 continue
             existing_id = str(row.get("existing_id") or "")
             relation = _relation_from_value(row.get("relation"))
             item = by_id.get(existing_id)
-            if item is None or relation is None:
+            if item is None or relation is None or existing_id in seen_existing_ids:
                 continue
             relation = self._validate_llm_relation(
                 candidate,
                 item.existing,
                 relation,
             )
+            seen_existing_ids.add(existing_id)
             decisions.append(
                 RelationDecision(
                     candidate=candidate,
@@ -586,7 +588,12 @@ class ConflictResolver:
             relation = _relation_from_value(row.get("relation"))
             candidate = candidates_by_id.get(candidate_id)
             item = by_pair.get((candidate_id, existing_id))
-            if candidate is None or item is None or relation is None:
+            if (
+                candidate is None
+                or item is None
+                or relation is None
+                or (candidate_id, existing_id) in seen_pairs
+            ):
                 continue
             relation = self._validate_llm_relation(
                 candidate,
@@ -807,7 +814,7 @@ def _relation_prompt(candidate: Contract, relation_candidates: list[RelationCand
         "Similarity is retrieval evidence: 0.55 * text_score + 0.30 * semantic "
         "overlap + 0.15 * operational pattern overlap. text_score is BM25 over "
         "contract text; pattern_score is weak auxiliary overlap over "
-        "tool_patterns, not semantic overlap.\n"
+        "check_patterns, not semantic overlap.\n"
         "Classify every candidate pair. Return exactly this JSON shape:\n"
         '{"relations":[{"existing_id":"MAC-...",'
         '"relation":"duplicate|refinement|supersedes|conflicts_with|exception_to|independent",'
@@ -862,7 +869,7 @@ def _batch_relation_prompt(
         "share at least one retrieved existing rule, so classify the component as "
         "one graph rather than as independent pairwise updates.\n"
         "Use semantics.actions/tags and scope for semantic overlap; treat "
-        "tool_patterns only as weak operational evidence.\n"
+        "check_patterns only as weak operational evidence.\n"
         "Return relation edges only; do not decide final active/rejected/superseded "
         "status. The deterministic apply phase handles status updates.\n"
         "Return exactly this JSON shape:\n"
@@ -885,7 +892,7 @@ def _contract_payload(contract: Contract) -> dict:
         "scope": contract.scope.model_dump(mode="json"),
         "validity": contract.validity.model_dump(mode="json"),
         "semantics": contract.semantics.model_dump(mode="json"),
-        "tool_patterns": [pattern.model_dump(mode="json") for pattern in contract.tool_patterns],
+        "check_patterns": [pattern.model_dump(mode="json") for pattern in contract.check_patterns],
         "predicate_pattern": _predicate_pattern_text(contract),
     }
 
@@ -969,8 +976,6 @@ def _overlaps(left: Contract, right: Contract) -> bool:
         return False
     if not _semantic_surface_compatible(left, right):
         return False
-    if left.scope.path_globs and right.scope.path_globs:
-        return _path_globs_overlap(left.scope.path_globs, right.scope.path_globs)
     return True
 
 
@@ -979,8 +984,6 @@ def _scope_lifecycle_overlaps(left: Contract, right: Contract) -> bool:
         return False
     if not _scope_boundaries_compatible(left.scope, right.scope):
         return False
-    if left.scope.path_globs and right.scope.path_globs:
-        return _path_globs_overlap(left.scope.path_globs, right.scope.path_globs)
     left_start = left.lifecycle.effective_from
     right_start = right.lifecycle.effective_from
     left_end = left.lifecycle.expires_at
@@ -995,19 +998,14 @@ def _scope_lifecycle_overlaps(left: Contract, right: Contract) -> bool:
 def _scope_boundaries_compatible(left: Scope, right: Scope) -> bool:
     scalar_boundaries = (
         "workspace",
-        "repo",
-        "task",
-        "component",
-        "organization",
+        "project",
+        "module",
         "user_id",
     )
     for field_name in scalar_boundaries:
         left_value = getattr(left, field_name)
         right_value = getattr(right, field_name)
         if left_value and right_value and left_value != right_value:
-            return False
-    if left.agent_family and right.agent_family:
-        if not set(left.agent_family).intersection(right.agent_family):
             return False
     return True
 
@@ -1102,10 +1100,8 @@ def _scope_contains(broader: Scope, narrower: Scope) -> tuple[bool, bool]:
     strict = False
     scalar_boundaries = (
         "workspace",
-        "repo",
-        "task",
-        "component",
-        "organization",
+        "project",
+        "module",
         "user_id",
     )
     for field_name in scalar_boundaries:
@@ -1115,26 +1111,6 @@ def _scope_contains(broader: Scope, narrower: Scope) -> tuple[bool, bool]:
             return False, False
         if not broad_value and narrow_value:
             strict = True
-    if broader.agent_family:
-        broad_families = set(broader.agent_family)
-        narrow_families = set(narrower.agent_family)
-        if not narrow_families or not narrow_families.issubset(broad_families):
-            return False, False
-        strict = strict or narrow_families != broad_families
-    elif narrower.agent_family:
-        strict = True
-    if broader.path_globs:
-        if not narrower.path_globs:
-            return False, False
-        for narrow_glob in narrower.path_globs:
-            if not any(
-                _glob_contains(broad_glob, narrow_glob)
-                for broad_glob in broader.path_globs
-            ):
-                return False, False
-        strict = strict or set(narrower.path_globs) != set(broader.path_globs)
-    elif narrower.path_globs:
-        strict = True
     strict = strict or scope_specificity(narrower) > scope_specificity(broader)
     return True, strict
 
@@ -1154,8 +1130,8 @@ def _operational_binding_contains(
     narrower: Contract,
 ) -> tuple[bool, bool]:
     if broader.semantics.actions and narrower.semantics.actions:
-        for narrow_pattern in narrower.tool_patterns:
-            for broad_pattern in broader.tool_patterns:
+        for narrow_pattern in narrower.check_patterns:
+            for broad_pattern in broader.check_patterns:
                 if (
                     _tool_pattern_contains(broad_pattern, narrow_pattern)
                     and broad_pattern.model_dump(mode="json")
@@ -1164,8 +1140,8 @@ def _operational_binding_contains(
                     return True, True
         return True, False
     return _tool_patterns_contain(
-        broader.tool_patterns,
-        narrower.tool_patterns,
+        broader.check_patterns,
+        narrower.check_patterns,
     )
 
 
@@ -1361,8 +1337,8 @@ def _can_be_duplicate(left: Contract, right: Contract) -> bool:
         return False
     if (
         not left.semantics.actions
-        and _canonical_tool_patterns(left.tool_patterns)
-        != _canonical_tool_patterns(right.tool_patterns)
+        and _canonical_tool_patterns(left.check_patterns)
+        != _canonical_tool_patterns(right.check_patterns)
     ):
         return False
     if left.override != right.override:
@@ -1467,7 +1443,7 @@ def _bm25_score(query_tokens: list[str], document_tokens: list[str], corpus: lis
 
 def _predicate_pattern_text(contract: Contract) -> str:
     parts: list[str] = []
-    for pattern in contract.tool_patterns:
+    for pattern in contract.check_patterns:
         parts.append(pattern.tool)
         for key, matcher in sorted(pattern.args.items()):
             parts.append(key)

@@ -21,7 +21,7 @@ def normalize_rule_payload(data: Any) -> Any:
 
     This is the compatibility seam for v1/v2 payloads and tests that still pass
     legacy fields. Runtime modules should consume the canonical fields produced
-    here: semantics, tool_patterns, validity, effect, and authority.
+    here: semantics, check_patterns, validity, effect, and authority.
     """
 
     if not isinstance(data, dict):
@@ -48,7 +48,6 @@ def normalize_rule_payload(data: Any) -> Any:
     if "authority" in normalized and "source" not in normalized:
         normalized["source"] = {
             "kind": AUTHORITY_TO_SOURCE_KIND.get(_value(normalized["authority"]), "agent_inferred"),
-            "span": normalized.get("text", ""),
         }
 
     semantics = _model_to_dict(normalized.get("semantics"))
@@ -82,10 +81,15 @@ def normalize_rule_payload(data: Any) -> Any:
     pattern_payload = _model_to_dict(pattern_version)
     if isinstance(pattern_payload, dict):
         canonical_pattern = canonical_pattern_version_payload(pattern_payload)
-        normalized.setdefault("tool_patterns", canonical_pattern.get("tool_patterns", []))
+        normalized.setdefault("check_patterns", canonical_pattern.get("check_patterns", []))
     normalized.pop("compiled_predicates", None)
     normalized.pop("targets", None)
     normalized.pop("target_patterns", None)
+    normalized.pop("tool_patterns", None)
+    source = _model_to_dict(normalized.get("source"))
+    if isinstance(source, dict):
+        source.pop("span", None)
+        normalized["source"] = source
     return normalized
 
 
@@ -96,6 +100,12 @@ def canonical_contract_payload(payload: dict[str, Any]) -> dict[str, Any]:
     canonical.pop("action_constraints", None)
     canonical.pop("compiled_predicates", None)
     canonical.pop("pattern_version", None)
+    canonical.pop("tool_patterns", None)
+    source = _model_to_dict(canonical.get("source"))
+    if isinstance(source, dict):
+        source = dict(source)
+        source.pop("span", None)
+        canonical["source"] = source
     validity = canonical.get("validity")
     if isinstance(validity, dict) and "start" in validity and "from" not in validity:
         validity = dict(validity)
@@ -107,15 +117,16 @@ def canonical_contract_payload(payload: dict[str, Any]) -> dict[str, Any]:
 def canonical_pattern_version_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Return canonical RulePatternVersion JSON.
 
-    Legacy host_action_patterns are converted into native tool_patterns at this
-    seam. The legacy key is not emitted in the canonical payload.
+    Legacy host_action_patterns are converted into native check_patterns at
+    this seam. Legacy keys are not emitted in the canonical payload.
     """
 
     canonical = dict(payload)
     canonical.pop("target_patterns", None)
     canonical.pop("targets", None)
-    if not canonical.get("tool_patterns"):
-        canonical["tool_patterns"] = tool_patterns_from_host_patterns(
+    canonical.pop("tool_patterns", None)
+    if not canonical.get("check_patterns"):
+        canonical["check_patterns"] = tool_patterns_from_host_patterns(
             canonical.get("host_action_patterns", [])
         )
     canonical.pop("host_action_patterns", None)

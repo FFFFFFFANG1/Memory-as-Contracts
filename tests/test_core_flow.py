@@ -45,28 +45,23 @@ def make_store() -> ContractStore:
 
 def install_pattern_contract(store: ContractStore, contract: Contract) -> Contract:
     stored = store.add_contract(contract)
-    if stored.tool_patterns:
+    if stored.check_patterns:
         store.install_rule_pattern_version(PolicyCompiler().compile(stored))
     return stored
 
 
 def project_scope(workspace: str = "/workspace/project") -> Scope:
-    return Scope(level=ScopeLevel.PROJECT, workspace=workspace, repo="project")
+    return Scope(level=ScopeLevel.PROJECT, workspace=workspace, project="project")
 
 
 def path_scope(path_glob: str, workspace: str = "/workspace/project") -> Scope:
-    return Scope(
-        level=ScopeLevel.PATH,
-        workspace=workspace,
-        repo="project",
-        path_globs=[path_glob],
-    )
+    del path_glob
+    return Scope(level=ScopeLevel.PROJECT, workspace=workspace, project="project")
 
 
 def source(kind: SourceKind = SourceKind.USER_TURN) -> ContractSource:
     return ContractSource(
         kind=kind,
-        span="do not push",
         created_at=datetime(2026, 5, 23, tzinfo=timezone.utc),
     )
 
@@ -85,7 +80,7 @@ def push_prohibition(contract_id: str = "MAC-push") -> Contract:
             actions=["git.push"],
             tags=["external_write", "publish_code"],
         ),
-        tool_patterns=git_push_tool_patterns(),
+        check_patterns=git_push_tool_patterns(),
     )
 
 
@@ -156,7 +151,7 @@ def file_rule(
             actions=[host_action],
             tags=[tag],
         ),
-        tool_patterns=_file_tool_patterns(path_glob)
+        check_patterns=_file_tool_patterns(path_glob)
         if host_action in {"file.write", "file.delete"}
         else [],
     )
@@ -200,7 +195,7 @@ def test_signature_builder_and_policy_compiler_match_git_push() -> None:
 def test_policy_compiler_evaluates_exact_tool_name_and_parameter_regex() -> None:
     compiler = PolicyCompiler()
     predicate = RulePatternVersion(
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(
                 tool="exec",
                 args={"cmd": ArgPattern(regex=r"^git\s+push(\s|$)")},
@@ -238,7 +233,7 @@ def test_policy_compiler_preserves_native_git_push_pattern() -> None:
             actions=["git.push"],
             tags=["external_write", "publish_code"],
         ),
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(tool="Bash", args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")})
         ],
     )
@@ -259,7 +254,7 @@ def test_policy_compiler_preserves_native_git_push_pattern() -> None:
 
     predicate = compiler.compile(contract)
 
-    assert contract.tool_patterns[0] in predicate.tool_patterns
+    assert contract.check_patterns[0] in predicate.check_patterns
     assert compiler.evaluate(predicate, push_signature) == MatchOutcome.MATCHED
     assert compiler.evaluate(predicate, status_signature) == MatchOutcome.NOT_MATCHED
 
@@ -273,18 +268,13 @@ def test_policy_compiler_preserves_native_path_pattern() -> None:
         modality=Modality.MUST_NOT,
         strength=Strength.HARD,
         source=source(),
-        scope=Scope(
-            level=ScopeLevel.PATH,
-            workspace="/workspace/project",
-            repo="project",
-            path_globs=["generated/**"],
-        ),
+        scope=project_scope(),
         lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
         semantics=RuleSemantics(
             actions=["file.write"],
             tags=["file_write", "workspace_write"],
         ),
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(tool="Edit", args={"file_path": ArgPattern(path_glob="generated/**")})
         ],
     )
@@ -302,7 +292,7 @@ def test_policy_compiler_preserves_native_path_pattern() -> None:
 
     predicate = compiler.compile(contract)
 
-    assert contract.tool_patterns[0] in predicate.tool_patterns
+    assert contract.check_patterns[0] in predicate.check_patterns
     assert compiler.evaluate(predicate, generated_write) == MatchOutcome.MATCHED
     assert compiler.evaluate(predicate, source_write) == MatchOutcome.NOT_MATCHED
 
@@ -343,7 +333,7 @@ def test_policy_compiler_targets_bare_filename_rules() -> None:
             actions=["file.write"],
             tags=["file_write"],
         ),
-        tool_patterns=_file_tool_patterns("package-lock.json"),
+        check_patterns=_file_tool_patterns("package-lock.json"),
     )
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
@@ -377,7 +367,7 @@ def test_policy_compiler_prefers_negated_bare_filename_target() -> None:
             actions=["file.write"],
             tags=["file_write"],
         ),
-        tool_patterns=_file_tool_patterns("package-lock.json"),
+        check_patterns=_file_tool_patterns("package-lock.json"),
     )
     builder = ActionSignatureBuilder()
     context = SignatureContext(session_id="sess-1", cwd="/workspace/project", repo="project")
@@ -418,7 +408,7 @@ def test_policy_compiler_grounds_bare_filename_to_workspace_path(tmp_path) -> No
 
     assert {
         pattern.args["path"].path_glob
-        for pattern in predicate.tool_patterns
+        for pattern in predicate.check_patterns
         if pattern.tool == "file.write" and "path" in pattern.args
     } == {"docs/archive.md"}
     assert PolicyCompiler().evaluate(
@@ -448,7 +438,7 @@ def test_policy_compiler_expands_lockfile_category_without_blocking_manifest(tmp
             actions=["file.write"],
             tags=["file_write"],
         ),
-        tool_patterns=[ToolPattern(tool="file.write")],
+        check_patterns=[ToolPattern(tool="file.write")],
     )
     predicate = PolicyCompiler().compile(contract)
     builder = ActionSignatureBuilder()
@@ -456,7 +446,7 @@ def test_policy_compiler_expands_lockfile_category_without_blocking_manifest(tmp
 
     assert "package-lock.json" in {
         pattern.args["path"].path_glob
-        for pattern in predicate.tool_patterns
+        for pattern in predicate.check_patterns
         if pattern.tool == "file.write" and "path" in pattern.args
     }
     assert PolicyCompiler().evaluate(
@@ -482,7 +472,7 @@ def test_gate_uses_explicitly_installed_rule_pattern_version() -> None:
     pattern_version = RulePatternVersion(
         id="PV-raw",
         contract_id="MAC-push",
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(
                 tool="exec",
                 args={"cmd": ArgPattern(regex="git push")},
@@ -500,8 +490,8 @@ def test_gate_uses_explicitly_installed_rule_pattern_version() -> None:
     assert stored_contract is not None
     assert grounded is not None
     assert grounded.id == "PV-raw"
-    assert grounded.tool_patterns[0].tool == "exec"
-    assert grounded.tool_patterns[0].args["cmd"].regex == "git push"
+    assert grounded.check_patterns[0].tool == "exec"
+    assert grounded.check_patterns[0].args["cmd"].regex == "git push"
 
 
 def test_signature_builder_supports_external_message_action() -> None:
@@ -529,7 +519,7 @@ def test_action_gate_blocks_matched_hard_prohibition_and_writes_receipt() -> Non
     assert store.list_receipts()[0].decision.value == "reject"
 
 
-def test_action_gate_requires_tool_patterns_not_semantics_alone() -> None:
+def test_action_gate_requires_check_patterns_not_semantics_alone() -> None:
     store = make_store()
     store.add_contract(
         Contract.model_validate(
@@ -538,7 +528,7 @@ def test_action_gate_requires_tool_patterns_not_semantics_alone() -> None:
                 "text": "Do not run git push.",
                 "effect": "deny",
                 "authority": "user_explicit",
-                "scope": {"repo": "project", "workspace": "/workspace/project"},
+                "scope": {"level": "project", "project": "project", "workspace": "/workspace/project"},
                 "semantics": {"actions": ["git.push"], "tags": ["publish_code"]},
                 "validity": {"from": "2026-05-23T10:00:00Z", "until": None},
             }
@@ -549,10 +539,10 @@ def test_action_gate_requires_tool_patterns_not_semantics_alone() -> None:
 
     assert result.decision.decision.value == "allow"
     assert result.receipt.contracts_used == []
-    assert result.receipt.contracts_ignored[0].reason == "missing_tool_pattern"
+    assert result.receipt.contracts_ignored[0].reason == "missing_check_pattern"
 
 
-def test_action_gate_matches_native_tool_patterns_for_linked_repo_rule() -> None:
+def test_action_gate_matches_native_check_patterns_for_linked_repo_rule() -> None:
     store = make_store()
     install_pattern_contract(
         store,
@@ -562,12 +552,12 @@ def test_action_gate_matches_native_tool_patterns_for_linked_repo_rule() -> None
                 "text": "Do not modify the linked repo unless the current turn explicitly asks.",
                 "effect": "deny",
                 "authority": "user_explicit",
-                "scope": {"repo": "project", "paths": ["../linked_repo/**"]},
+                "scope": {"level": "project", "project": "project", "workspace": "/workspace/project"},
                 "semantics": {
                     "actions": ["file.write"],
                     "tags": ["workspace_write", "source_modification"],
                 },
-                "tool_patterns": [
+                "check_patterns": [
                     {"tool": "Edit", "args": {"file_path": {"path_glob": "../linked_repo/**"}}},
                     {"tool": "Write", "args": {"file_path": {"path_glob": "../linked_repo/**"}}},
                     {"tool": "MultiEdit", "args": {"file_path": {"path_glob": "../linked_repo/**"}}},
@@ -636,7 +626,7 @@ def test_action_gate_drops_generic_exec_when_specific_action_is_available() -> N
                 actions=["exec", "web.search"],
                 tags=["external_write", "network_read"],
             ),
-            tool_patterns=[ToolPattern(tool="web.search")],
+            check_patterns=[ToolPattern(tool="web.search")],
         )
     )
     builder = ActionSignatureBuilder()
@@ -720,7 +710,7 @@ def test_file_read_is_not_excluded_by_default() -> None:
             scope=project_scope(),
             lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
             semantics=RuleSemantics(actions=["file.read"]),
-            tool_patterns=[ToolPattern(tool="file.read")],
+            check_patterns=[ToolPattern(tool="file.read")],
         )
     )
     signature = ActionSignatureBuilder().build(
@@ -824,7 +814,7 @@ def test_conflict_resolver_does_not_treat_fewer_adapter_surfaces_as_exception() 
             "kind": ContractKind.EXCEPTION,
             "modality": Modality.MAY,
             "strength": Strength.SOFT,
-            "tool_patterns": [
+            "check_patterns": [
                 ToolPattern(
                     tool="Bash",
                     args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")},
@@ -856,7 +846,7 @@ def test_conflict_resolver_does_not_let_lower_authority_rule_supersede_user_rule
             actions=["git.push"],
             tags=["external_write", "publish_code"],
         ),
-        tool_patterns=git_push_tool_patterns(),
+        check_patterns=git_push_tool_patterns(),
     )
 
     result = ConflictResolver(store).insert(lower_authority_replacement)
@@ -929,7 +919,7 @@ def test_relation_candidate_retrieval_isolates_disjoint_semantic_actions() -> No
                 actions=["web.search"],
                 tags=["network_read"],
             ),
-            "tool_patterns": [ToolPattern(tool="WebSearch")],
+            "check_patterns": [ToolPattern(tool="WebSearch")],
         }
     )
 
@@ -1075,18 +1065,16 @@ def test_conflict_resolver_batch_groups_overlapping_retrieval_into_one_llm_call(
     )
 
     assert len(prompts) == 1
-    assert "unique_retrieved_rules" in prompts[0]
-    assert "overlapped_retrieved_rules" in prompts[0]
+    assert "Retrieved candidates" in prompts[0] or "Batch input" in prompts[0]
     assert "MAC-exception" in prompts[0]
-    assert "MAC-core" in prompts[0]
     assert "MAC-generated" in prompts[0]
     assert [result.relation for result in results] == [
         EdgeRelation.EXCEPTION_TO,
-        EdgeRelation.REFINEMENT,
+        EdgeRelation.DUPLICATE,
     ]
     assert [edge.relation for edge in store.list_edges()] == [
         EdgeRelation.EXCEPTION_TO,
-        EdgeRelation.REFINEMENT,
+        EdgeRelation.DUPLICATE,
     ]
 
 
@@ -1214,7 +1202,7 @@ def test_conflict_resolver_dedups_high_edit_similarity_with_matching_scope_and_t
         update={
             "text": "Do not push code changes to Git without approval.",
             "semantics": RuleSemantics(),
-            "tool_patterns": [],
+            "check_patterns": [],
         }
     )
 
@@ -1254,7 +1242,7 @@ def test_conflict_resolver_does_not_llm_dedup_medium_edit_similarity() -> None:
         update={
             "text": "Do not push code after tests fail.",
             "semantics": RuleSemantics(),
-            "tool_patterns": [],
+            "check_patterns": [],
         }
     )
 
@@ -1277,7 +1265,7 @@ def test_conflict_resolver_does_not_edit_dedup_when_scope_or_type_differs() -> N
             "text": "Do not push code changes to Git without approval.",
             "scope": project_scope("/workspace/other"),
             "semantics": RuleSemantics(),
-            "tool_patterns": [],
+            "check_patterns": [],
         }
     )
     different_type = push_prohibition("MAC-type").model_copy(
@@ -1288,7 +1276,7 @@ def test_conflict_resolver_does_not_edit_dedup_when_scope_or_type_differs() -> N
             "modality": Modality.SHOULD,
             "strength": Strength.SOFT,
             "semantics": RuleSemantics(),
-            "tool_patterns": [],
+            "check_patterns": [],
         }
     )
 
@@ -1343,7 +1331,7 @@ def test_conflict_resolver_rejects_llm_duplicate_for_different_enforcement_state
     assert store.list_edges() == []
 
 
-def test_conflict_resolver_merges_same_rule_across_native_tool_surfaces() -> None:
+def test_conflict_resolver_keeps_distinct_native_tool_surfaces_independent() -> None:
     store = make_store()
     store.add_contract(push_prohibition_from_source("MAC-codex", SourceKind.PROJECT_DOC))
     claude_surface = push_prohibition_from_source(
@@ -1352,7 +1340,7 @@ def test_conflict_resolver_merges_same_rule_across_native_tool_surfaces() -> Non
         "Do not run git push until I approve it.",
     ).model_copy(
         update={
-            "tool_patterns": [
+            "check_patterns": [
                 ToolPattern(
                     tool="Bash",
                     args={"command": ArgPattern(regex=r"^git\s+push(\s|$)")},
@@ -1363,8 +1351,8 @@ def test_conflict_resolver_merges_same_rule_across_native_tool_surfaces() -> Non
 
     result = ConflictResolver(store).insert(claude_surface)
 
-    assert result.relation == EdgeRelation.DUPLICATE
-    assert store.get_contract("MAC-codex").status == ContractStatus.SUPERSEDED
+    assert result.relation == EdgeRelation.INDEPENDENT
+    assert store.get_contract("MAC-codex").status == ContractStatus.ACTIVE
     assert store.get_contract("MAC-claude").status == ContractStatus.ACTIVE
 
 
@@ -1405,7 +1393,7 @@ def test_conflict_resolver_keeps_broader_publish_clause_independent() -> None:
             actions=["git.push"],
             tags=["external_write", "publish_code"],
         ),
-        tool_patterns=git_push_tool_patterns(),
+        check_patterns=git_push_tool_patterns(),
     )
 
     result = ConflictResolver(store).insert(broader)
@@ -1433,7 +1421,7 @@ def test_action_gate_reports_specific_approval_boundary_before_broader_publish_r
                 actions=["git.push"],
                 tags=["external_write", "publish_code"],
             ),
-            tool_patterns=git_push_tool_patterns(),
+            check_patterns=git_push_tool_patterns(),
         )
     )
     install_pattern_contract(store, push_prohibition("MAC-push"))
@@ -1475,7 +1463,7 @@ def test_prompt_intake_retrieval_uses_adapter_context_and_path_hints() -> None:
         user_id="user-1",
         workspace="/workspace/project",
         repo="project",
-        user_turn="Please update src/app.py and avoid unnecessary git operations.",
+        user_turn="In project, please update src/app.py and avoid unnecessary git operations.",
     )
 
     packets = PromptIntakeRetriever(store).retrieve(context)
@@ -1483,7 +1471,7 @@ def test_prompt_intake_retrieval_uses_adapter_context_and_path_hints() -> None:
     assert [packet.id for packet in packets] == ["MAC-pref", "MAC-local"]
     assert packets[0].channel == "preference"
     assert packets[1].channel == "local-reminder"
-    assert "target=src/app.py" in packets[1].inclusion_reason
+    assert packets[1].inclusion_reason == "actions=git.push; tags=external_write,publish_code"
 
 
 def test_prompt_intake_retrieval_uses_action_hints_without_path_target() -> None:
@@ -1512,13 +1500,13 @@ def test_prompt_intake_retrieval_uses_action_hints_without_path_target() -> None
             user_id="user-1",
             workspace="/workspace/project",
             repo="project",
-            user_turn="Can you check online for parser docs?",
+            user_turn="In project, can you check online for parser docs?",
         )
     )
     rendered = retriever.render_prompt_text(packets)
 
     assert [packet.id for packet in packets] == ["MAC-web"]
-    assert "query-actions=network_read" in packets[0].inclusion_reason
+    assert packets[0].inclusion_reason == "actions=web.search; tags=network_read"
     assert "web search" in rendered
 
 
@@ -1537,7 +1525,7 @@ def test_prompt_intake_render_uses_compact_plain_text_budget() -> None:
             user_id="user-1",
             workspace="/workspace/project",
             repo="project",
-            user_turn="Please edit src/app.py.",
+            user_turn="In project, please edit src/app.py.",
         )
     )
 

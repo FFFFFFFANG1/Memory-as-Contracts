@@ -55,5 +55,14 @@ def bench_grade_path(memory_system: str, bench: str, run_id: str) -> Path:
     return memory_grade_dir(bench) / f"{bench_run_basename(memory_system, bench, run_id)}.json"
 
 
+def mac_graph_dir(bench: str) -> Path:
+    return bench_results_dir(bench) / "mac_graph"
+
+
+def mac_graph_path(memory_system: str, bench: str, run_id: str, task_uid: str) -> Path:
+    safe_task = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in task_uid)
+    return mac_graph_dir(bench) / f"{bench_run_basename(memory_system, bench, run_id)}__{safe_task}.json"
+
+
 def bench_run_log_path(memory_system: str, bench: str, run_id: str) -> Path:
     return log_dir(bench) / f"{bench_run_basename(memory_system, bench, run_id)}.log"

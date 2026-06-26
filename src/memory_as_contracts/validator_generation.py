@@ -16,29 +16,94 @@ from memory_as_contracts.store import ContractStore
 
 
 VALIDATOR_GENERATION_SYSTEM_PROMPT = """
-You generate validator code snippets.
+You translate one immutable contract into pre/post hook code that gates an agent at runtime.
 Return strict JSON only. Do not wrap the answer in Markdown.
-The snippet must define check(action, state, log, context).
-For check_update validators, it must also define update(state, entry, log, context).
-The snippet must be deterministic and must not perform file IO, network access,
-environment access, subprocess execution, or raw SQL. Use only the supplied
-log.search(spec) API and verdict helpers.
-At runtime, action, entry, state, and context are plain JSON-like Python dicts.
-Use mapping access such as action.get("arguments"); never use getattr or field
-attribute access on those values. Only log is an object with a method API.
+
+# Required output
+Return one JSON object with:
+- check_code: Python code defining check(action, log, context)
+- update_code: Python code defining update(entry, log, context), or null
+  when the enforcement shape is check_only
+- shared_states: object declaring the only state keys this validator may read or
+  write. For check_update include every requested state field with a safe
+  default such as zero, null, false, or []
+
+# Hook responsibilities
+- check_code runs before a pending tool action. It decides whether that action
+  satisfies the contract. It may read shared state but must not write it.
+- update_code runs after a committed tool action. It updates shared state from
+  that entry using log.state_write(...).
+- check_code and update_code run as separate modules. Do not rely on shared
+  helper functions, globals, or imports between them.
+
+# Runtime API
+- action is a dict with tool_name, host_action, arguments, targets, and context fields.
+- entry is a committed action dict with seq, tool_name, host_action, arguments,
+  result, result_text, outcome, and targets when available.
+- context is a dict with runtime metadata such as contract_id and scope_key.
+- log.read(spec) reads bounded committed action-log rows.
+- log.state_read(key=None) reads shared state. With a key, it returns that value;
+  without a key, it returns a shallow state snapshot.
+- log.state_write(updates) writes existing shared state keys in update only.
+  It does not add or delete keys, and it is forbidden in check.
+Use action.get(...) and entry.get(...) for field access.
+Do not use getattr, hasattr, action.field, or entry.field.
+
+# log.read spec
+Required: {"from": "actions", "limit": N}.
+The where value MUST be an object mapping field names to operator objects.
+Do not use SQL strings, tuples, lambdas, or a list of clauses.
+Supported select/where fields include seq, timestamp, tool_name, host_action,
+outcome, arguments, result, result_text, targets, and any_text.
+
+Example:
+{
+  "from": "actions",
+  "select": ["seq", "tool_name", "arguments", "result_text"],
+  "where": {
+    "tool_name": {"eq": "Bash"},
+    "outcome": {"eq": "success"},
+    "any_text": {"regex": "pytest|uv run pytest"}
+  },
+  "order_by": [{"field": "seq", "direction": "desc"}],
+  "limit": 20
+}
+
+# Verdict API
+check must return allow(reason, evidence_refs=None, confidence=1.0) only when evidence is sufficient.
+Return reject(reason, evidence_refs=None, confidence=1.0) for definite violations.
+Return ask(reason, evidence_refs=None, confidence=1.0) when user input is required or evidence is insufficient.
+
+# Sandbox capabilities
+Only import math or re.
+Available builtins: abs, all, any, bool, dict, enumerate, float, format, int,
+isinstance, len, list, max, min, range, round, set, sorted, str, sum, and tuple.
+Do not assume any other builtin, module, filesystem, environment, subprocess,
+network, or raw SQL API.
+
+# Safety rules
+Do not hard-code literal values from committed examples; use them only to infer
+where relevant fields appear in action arguments or results.
+Before returning allow, verify that every pending action field needed by the
+check_patterns is present and usable. If a required field is missing, null, or
+unparsable, return ask.
+For check_update, update must use state_read/state_write, inspect entry.seq when
+present, and be idempotent for repeated entries.
 """.strip()
 
-ValidatorPackageStatus = Literal["ready", "needs_refinement", "manual_review", "no_validator"]
+ValidatorPackageStatus = Literal["success", "fail"]
 
 
 class ValidatorSnippetPackage(BaseModel):
     status: ValidatorPackageStatus
-    snippet: str | None = None
-    initial_state: dict[str, Any] = Field(default_factory=dict)
+    check_code: str | None = None
+    update_code: str | None = None
+    shared_states: dict[str, Any] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
+    verification_hash: str = ""
 
     def is_ready(self) -> bool:
-        return self.status == "ready" and bool(self.snippet)
+        return self.status == "success" and bool(self.check_code)
 
 
 class ValidatorSnippetGenerator:
@@ -54,10 +119,8 @@ class ValidatorSnippetGenerator:
         store: ContractStore,
         session_id: str,
         task_id: str | None = None,
-        pending_examples: Sequence[dict[str, Any]] | None = None,
         tool_capsules: Sequence[Any] | None = None,
     ) -> ValidatorSnippetPackage:
-        pending = list(pending_examples or [])
         capsules = list(tool_capsules or [])
         examples = matched_action_examples(
             store.list_action_log_entries(),
@@ -66,17 +129,16 @@ class ValidatorSnippetGenerator:
             task_id=task_id,
             limit_per_tool=2,
         )
-        preflight = _preflight(contract, examples, pending, capsules)
+        preflight = _preflight(contract, capsules)
         if preflight is not None:
             return preflight
 
         prompt = build_validator_generator_prompt(
             contract,
             committed_examples=examples,
-            pending_examples=pending,
             tool_capsules=capsules,
         )
-        return _with_default_initial_state(contract, _parse_package(self.response_provider(prompt)))
+        return _with_default_shared_states(contract, _parse_package(self.response_provider(prompt)))
 
     def generate_verified(
         self,
@@ -85,13 +147,11 @@ class ValidatorSnippetGenerator:
         store: ContractStore,
         session_id: str,
         task_id: str | None = None,
-        pending_examples: Sequence[dict[str, Any]] | None = None,
         tool_capsules: Sequence[Any] | None = None,
         max_attempts: int = 3,
     ) -> ValidatorSnippetPackage:
         from memory_as_contracts.validator_installation import ValidatorSnippetVerifier
 
-        pending = list(pending_examples or [])
         capsules = list(tool_capsules or [])
         examples = matched_action_examples(
             store.list_action_log_entries(),
@@ -100,13 +160,12 @@ class ValidatorSnippetGenerator:
             task_id=task_id,
             limit_per_tool=2,
         )
-        preflight = _preflight(contract, examples, pending, capsules)
+        preflight = _preflight(contract, capsules)
         if preflight is not None:
             return preflight
         base_prompt = build_validator_generator_prompt(
             contract,
             committed_examples=examples,
-            pending_examples=pending,
             tool_capsules=capsules,
         )
         verifier = ValidatorSnippetVerifier()
@@ -119,7 +178,7 @@ class ValidatorSnippetGenerator:
                     + _json(errors)
                     + "\nReturn a corrected full package. Do not weaken uncertain cases to allow."
                 )
-            package = _with_default_initial_state(
+            package = _with_default_shared_states(
                 contract,
                 _parse_package(self.response_provider(prompt)),
             )
@@ -131,16 +190,15 @@ class ValidatorSnippetGenerator:
                 store=store,
                 session_id=session_id,
                 task_id=task_id,
-                pending_examples=pending,
                 committed_examples=examples,
             )
             if verification.accepted:
-                return package
+                return package.model_copy(update={"verification_hash": verification.verification_hash})
             errors = verification.errors
             if attempt + 1 >= max_attempts:
                 break
         return ValidatorSnippetPackage(
-            status="manual_review",
+            status="fail",
             notes=["validator verification failed after retries", *errors],
         )
 
@@ -149,17 +207,10 @@ def build_validator_generator_prompt(
     contract: Contract,
     *,
     committed_examples: Sequence[ActionLogEntryV1],
-    pending_examples: Sequence[dict[str, Any]],
     tool_capsules: Sequence[Any],
 ) -> str:
     rule_payload = {
-        "id": contract.id,
         "text": contract.text,
-        "effect": contract.effect.value,
-        "authority": contract.authority.value,
-        "scope": contract.scope.model_dump(mode="json"),
-        "semantics": contract.semantics.model_dump(mode="json"),
-        "validity": contract.validity.model_dump(mode="json", by_alias=True),
     }
     enforcement_payload = {
         "enforcement_shape": contract.validator_enforcement_shape.value,
@@ -172,8 +223,6 @@ def build_validator_generator_prompt(
         patterns=[*contract.check_patterns, *contract.update_patterns],
     )
     sections = [
-        "You are generating a validator for Memory-as-Contracts v4.",
-        "",
         "IMMUTABLE RULE",
         _json(rule_payload),
         "",
@@ -181,86 +230,41 @@ def build_validator_generator_prompt(
         _enforcement_summary(enforcement_payload),
         _json(enforcement_payload),
         "",
-        "ACTION LOG ENTRY SCHEMA",
-        _action_log_schema_doc(),
-        "",
-        "ACTION LOG SEARCH API",
-        _search_api_doc(),
-        "",
-        "VERDICT API",
-        _verdict_api_doc(),
-        "",
-        "RUNTIME VALUE SHAPES",
-        _runtime_value_shapes_doc(),
-        "",
-        "SANDBOX CAPABILITIES",
-        _sandbox_capabilities_doc(),
-        "",
         "TOOL CAPSULES",
         _json([_dump_capsule(capsule) for capsule in relevant_tool_capsules]),
         "",
-        "MATCHED COMMITTED ACTION EXAMPLES",
-        _json([_compact_action_signature_example(entry) for entry in committed_examples]),
-        "",
-        "PENDING ACTION EXAMPLES",
-        _pending_examples_doc(pending_examples),
-        "",
-            "TASK",
+        "TASK",
         (
-            "Return one JSON object with status, snippet, initial_state, and notes. "
-            "For check_update validators, initial_state must contain every state_fields key "
-            "with zero, null, false, or empty-list defaults as appropriate. "
-            "Do not hard-code literal values from examples; use them only to infer "
-            "where relevant fields appear in action arguments or results. "
-            "Before returning allow, verify that every Pending Action field needed "
-            "to evaluate the relevant check_patterns is present and usable. If a "
-            "required argument or target is missing, null, or unparsable, return ask. "
-            "The snippet may define helper functions plus check(action, state, log, context) "
-            "and update(state, entry, log, context). It must only use the provided "
-            "log.search(spec) API and verdict helper functions. If evidence is insufficient, "
-            "return status needs_refinement or manual_review instead of unsafe code."
+            "Translate the immutable rule into hook functions. Use the patterns to decide "
+            "which actions should be gated and the tool capsules to locate runtime fields."
         ),
     ]
+    if committed_examples:
+        sections[10:10] = [
+            "",
+            "MATCHED COMMITTED ACTION EXAMPLES",
+            _json([_compact_action_signature_example(entry) for entry in committed_examples]),
+        ]
     return "\n".join(sections)
 
 
 def _preflight(
     contract: Contract,
-    committed_examples: Sequence[ActionLogEntryV1],
-    pending_examples: Sequence[dict[str, Any]],
     tool_capsules: Sequence[Any],
 ) -> ValidatorSnippetPackage | None:
     shape = contract.validator_enforcement_shape
     if shape == ValidatorEnforcementShape.NO_VALIDATOR:
         return ValidatorSnippetPackage(
-            status="no_validator",
+            status="fail",
             notes=["contract does not request validator enforcement"],
         )
     if not tool_capsules:
-        return ValidatorSnippetPackage(status="needs_refinement", notes=["missing tool capsules"])
+        return ValidatorSnippetPackage(status="fail", notes=["missing tool capsules"])
     if not contract.check_patterns:
-        return ValidatorSnippetPackage(status="needs_refinement", notes=["missing check patterns"])
+        return ValidatorSnippetPackage(status="fail", notes=["missing check patterns"])
     if shape == ValidatorEnforcementShape.CHECK_UPDATE and not contract.update_patterns:
-        return ValidatorSnippetPackage(status="needs_refinement", notes=["missing update patterns"])
-    if shape == ValidatorEnforcementShape.CHECK_UPDATE and not committed_examples:
-        return ValidatorSnippetPackage(
-            status="needs_refinement",
-            notes=["missing committed action examples"],
-        )
+        return ValidatorSnippetPackage(status="fail", notes=["missing update patterns"])
     return None
-
-
-def _pending_examples_doc(pending_examples: Sequence[dict[str, Any]]) -> str:
-    if pending_examples:
-        return _json(list(pending_examples))
-    return (
-        "[]\n"
-        "No pending action examples were available. Generate the validator from the "
-        "immutable rule, enforcement plan, runtime value shapes, and tool capsules. "
-        "Infer possible action argument locations from the tool capsule schemas, and "
-        "write defensive checks that return ask when a required runtime field is "
-        "missing, null, or unparsable."
-    )
 
 
 def _filter_tool_capsules_for_enforcement(
@@ -321,18 +325,18 @@ def _compact_arguments(arguments: Any) -> Any:
     return compact
 
 
-def _with_default_initial_state(
+def _with_default_shared_states(
     contract: Contract,
     package: ValidatorSnippetPackage,
 ) -> ValidatorSnippetPackage:
-    if package.status != "ready":
+    if package.status != "success":
         return package
     if contract.validator_enforcement_shape != ValidatorEnforcementShape.CHECK_UPDATE:
         return package
-    initial_state = dict(package.initial_state)
+    shared_states = dict(package.shared_states)
     for field in contract.state_fields:
-        initial_state.setdefault(field, _default_state_value(field))
-    return package.model_copy(update={"initial_state": initial_state})
+        shared_states.setdefault(field, _default_state_value(field))
+    return package.model_copy(update={"shared_states": shared_states})
 
 
 def _default_state_value(field: str) -> Any:
@@ -377,53 +381,14 @@ def matched_action_examples(
     return examples
 
 
-def pending_action_examples(contract: Contract) -> list[dict[str, Any]]:
-    """Build shape-only Pending Action examples from extractor-proposed bindings."""
-
-    examples: list[dict[str, Any]] = []
-    host_action = contract.semantics.actions[0] if contract.semantics.actions else ""
-    for pattern in contract.check_patterns:
-        arguments = {
-            name: _representative_argument(name, matcher)
-            for name, matcher in pattern.args.items()
-        }
-        examples.append(
-            {
-                "tool_name": pattern.tool,
-                "host_action": host_action or pattern.tool,
-                "arguments": arguments,
-            }
-        )
-    return examples
-
-
-def _representative_argument(name: str, matcher: Any) -> Any:
-    if matcher.equals is not None:
-        return matcher.equals
-    if matcher.contains is not None:
-        return matcher.contains
-    if matcher.path_glob is not None:
-        return matcher.path_glob.replace("**", "example").replace("*", "example")
-    if matcher.mentions_path_glob is not None:
-        return matcher.mentions_path_glob.replace("**", "example").replace("*", "example")
-    if matcher.regex is not None:
-        lowered = matcher.regex.lower()
-        if "git" in lowered and "push" in lowered:
-            return "git push origin main"
-        if "pytest" in lowered or "test" in lowered:
-            return "uv run pytest -q"
-        return f"<value matching {matcher.regex}>"
-    return f"<{name}>"
-
-
 def _parse_package(raw: str) -> ValidatorSnippetPackage:
     try:
         payload = _normalize_package_payload(json.loads(_json_object_text(raw)))
         package = ValidatorSnippetPackage.model_validate(payload)
     except (json.JSONDecodeError, ValidationError, ValueError) as exc:
-        return ValidatorSnippetPackage(status="manual_review", notes=[f"invalid generator response: {exc}"])
-    if package.status == "ready" and not package.snippet:
-        return ValidatorSnippetPackage(status="manual_review", notes=["ready response omitted snippet"])
+        return ValidatorSnippetPackage(status="fail", notes=[f"invalid generator response: {exc}"])
+    if package.status == "success" and not package.check_code:
+        return ValidatorSnippetPackage(status="fail", notes=["success response omitted check_code"])
     return package
 
 
@@ -435,30 +400,46 @@ def _normalize_package_payload(payload: Any) -> dict[str, Any]:
     if isinstance(nested, dict):
         normalized = {**normalized, **nested}
 
-    snippet = (
-        normalized.get("snippet")
-        or normalized.get("code")
-        or normalized.get("validator_code")
-        or normalized.get("python")
+    check_code = (
+        normalized.get("check_code")
+        or normalized.get("check")
+        or normalized.get("pre_hook")
+        or normalized.get("pre_hook_code")
     )
-    if snippet is not None:
-        normalized["snippet"] = _clean_snippet(str(snippet))
+    if check_code is not None:
+        normalized["check_code"] = _clean_snippet(str(check_code))
+    update_code = (
+        normalized.get("update_code")
+        or normalized.get("update")
+        or normalized.get("post_hook")
+        or normalized.get("post_hook_code")
+    )
+    if update_code is not None:
+        normalized["update_code"] = _clean_snippet(str(update_code))
+    shared_states = normalized.get("shared_states", normalized.get("initial_state", {}))
+    normalized["shared_states"] = shared_states if isinstance(shared_states, dict) else {}
 
     status = str(normalized.get("status", "")).strip().lower()
     status_aliases = {
-        "ok": "ready",
-        "success": "ready",
-        "valid": "ready",
-        "complete": "ready",
-        "completed": "ready",
-        "needs refinement": "needs_refinement",
-        "need_refinement": "needs_refinement",
-        "manual review": "manual_review",
+        "ok": "success",
+        "ready": "success",
+        "valid": "success",
+        "complete": "success",
+        "completed": "success",
+        "failed": "fail",
+        "failure": "fail",
+        "error": "fail",
+        "needs_refinement": "fail",
+        "needs refinement": "fail",
+        "need_refinement": "fail",
+        "manual_review": "fail",
+        "manual review": "fail",
+        "no_validator": "fail",
     }
     if status in status_aliases:
         normalized["status"] = status_aliases[status]
-    elif status not in {"ready", "needs_refinement", "manual_review", "no_validator"}:
-        normalized["status"] = "ready" if snippet else "manual_review"
+    elif status not in {"success", "fail"}:
+        normalized["status"] = "success" if check_code else "fail"
 
     notes = normalized.get("notes", [])
     if isinstance(notes, str):
@@ -498,105 +479,6 @@ def _enforcement_summary(payload: dict[str, Any]) -> str:
         f"state_fields: {', '.join(payload['state_fields']) or '<none>'}",
     ]
     return "\n".join(lines)
-
-
-def _action_log_schema_doc() -> str:
-    return "\n".join(
-        [
-            "ActionLogEntryV1 fields:",
-            "- seq: committed action order, integer",
-            "- timestamp: ISO datetime",
-            "- session_id, agent_id, adapter_id",
-            "- tool_call_id, tool_name, host_action",
-            "- arguments: raw assistant tool-call arguments",
-            "- result: structured tool result when available",
-            "- result_text: textual tool result",
-            "- outcome: success | failure | unknown",
-            "- reasoning_text: optional assistant reasoning metadata",
-        ]
-    )
-
-
-def _runtime_value_shapes_doc() -> str:
-    return "\n".join(
-        [
-            "- action is a dict with tool_name, host_action, arguments, targets, and context fields.",
-            "- entry is a dict matching ActionLogEntryV1.",
-            "- state is a dict owned by this validator.",
-            "- context is a dict with runtime metadata.",
-            "- log is the only object; call log.search(spec).",
-            "Use action.get(...) and entry.get(...) for field access.",
-            "Do not use getattr, hasattr, action.field, or entry.field.",
-        ]
-    )
-
-
-def _sandbox_capabilities_doc() -> str:
-    return "\n".join(
-        [
-            "Only import math or re.",
-            (
-                "Available builtins: abs, all, any, bool, dict, enumerate, float, "
-                "format, int, isinstance, len, list, max, min, range, round, set, "
-                "sorted, str, sum, and tuple."
-            ),
-            "Do not assume any other builtin, module, filesystem, environment, or network API.",
-            (
-                "For check_update, check must be read-only: inspect the Pending Action "
-                "and current state without mutating state or calling a helper that mutates it."
-            ),
-            (
-                "For check_update, update must copy state, inspect entry.seq, and if that "
-                "sequence is already recorded, return unchanged before applying any state transition."
-            ),
-            "For check_update, update must return a state dict on every path.",
-            (
-                "Do not reconcile or repair accumulated state inside check; replay and post-action "
-                "update own state maintenance."
-            ),
-        ]
-    )
-
-
-def _search_api_doc() -> str:
-    return "\n".join(
-        [
-            "Use log.search(spec) for bounded committed-action lookup.",
-            'Required: {"from": "actions", "limit": N}.',
-            "The where value MUST be an object mapping field names to operator objects.",
-            "Do not use SQL strings, tuples, lambdas, or a list of clauses.",
-            "Supported select/where fields include seq, timestamp, tool_name, host_action,",
-            "outcome, arguments, result, result_text, reasoning_text, and any_text.",
-            "Nested JSON fields are addressed with dot paths such as arguments.total.",
-            "Supported operators: eq, ne, in, gt, gte, lt, lte, exists, missing, contains, regex.",
-            "Always include limit as an integer from 1 through 100. Never use 0 or an unbounded limit.",
-            "The runtime scopes search to the current session/task.",
-            "Valid example:",
-            _json(
-                {
-                    "from": "actions",
-                    "select": ["seq", "tool_name", "arguments", "result_text"],
-                    "where": {
-                        "tool_name": {"eq": "Bash"},
-                        "outcome": {"eq": "success"},
-                        "any_text": {"regex": "pytest|uv run pytest"},
-                    },
-                    "order_by": [{"field": "seq", "direction": "desc"}],
-                    "limit": 20,
-                }
-            ),
-        ]
-    )
-
-
-def _verdict_api_doc() -> str:
-    return "\n".join(
-        [
-            "Return allow(reason, evidence_refs=None, confidence=1.0) only when evidence is sufficient.",
-            "Return reject(reason, evidence_refs=None, confidence=1.0) for definite violations.",
-            "Return ask(reason, evidence_refs=None, confidence=1.0) when user input is required or evidence is insufficient.",
-        ]
-    )
 
 
 def _dump_capsule(capsule: Any) -> Any:

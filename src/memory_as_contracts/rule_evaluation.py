@@ -20,7 +20,7 @@ from memory_as_contracts.models import (
 )
 from memory_as_contracts.rule_surface import (
     bind_contract_check_patterns,
-    bind_tool_patterns,
+    bind_check_patterns,
     bind_validator_check,
 )
 from memory_as_contracts.store import ContractStore
@@ -147,7 +147,7 @@ class RuleEvaluator:
 
         if contract.validator_enforcement_shape != ValidatorEnforcementShape.NO_VALIDATOR:
             if not contract.check_patterns:
-                return self._ignored(contract, "validator_needs_refinement")
+                return self._ignored(contract, "validator_unavailable")
             binding = bind_contract_check_patterns(contract, signature)
             if not binding.matched:
                 return self._ignored(contract, "validator_not_matched")
@@ -180,8 +180,8 @@ class RuleEvaluator:
 
         pattern_version = self._active_pattern_version(contract)
         if pattern_version is None:
-            return self._ignored(contract, "missing_tool_pattern")
-        binding = bind_tool_patterns(contract, signature, pattern_version.tool_patterns)
+            return self._ignored(contract, "missing_check_pattern")
+        binding = bind_check_patterns(contract, signature, pattern_version.check_patterns)
         if not binding.matched:
             return self._ignored(contract, "predicate_not_matched")
         response = self._ask_response_evaluation(
@@ -259,7 +259,7 @@ class RuleEvaluator:
         contract: Contract,
     ) -> RulePatternVersion | None:
         current = self.store.get_active_rule_pattern_version(contract.id)
-        return current if current is not None and current.tool_patterns else None
+        return current if current is not None and current.check_patterns else None
 
     def _active_override_edge_id(
         self,
@@ -310,10 +310,10 @@ class RuleEvaluator:
             )
             if exception_pattern_version is None:
                 continue
-            if not bind_tool_patterns(
+            if not bind_check_patterns(
                 exception_contract,
                 signature,
-                exception_pattern_version.tool_patterns,
+                exception_pattern_version.check_patterns,
             ).matched:
                 continue
             if _exception_can_cover_contract(exception_contract, contract):
@@ -347,9 +347,9 @@ def _exception_can_cover_contract(
     ):
         return False
     if (
-        exception_contract.scope.repo
-        and contract.scope.repo
-        and exception_contract.scope.repo != contract.scope.repo
+        exception_contract.scope.project
+        and contract.scope.project
+        and exception_contract.scope.project != contract.scope.project
     ):
         return False
     exception_actions = set(exception_contract.semantics.actions)
@@ -368,15 +368,12 @@ def _exception_can_cover_contract(
         and not exception_tags.intersection(contract_tags)
     ):
         return False
-    exception_globs = exception_contract.scope.path_globs
-    contract_globs = contract.scope.path_globs
-    if exception_globs and contract_globs:
-        if not any(
-            _glob_is_narrower(exception_glob, contract_glob)
-            for exception_glob in exception_globs
-            for contract_glob in contract_globs
-        ):
-            return False
+    if (
+        exception_contract.scope.module
+        and contract.scope.module
+        and exception_contract.scope.module != contract.scope.module
+    ):
+        return False
     return True
 
 

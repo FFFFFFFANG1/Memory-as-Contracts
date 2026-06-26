@@ -50,104 +50,39 @@ class ScopeNormalizer:
 
     def normalize(self, text: str, context: NormalizationContext) -> Scope:
         lower = text.lower()
-        if _is_per_turn_text(lower):
-            return Scope(
-                level=ScopeLevel.PER_TURN,
-                workspace=context.workspace,
-                repo=context.repo,
-                agent_family=context.agent_family,
-                user_id=context.user_id,
-            )
         component_match = self.component_pattern.search(text)
         if component_match:
             return Scope(
-                level=ScopeLevel.COMPONENT,
+                level=ScopeLevel.MODULE,
                 workspace=context.workspace,
-                repo=context.repo,
-                task=context.task,
-                component=component_match.group(1).rstrip(".,;:"),
-                agent_family=context.agent_family,
-                user_id=context.user_id,
-            )
-        path_match = self.path_pattern.search(text)
-        glob_match = self.glob_pattern.search(text)
-        relative_path_match = self.relative_path_pattern.search(text)
-        if relative_path_match or path_match or glob_match:
-            if relative_path_match:
-                path_glob = relative_path_match.group(0)
-            elif path_match:
-                path_glob = path_match.group(1) or path_match.group(2)
-            else:
-                path_glob = glob_match.group(1)
-            path_glob = path_glob.rstrip(".,;:")
-            return Scope(
-                level=ScopeLevel.PATH,
-                workspace=context.workspace,
-                repo=context.repo,
-                path_globs=[path_glob],
-                task=context.task,
-                agent_family=context.agent_family,
-                user_id=context.user_id,
-            )
-        bare_file = _selected_bare_file_target(text, self.bare_file_pattern)
-        if bare_file and any(token in lower for token in ("edit", "write", "delete", "touch", "read")):
-            return Scope(
-                level=ScopeLevel.PATH,
-                workspace=context.workspace,
-                repo=context.repo,
-                path_globs=[bare_file],
-                task=context.task,
-                agent_family=context.agent_family,
-                user_id=context.user_id,
-            )
-        if "generated" in lower and any(token in lower for token in ("edit", "write", "touch")):
-            return Scope(
-                level=ScopeLevel.PATH,
-                workspace=context.workspace,
-                repo=context.repo,
-                path_globs=["generated/**"],
-                task=context.task,
-                agent_family=context.agent_family,
-                user_id=context.user_id,
-            )
-        if "this task" in lower or "current task" in lower:
-            return Scope(
-                level=ScopeLevel.TASK,
-                workspace=context.workspace,
-                repo=context.repo,
-                task=context.task or "current",
-                agent_family=context.agent_family,
+                project=context.repo or context.workspace,
+                module=component_match.group(1).rstrip(".,;:"),
                 user_id=context.user_id,
             )
         if "this session" in lower or "current session" in lower:
             return Scope(
                 level=ScopeLevel.SESSION,
                 workspace=context.workspace,
-                repo=context.repo,
-                agent_family=context.agent_family,
                 user_id=context.user_id,
             )
         if "globally" in lower or "always" in lower or "from now on" in lower:
             return Scope(
                 level=ScopeLevel.GLOBAL,
-                agent_family=context.agent_family,
-                organization=context.organization,
                 user_id=context.user_id,
             )
-        if "this repo" in lower and (context.repo or context.workspace):
+        if any(token in lower for token in ("this repo", "this task", "current task")) and (
+            context.repo or context.workspace
+        ):
             return Scope(
-                level=ScopeLevel.REPO,
+                level=ScopeLevel.PROJECT,
                 workspace=context.workspace,
-                repo=context.repo,
-                agent_family=context.agent_family,
+                project=context.repo or context.workspace,
                 user_id=context.user_id,
             )
         return Scope(
             level=ScopeLevel.PROJECT if context.workspace else ScopeLevel.GLOBAL,
             workspace=context.workspace,
-            repo=context.repo,
-            agent_family=context.agent_family,
-            organization=context.organization,
+            project=context.repo or context.workspace,
             user_id=context.user_id,
         )
 

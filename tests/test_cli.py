@@ -71,13 +71,12 @@ def test_mac_rule_override_creates_override_edge(monkeypatch, tmp_path) -> None:
             modality=Modality.MUST_NOT,
             source=ContractSource(
                 kind=SourceKind.USER_TURN,
-                span="Do not push code.",
                 created_at=datetime(2026, 5, 23, tzinfo=timezone.utc),
             ),
             scope=Scope(
                 level=ScopeLevel.PROJECT,
                 workspace="/workspace/project",
-                repo="project",
+                project="project",
             ),
             lifecycle=Lifecycle(
                 type=LifecycleType.UNTIL_REVOKED,
@@ -97,7 +96,7 @@ def test_mac_rule_override_creates_override_edge(monkeypatch, tmp_path) -> None:
                 {
                     "level": "project",
                     "workspace": "/workspace/project",
-                    "repo": "project",
+                        "project": "project",
                 }
             ),
             "--lifecycle-json",

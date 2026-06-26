@@ -16,6 +16,7 @@ from memory_as_contracts.models import (
     Contract,
     GateDecisionType,
     PredicateStatus,
+    ToolPattern,
     ValidatorEnforcementShape,
     ValidatorInstallationRecord,
     ValidatorInstallationStatus,
@@ -27,8 +28,6 @@ from memory_as_contracts.store import ContractStore
 from memory_as_contracts.validator_generation import (
     ValidatorSnippetGenerator,
     ValidatorSnippetPackage,
-    matched_action_examples,
-    pending_action_examples,
 )
 from memory_as_contracts.validators import ValidatorSandboxError, ValidatorSandboxRunner
 
@@ -60,7 +59,6 @@ class ValidatorSnippetVerifier:
         store: ContractStore,
         session_id: str,
         task_id: str | None,
-        pending_examples: Sequence[dict[str, Any]],
         committed_examples: Sequence[ActionLogEntryV1] = (),
     ) -> ValidatorVerificationResult:
         parsed = (
@@ -74,31 +72,42 @@ class ValidatorSnippetVerifier:
                 accepted=False,
                 errors=[f"package status is {parsed.status}"],
             )
-        snippet = parsed.snippet or ""
-        tree = self._parse_structure(snippet, contract, errors)
-        if tree is None:
+        check_code = parsed.check_code or ""
+        check_tree = self._parse_structure(check_code, "check", errors)
+        update_tree = None
+        if contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE:
+            if not parsed.update_code:
+                errors.append("check_update validators must include update_code")
+            else:
+                update_tree = self._parse_structure(parsed.update_code, "update", errors)
+        elif parsed.update_code:
+            errors.append("check_only validators must not include update_code")
+        if check_tree is None or (
+            contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE
+            and update_tree is None
+        ):
             return ValidatorVerificationResult(accepted=False, errors=errors)
-        missing_state = sorted(set(contract.state_fields) - set(parsed.initial_state))
+        missing_state = sorted(set(contract.state_fields) - set(parsed.shared_states))
         if missing_state:
-            errors.append(f"initial state is missing fields: {', '.join(missing_state)}")
-        if not pending_examples:
-            errors.append("at least one pending action example is required")
+            errors.append(f"shared_states is missing fields: {', '.join(missing_state)}")
         if errors:
             return ValidatorVerificationResult(accepted=False, errors=errors)
 
         version = ValidatorVersion(
             contract_id=contract.id,
             enforcement_shape=contract.validator_enforcement_shape,
-            snippet=snippet,
+            check_code=check_code,
+            update_code=parsed.update_code,
             check_patterns=contract.check_patterns,
             update_patterns=contract.update_patterns,
             state_fields=contract.state_fields,
+            shared_states=parsed.shared_states,
             status=PredicateStatus.REJECTED,
         )
         del task_id
         log = ActionLogView(store, session_id=session_id)
-        initial_state = json.loads(json.dumps(parsed.initial_state))
-        for pending in pending_examples:
+        initial_state = json.loads(json.dumps(parsed.shared_states))
+        for pending in _verification_actions(contract):
             try:
                 verdict, post_state = self.runner.inspect_check(
                     version,
@@ -109,30 +118,35 @@ class ValidatorSnippetVerifier:
                 )
                 if post_state != initial_state:
                     errors.append(
-                        "check must not modify input state; keep check read-only and do not "
-                        "call helpers that mutate state"
+                        "check must not write shared state; use log.state_read only"
                     )
-                incomplete = dict(pending)
-                incomplete["arguments"] = {}
-                incomplete_verdict, _ = self.runner.inspect_check(
-                    version,
-                    action=incomplete,
-                    state=initial_state,
-                    log=log,
-                    context={"contract_id": contract.id, "verification": True},
-                )
-                if incomplete_verdict.decision == GateDecisionType.ALLOW:
-                    errors.append("check unsafely allows an action with missing arguments")
+                if pending.get("arguments"):
+                    incomplete = dict(pending)
+                    incomplete["arguments"] = {}
+                    incomplete_verdict, _ = self.runner.inspect_check(
+                        version,
+                        action=incomplete,
+                        state=initial_state,
+                        log=log,
+                        context={"contract_id": contract.id, "verification": True},
+                    )
+                    if incomplete_verdict.decision == GateDecisionType.ALLOW:
+                        errors.append("check unsafely allows an action with missing arguments")
                 if verdict.decision not in set(GateDecisionType):
                     errors.append("check returned an invalid decision")
             except (ValidatorSandboxError, ValueError) as exc:
                 errors.append(f"sandbox check failed: {exc}")
 
         if contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE:
-            self._verify_updates(version, initial_state, committed_examples, log, errors)
+            entries = list(committed_examples) or _verification_entries(
+                contract,
+                session_id=session_id,
+            )
+            self._verify_updates(version, initial_state, entries, log, errors)
 
         digest_payload = {
-            "snippet": snippet,
+            "check_code": check_code,
+            "update_code": parsed.update_code,
             "shape": contract.validator_enforcement_shape.value,
             "check_patterns": [
                 pattern.model_dump(mode="json") for pattern in contract.check_patterns
@@ -140,7 +154,7 @@ class ValidatorSnippetVerifier:
             "update_patterns": [
                 pattern.model_dump(mode="json") for pattern in contract.update_patterns
             ],
-            "state_fields": contract.state_fields,
+            "shared_states": parsed.shared_states,
         }
         verification_hash = hashlib.sha256(
             json.dumps(digest_payload, sort_keys=True).encode("utf-8")
@@ -153,21 +167,19 @@ class ValidatorSnippetVerifier:
 
     def _parse_structure(
         self,
-        snippet: str,
-        contract: Contract,
+        code: str,
+        function_name: str,
         errors: list[str],
     ) -> ast.Module | None:
         try:
-            tree = ast.parse(snippet)
+            tree = ast.parse(code)
         except SyntaxError as exc:
             errors.append(f"syntax error: {exc}")
             return None
         functions = {
             node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
         }
-        self._check_signature(functions.get("check"), "check", errors)
-        if contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE:
-            self._check_signature(functions.get("update"), "update", errors)
+        self._check_signature(functions.get(function_name), function_name, errors)
         for node in tree.body:
             if isinstance(node, (ast.Assign, ast.AnnAssign)):
                 value = node.value
@@ -180,6 +192,7 @@ class ValidatorSnippetVerifier:
             else:
                 errors.append(f"unsupported top-level statement: {node.__class__.__name__}")
         self._check_mapping_access(tree, errors)
+        self._check_log_access(tree, errors)
         return tree
 
     @staticmethod
@@ -220,13 +233,28 @@ class ValidatorSnippetVerifier:
         errors.extend(sorted(seen))
 
     @staticmethod
+    def _check_log_access(tree: ast.Module, errors: list[str]) -> None:
+        allowed = {"read", "state_read", "state_write"}
+        seen: set[str] = set()
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "log"
+                and node.attr not in allowed
+            ):
+                seen.add(
+                    "log only exposes read(...), state_read(...), and state_write(...)"
+                )
+        errors.extend(sorted(seen))
+
+    @staticmethod
     def _check_signature(
         function: ast.FunctionDef | None,
         name: str,
         errors: list[str],
     ) -> None:
-        expected = ["action", "state", "log", "context"] if name == "check" else [
-            "state",
+        expected = ["action", "log", "context"] if name == "check" else [
             "entry",
             "log",
             "context",
@@ -246,9 +274,6 @@ class ValidatorSnippetVerifier:
         log: ActionLogView,
         errors: list[str],
     ) -> None:
-        if not entries:
-            errors.append("check_update verification requires a committed action example")
-            return
         state = json.loads(json.dumps(initial_state))
         try:
             for index, raw_entry in enumerate(entries, start=1):
@@ -296,13 +321,80 @@ class ValidatorSnippetVerifier:
             errors.append(f"sandbox update failed: {exc}")
 
 
+def _verification_actions(contract: Contract) -> list[dict[str, Any]]:
+    host_action = contract.semantics.actions[0] if contract.semantics.actions else ""
+    return [
+        {
+            "tool_name": pattern.tool,
+            "host_action": host_action or pattern.tool,
+            "arguments": _representative_arguments(pattern),
+        }
+        for pattern in contract.check_patterns
+    ]
+
+
+def _verification_entries(
+    contract: Contract,
+    *,
+    session_id: str,
+) -> list[ActionLogEntryV1]:
+    host_action = contract.semantics.actions[0] if contract.semantics.actions else ""
+    return [
+        ActionLogEntryV1(
+            seq=index,
+            session_id=session_id,
+            agent_id="validator-verifier",
+            adapter_id="validator-verifier",
+            tool_call_id=f"verification-{contract.id}-{index}",
+            tool_name=pattern.tool,
+            host_action=host_action or pattern.tool,
+            arguments=_representative_arguments(pattern),
+        )
+        for index, pattern in enumerate(contract.update_patterns, start=1)
+    ]
+
+
+def _representative_arguments(pattern: ToolPattern) -> dict[str, Any]:
+    return {
+        name: _representative_argument(name, matcher)
+        for name, matcher in pattern.args.items()
+    }
+
+
+def _representative_argument(name: str, matcher: Any) -> Any:
+    if matcher.equals is not None:
+        return matcher.equals
+    if matcher.contains is not None:
+        return matcher.contains
+    if matcher.path_glob is not None:
+        return matcher.path_glob.replace("**", "example").replace("*", "example")
+    if matcher.mentions_path_glob is not None:
+        return matcher.mentions_path_glob.replace("**", "example").replace("*", "example")
+    if matcher.regex is not None:
+        lowered = matcher.regex.lower()
+        if "git" in lowered and "push" in lowered:
+            return "git push origin main"
+        if "pytest" in lowered or "test" in lowered:
+            return "uv run pytest -q"
+        return f"<value matching {matcher.regex}>"
+    return f"<{name}>"
+
+
+def _code_hash(check_code: str, update_code: str | None) -> str:
+    payload = {
+        "check_code": check_code,
+        "update_code": update_code,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
 class ValidatorInstaller:
-    """Install only snippets accepted by ValidatorSnippetVerifier."""
+    """Register validator hook packages already accepted by generate_verified."""
 
     def __init__(self, verifier: ValidatorSnippetVerifier | None = None) -> None:
-        self.verifier = verifier or ValidatorSnippetVerifier()
+        del verifier
 
-    def install(
+    def register(
         self,
         contract: Contract,
         package: ValidatorSnippetPackage | dict[str, Any],
@@ -310,8 +402,6 @@ class ValidatorInstaller:
         store: ContractStore,
         session_id: str,
         task_id: str | None,
-        pending_examples: Sequence[dict[str, Any]],
-        committed_examples: Sequence[ActionLogEntryV1] = (),
         user_id: str | None = None,
         workspace: str | None = None,
         repo: str | None = None,
@@ -325,89 +415,46 @@ class ValidatorInstaller:
             else ValidatorSnippetPackage.model_validate(package)
         )
         if not parsed.is_ready():
-            status = (
-                ValidatorInstallationStatus.NEEDS_REFINEMENT
-                if parsed.status == "needs_refinement"
-                else ValidatorInstallationStatus.MANUAL_REVIEW
-            )
             store.add_validator_installation(
                 ValidatorInstallationRecord(
                     contract_id=contract.id,
-                    status=status,
+                    status=ValidatorInstallationStatus.FAILED,
                     errors=list(parsed.notes),
                 )
             )
-            return ValidatorInstallationResult(status=status.value, validator_version=None, errors=list(parsed.notes))
-        if (
-            contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE
-            and contract.scope.level.value == "global"
-            and user_id is None
-        ):
-            errors = ["stateful global validators require user identity"]
+            return ValidatorInstallationResult(
+                status=ValidatorInstallationStatus.FAILED.value,
+                validator_version=None,
+                errors=list(parsed.notes),
+            )
+        if not parsed.verification_hash:
+            errors = ["validator package is missing verification_hash"]
             store.add_validator_installation(
                 ValidatorInstallationRecord(
                     contract_id=contract.id,
-                    status=ValidatorInstallationStatus.MANUAL_REVIEW,
+                    status=ValidatorInstallationStatus.FAILED,
                     errors=errors,
                 )
             )
             return ValidatorInstallationResult(
-                status=ValidatorInstallationStatus.MANUAL_REVIEW.value,
-                validator_version=None,
-                errors=errors,
-            )
-        if (
-            contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE
-            and not supports_post_action
-        ):
-            errors = ["check_update validators require reliable post-action capability"]
-            store.add_validator_installation(
-                ValidatorInstallationRecord(
-                    contract_id=contract.id,
-                    status=ValidatorInstallationStatus.MANUAL_REVIEW,
-                    errors=errors,
-                )
-            )
-            return ValidatorInstallationResult(
-                status=ValidatorInstallationStatus.MANUAL_REVIEW.value,
+                status=ValidatorInstallationStatus.FAILED.value,
                 validator_version=None,
                 errors=errors,
             )
 
-        verification = self.verifier.verify(
-            contract,
-            parsed,
-            store=store,
-            session_id=session_id,
-            task_id=task_id,
-            pending_examples=pending_examples,
-            committed_examples=committed_examples,
-        )
-        if not verification.accepted:
-            store.add_validator_installation(
-                ValidatorInstallationRecord(
-                    contract_id=contract.id,
-                    status=ValidatorInstallationStatus.MANUAL_REVIEW,
-                    errors=verification.errors,
-                )
-            )
-            return ValidatorInstallationResult(
-                status=ValidatorInstallationStatus.MANUAL_REVIEW.value,
-                validator_version=None,
-                errors=verification.errors,
-            )
-
-        snippet = parsed.snippet or ""
+        check_code = parsed.check_code or ""
+        snippet_hash = _code_hash(check_code, parsed.update_code)
         version = ValidatorVersion(
             contract_id=contract.id,
             enforcement_shape=contract.validator_enforcement_shape,
-            snippet=snippet,
+            check_code=check_code,
+            update_code=parsed.update_code,
             check_patterns=contract.check_patterns,
             update_patterns=contract.update_patterns,
-            state_fields=contract.state_fields,
-            initial_state=parsed.initial_state,
-            snippet_hash=hashlib.sha256(snippet.encode("utf-8")).hexdigest(),
-            verification_hash=verification.verification_hash,
+            state_fields=sorted(parsed.shared_states),
+            shared_states=parsed.shared_states,
+            snippet_hash=snippet_hash,
+            verification_hash=parsed.verification_hash,
             verified_at=utc_now(),
             sandbox_policy_version="subprocess-v1",
             action_log_search_spec_version="ActionLogSearchSpecV1",
@@ -416,27 +463,29 @@ class ValidatorInstaller:
             contract,
             session_id=session_id,
             workspace=workspace or contract.scope.workspace,
-            repo=repo or contract.scope.repo,
+            repo=repo or contract.scope.project,
             branch=branch,
             user_id=user_id or contract.scope.user_id,
         )
         store.install_verified_validator_version(
             version,
-            initial_state=parsed.initial_state,
             scope_key=scope_key,
         )
         store.add_validator_installation(
             ValidatorInstallationRecord(
                 contract_id=contract.id,
-                status=ValidatorInstallationStatus.INSTALLED,
+                status=ValidatorInstallationStatus.SUCCESS,
                 validator_version_id=version.id,
             )
         )
         return ValidatorInstallationResult(
-            status=ValidatorInstallationStatus.INSTALLED.value,
+            status=ValidatorInstallationStatus.SUCCESS.value,
             validator_version=version,
             errors=[],
         )
+
+    def install(self, *args: Any, **kwargs: Any) -> ValidatorInstallationResult:
+        return self.register(*args, **kwargs)
 
 
 class ValidatorProvisioner:
@@ -465,36 +514,68 @@ class ValidatorProvisioner:
         organization: str | None = None,
         supports_post_action: bool = True,
     ) -> ValidatorInstallationResult:
-        pending = pending_action_examples(contract)
-        committed = matched_action_examples(
-            store.list_action_log_entries(),
-            patterns=[*contract.check_patterns, *contract.update_patterns],
-            session_id=session_id,
-            task_id=task_id,
-            limit_per_tool=2,
-        )
+        if (
+            contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE
+            and contract.scope.level.value == "global"
+            and user_id is None
+        ):
+            package = ValidatorSnippetPackage(
+                status="fail",
+                notes=["stateful global validators require user identity"],
+            )
+            return self.installer.register(
+                contract,
+                package,
+                store=store,
+                session_id=session_id,
+                task_id=task_id,
+                user_id=user_id,
+                workspace=workspace,
+                repo=repo,
+                branch=branch,
+                organization=organization,
+                supports_post_action=supports_post_action,
+            )
+        if (
+            contract.validator_enforcement_shape == ValidatorEnforcementShape.CHECK_UPDATE
+            and not supports_post_action
+        ):
+            package = ValidatorSnippetPackage(
+                status="fail",
+                notes=["check_update validators require reliable post-action capability"],
+            )
+            return self.installer.register(
+                contract,
+                package,
+                store=store,
+                session_id=session_id,
+                task_id=task_id,
+                user_id=user_id,
+                workspace=workspace,
+                repo=repo,
+                branch=branch,
+                organization=organization,
+                supports_post_action=supports_post_action,
+            )
         try:
             package = self.generator.generate_verified(
                 contract,
                 store=store,
                 session_id=session_id,
                 task_id=task_id,
-                pending_examples=pending,
                 tool_capsules=tool_capsules,
             )
         except LLMCallError as exc:
             package = ValidatorSnippetPackage(
-                status="manual_review",
+                status="fail",
                 notes=[str(exc)],
             )
-        return self.installer.install(
+        return self.installer.register(
             contract,
             package,
             store=store,
             session_id=session_id,
             task_id=task_id,
-            pending_examples=pending,
-            committed_examples=committed,
             user_id=user_id,
             workspace=workspace,
             repo=repo,

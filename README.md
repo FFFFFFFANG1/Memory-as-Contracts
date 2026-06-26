@@ -198,10 +198,11 @@ The flag expires after 30 minutes and never interprets the user's reply.
 
 MAC v4 records only committed post-action tool calls in the Action Log. Installed
 validators are immutable, verifier-approved versions. `check_only` validators
-read the Pending Action plus bounded `log.search(spec)` results; `check_update`
-validators additionally maintain revisioned state keyed by validator version and
-scope. The sandbox worker receives an RPC log proxy, never the full Action Log or
-a SQLite connection.
+read the Pending Action plus bounded `log.read(spec)` results; `check_update`
+validators additionally maintain revisioned state through `log.state_read(...)`
+and `log.state_write(...)`, keyed by validator version and scope. The sandbox
+worker receives an RPC log proxy, never the full Action Log, ValidatorState
+table, or a SQLite connection.
 
 Online contract ingestion is separate from the action gate. Adapters persist
 user turns and, after each ten unprocessed turns in a session, send that batch to

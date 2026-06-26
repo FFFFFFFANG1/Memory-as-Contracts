@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from fnmatch import fnmatch
 
 from memory_as_contracts.models import (
     ActionSignature,
@@ -21,51 +20,29 @@ def lifecycle_is_active(lifecycle: Lifecycle, signature: ActionSignature | None 
 
 def scope_matches(scope: Scope, signature: ActionSignature) -> bool:
     workspace_root = signature.workspace.root or signature.workspace.cwd
-    if scope.agent_family and signature.agent_family not in scope.agent_family:
-        return False
     if scope.user_id and signature.session.user_id and scope.user_id != signature.session.user_id:
         return False
     if scope.workspace and scope.workspace != workspace_root:
         return False
-    if scope.repo and signature.workspace.repo and scope.repo != signature.workspace.repo:
-        return False
-    if scope.task and signature.session.task_id and scope.task != signature.session.task_id:
-        return False
 
     if scope.level == ScopeLevel.GLOBAL:
         return True
-    if scope.level == ScopeLevel.ORGANIZATION:
-        return bool(scope.organization)
-    if scope.level == ScopeLevel.AGENT_FAMILY:
-        return signature.agent_family in scope.agent_family
-    if scope.level == ScopeLevel.PROJECT:
-        return bool(scope.workspace and scope.workspace == workspace_root)
-    if scope.level == ScopeLevel.REPO:
-        if scope.repo and signature.workspace.repo:
-            return scope.repo == signature.workspace.repo
-        return bool(scope.workspace and scope.workspace == workspace_root)
-    if scope.level == ScopeLevel.COMPONENT:
-        if not scope.component:
-            return False
-        component = scope.component.lower()
-        return component in signature.intent.lower() or any(
-            component in target.lower() for target in signature.targets
-        )
-    if scope.level == ScopeLevel.PATH:
-        if any(
-            fnmatch(target, glob)
-            for target in signature.targets
-            for glob in scope.path_globs
-        ):
-            return True
-        raw_text = _raw_arguments_text(signature)
-        return any(_glob_prefix(glob) in raw_text for glob in scope.path_globs if _glob_prefix(glob))
-    if scope.level == ScopeLevel.TASK:
-        return bool(scope.task and scope.task == signature.session.task_id)
     if scope.level == ScopeLevel.SESSION:
         return True
-    if scope.level == ScopeLevel.PER_TURN:
-        return True
+    if scope.level == ScopeLevel.PROJECT:
+        return _project_matches(scope, signature)
+    if scope.level == ScopeLevel.MODULE:
+        if not _project_matches(scope, signature) or not scope.module:
+            return False
+        module = scope.module.lower()
+        haystack = " ".join(
+            [
+                signature.intent,
+                *signature.targets,
+                _raw_arguments_text(signature),
+            ]
+        ).lower()
+        return module in haystack
     return False
 
 
@@ -73,8 +50,14 @@ def _raw_arguments_text(signature: ActionSignature) -> str:
     return json.dumps(signature.tool.raw_arguments, sort_keys=True)
 
 
-def _glob_prefix(glob: str) -> str:
-    return glob.split("*", 1)[0].rstrip("/")
+def _project_matches(scope: Scope, signature: ActionSignature) -> bool:
+    workspace_root = signature.workspace.root or signature.workspace.cwd
+    project = scope.project or scope.workspace
+    if scope.workspace and scope.workspace != workspace_root:
+        return False
+    if project is None:
+        return False
+    return project in {workspace_root, signature.workspace.repo}
 
 
 def contract_applies_to_signature(contract: Contract, signature: ActionSignature) -> bool:
@@ -91,15 +74,9 @@ def edge_applies_to_signature(edge: ContractEdge, signature: ActionSignature) ->
 
 def scope_specificity(scope: Scope) -> int:
     order = {
-        ScopeLevel.PATH: 90,
-        ScopeLevel.TASK: 80,
+        ScopeLevel.MODULE: 80,
         ScopeLevel.SESSION: 70,
-        ScopeLevel.COMPONENT: 65,
-        ScopeLevel.REPO: 60,
         ScopeLevel.PROJECT: 50,
-        ScopeLevel.AGENT_FAMILY: 40,
-        ScopeLevel.ORGANIZATION: 30,
         ScopeLevel.GLOBAL: 10,
-        ScopeLevel.PER_TURN: 100,
     }
     return order[scope.level]

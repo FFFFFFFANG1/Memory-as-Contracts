@@ -241,23 +241,17 @@ def _binding_specificity(contract: Contract) -> int:
         score += 3
     if actions.difference({"exec"}):
         score += 10
-    if contract.tool_patterns:
-        score += len(contract.tool_patterns) * 4
+    if contract.check_patterns:
+        score += len(contract.check_patterns) * 4
     return score
 
 
 def _scope_specificity_value(contract: Contract) -> int:
     return {
         "global": 0,
-        "organization": 1,
-        "agent_family": 2,
         "project": 3,
-        "repo": 4,
         "session": 5,
-        "task": 6,
-        "component": 7,
-        "path": 8,
-        "per_turn": 9,
+        "module": 7,
     }.get(contract.scope.level.value, 0)
 
 

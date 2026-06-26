@@ -33,11 +33,10 @@ from memory_as_contracts.models import (
     ToolCall,
     WorkspaceContext,
 )
-from memory_as_contracts.schema_compat import normalize_rule_payload
 
 
 def project_scope() -> Scope:
-    return Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project")
+    return Scope(level=ScopeLevel.PROJECT, workspace="/workspace/project", project="/workspace/project")
 
 
 def user_source() -> ContractSource:
@@ -45,7 +44,6 @@ def user_source() -> ContractSource:
         kind=SourceKind.USER_TURN,
         conversation_id="conv-123",
         turn_id="u-017",
-        span="this week do not push before asking",
         created_at=datetime(2026, 5, 23, 9, 30, tzinfo=timezone.utc),
     )
 
@@ -69,7 +67,7 @@ def test_contract_and_pattern_version_serialize_canonical_schema() -> None:
             actions=["git.push"],
             tags=["external_write", "publish_code"],
         ),
-        tool_patterns=[
+        check_patterns=[
             ToolPattern(
                 tool="exec",
                 args={"cmd": ArgPattern(regex=r"^\s*git\s+push(?:\s|$)")},
@@ -81,7 +79,7 @@ def test_contract_and_pattern_version_serialize_canonical_schema() -> None:
         id="PV-001",
         contract_id=contract.id,
         version="PV-001",
-        tool_patterns=contract.tool_patterns,
+        check_patterns=contract.check_patterns,
         canonical_tags=["external_write", "publish_code"],
     )
 
@@ -94,22 +92,23 @@ def test_contract_and_pattern_version_serialize_canonical_schema() -> None:
     assert "action_constraints" not in payload
     assert "compiled_predicates" not in payload
     assert "host_action_patterns" not in pattern_payload
-    assert pattern_payload["tool_patterns"][0]["args"]["cmd"]["regex"].startswith("^")
+    assert "tool_patterns" not in payload
+    assert pattern_payload["check_patterns"][0]["args"]["cmd"]["regex"].startswith("^")
 
 
-def test_rule_schema_round_trips_linked_repo_tool_patterns() -> None:
+def test_rule_schema_round_trips_linked_repo_check_patterns() -> None:
     payload = {
         "id": "rule_01",
         "text": "不要修改 linked repo，除非用户本轮显式要求。",
         "effect": "deny",
         "status": "active",
         "authority": "user_explicit",
-        "scope": {"repo": "current", "paths": ["../linked_repo/**"]},
+        "scope": {"project": "current"},
         "semantics": {
             "actions": ["file.write"],
             "tags": ["workspace_write", "source_modification"],
         },
-        "tool_patterns": [
+        "check_patterns": [
             {
                 "tool": "Edit",
                 "args": {"file_path": {"path_glob": "../linked_repo/**"}},
@@ -127,9 +126,9 @@ def test_rule_schema_round_trips_linked_repo_tool_patterns() -> None:
     dumped = rule.model_dump(mode="json")
 
     assert rule.effect == "deny"
-    assert rule.scope.path_globs == ["../linked_repo/**"]
+    assert rule.scope.project == "current"
     assert rule.semantics.actions == ["file.write"]
-    assert rule.tool_patterns[0] == ToolPattern(
+    assert rule.check_patterns[0] == ToolPattern(
         tool="Edit",
         args={"file_path": ArgPattern(path_glob="../linked_repo/**")},
     )
@@ -142,27 +141,27 @@ def test_fact_cannot_bind_rule_semantics() -> None:
             text="This repo uses uv.",
             kind=ContractKind.FACT,
             modality=Modality.MAY,
-            source=ContractSource(kind=SourceKind.PROJECT_DOC, span="uses uv"),
+            source=ContractSource(kind=SourceKind.PROJECT_DOC),
             scope=project_scope(),
             semantics=RuleSemantics(actions=["exec"]),
         )
 
 
-def test_fact_cannot_bind_tool_patterns() -> None:
-    with pytest.raises(ValidationError, match="fact contracts cannot bind tool patterns"):
+def test_fact_cannot_bind_check_patterns() -> None:
+    with pytest.raises(ValidationError, match="fact contracts cannot bind operational patterns"):
         Contract(
             text="This repo uses uv.",
             kind=ContractKind.FACT,
             modality=Modality.MAY,
-            source=ContractSource(kind=SourceKind.PROJECT_DOC, span="uses uv"),
+            source=ContractSource(kind=SourceKind.PROJECT_DOC),
             scope=project_scope(),
-            tool_patterns=[
+            check_patterns=[
                 ToolPattern(tool="exec", args={"cmd": ArgPattern(regex=r"^uv(?:\s|$)")})
             ],
         )
 
 
-def test_legacy_rule_payload_requires_explicit_compatibility_adapter() -> None:
+def test_legacy_rule_payload_is_rejected_by_canonical_schema() -> None:
     legacy_payload = {
         "text": "Do not push code.",
         "kind": "prohibition",
@@ -187,17 +186,13 @@ def test_legacy_rule_payload_requires_explicit_compatibility_adapter() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         Contract.model_validate(legacy_payload)
 
-    rule = Contract.model_validate(normalize_rule_payload(legacy_payload))
-
-    assert rule.semantics.actions == ["git.push"]
-    assert rule.tool_patterns[0].tool == "exec"
     assert "action_constraints" not in Contract.model_fields
     assert "compiled_predicates" not in Contract.model_fields
 
 
-def test_path_scope_requires_path_globs() -> None:
-    with pytest.raises(ValidationError, match="path scope requires"):
-        Scope(level=ScopeLevel.PATH, workspace="/workspace/project")
+def test_project_scope_requires_project_or_workspace() -> None:
+    with pytest.raises(ValidationError, match="project scope requires"):
+        Scope(level=ScopeLevel.PROJECT)
 
 
 def test_bounded_time_lifecycle_requires_expiry_after_effective_time() -> None:

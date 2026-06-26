@@ -111,8 +111,8 @@ def _scope_can_apply_to_extraction_context(
     user_id = context.normalization.user_id
     if user_id and contract.scope.user_id and contract.scope.user_id != user_id:
         return False
-    task = context.normalization.task
-    if task and contract.scope.task and contract.scope.task != task:
+    project = context.normalization.repo or context.normalization.workspace
+    if contract.scope.project and project and contract.scope.project != project:
         return False
     if (
         context.conversation_id

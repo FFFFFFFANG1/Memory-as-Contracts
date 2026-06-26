@@ -179,7 +179,6 @@ def validator_errors(
 def verify_validator(
     contract_id: str = typer.Argument(...),
     package_json: str = typer.Option(..., "--package-json"),
-    pending_json: str = typer.Option(..., "--pending-json"),
     session_id: str = typer.Option(...),
     task_id: str | None = typer.Option(None),
 ) -> None:
@@ -189,14 +188,12 @@ def verify_validator(
     try:
         contract = _require_contract(store, contract_id)
         package = ValidatorSnippetPackage.model_validate_json(package_json)
-        pending = _json_list(pending_json, "pending-json")
         result = ValidatorSnippetVerifier().verify(
             contract,
             package,
             store=store,
             session_id=session_id,
             task_id=task_id,
-            pending_examples=pending,
             committed_examples=store.list_action_log_entries(),
         )
         _echo_json(result.model_dump(mode="json"))
@@ -208,7 +205,6 @@ def verify_validator(
 def install_validator(
     contract_id: str = typer.Argument(...),
     package_json: str = typer.Option(..., "--package-json"),
-    pending_json: str = typer.Option(..., "--pending-json"),
     session_id: str = typer.Option(...),
     task_id: str | None = typer.Option(None),
 ) -> None:
@@ -218,14 +214,12 @@ def install_validator(
     try:
         contract = _require_contract(store, contract_id)
         package = ValidatorSnippetPackage.model_validate_json(package_json)
-        result = ValidatorInstaller().install(
+        result = ValidatorInstaller().register(
             contract,
             package,
             store=store,
             session_id=session_id,
             task_id=task_id,
-            pending_examples=_json_list(pending_json, "pending-json"),
-            committed_examples=store.list_action_log_entries(),
         )
         _echo_json(
             {
@@ -302,7 +296,6 @@ def mac_rule_override(
         lifecycle=lifecycle,
         source=ContractSource(
             kind=source_kind,
-            span=reason,
             metadata={"override_reason": reason},
         ),
     )

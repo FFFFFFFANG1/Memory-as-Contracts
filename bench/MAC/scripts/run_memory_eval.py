@@ -27,7 +27,30 @@ from bench.MAC.agent.loop.llm_tools import (
 )
 from bench.MAC.agent.loop.memoryarena_tools import MemoryArenaWebShopToolExecutor
 from bench.MAC.agent.loop.runner import run_agent_loop
+from bench.MAC.agent.loop.tools import HeuristicToolExecutor
 from bench.MAC.agent.memory import MemoryRequest, available_memory_systems, get_memory_provider
+from bench.MAC.agent.memory.bm25 import BM25Config, BM25MemoryProvider
+from bench.MAC.agent.memory.embedding import (
+    DEFAULT_EMBEDDING_CACHE_DIR,
+    DEFAULT_EMBEDDING_MODEL,
+    EmbeddingConfig,
+    EmbeddingMemoryProvider,
+)
+from bench.MAC.agent.memory.mac import (
+    DEFAULT_MAC_STORE_DIR,
+    MACHookedToolExecutor,
+    MACMemoryConfig,
+    MACMemoryProvider,
+    export_mac_constraint_graph,
+    write_mac_constraint_graph,
+)
+from bench.MAC.agent.memory.mem0 import (
+    DEFAULT_MEM0_FAISS_DIR,
+    DEFAULT_MEM0_INGEST_CACHE_DIR,
+    Mem0Config,
+    Mem0MemoryProvider,
+)
+from bench.MAC.agent.memory.rrf import RRFConfig, RRFMemoryProvider
 from bench.MAC.memoryarena.bridge import (
     DEFAULT_BUNDLED_SHOPPING_PATH,
     build_memoryarena_system_config,
@@ -36,6 +59,7 @@ from bench.MAC.memoryarena.bridge import (
 )
 from bench.MAC.scripts.run_paths import (
     bench_output_path,
+    mac_graph_path,
     make_run_unique_index,
     memory_output_error_path,
 )
@@ -136,6 +160,80 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--memory-llm-api-key-env", default="LLM_API_KEY")
     parser.add_argument("--memory-llm-temperature", type=float, default=0.3)
     parser.add_argument("--memory-llm-max-tokens", type=int, default=4096)
+    parser.add_argument("--memory-top-k", type=int, default=int(os.getenv("MAC_MEMORY_TOP_K", "10")))
+    parser.add_argument(
+        "--memory-max-chars",
+        type=int,
+        default=int(os.getenv("MAC_MEMORY_MAX_CHARS", "0")),
+        help="Maximum characters for retrieved memory; 0 means unlimited.",
+    )
+    parser.add_argument(
+        "--embedding-model",
+        default=os.getenv("MAC_EMBEDDING_MODEL") or os.getenv("EMBEDDING_MODEL") or DEFAULT_EMBEDDING_MODEL,
+        help="Embedding model for embedding and rrf memory systems.",
+    )
+    parser.add_argument(
+        "--embedding-cache-dir",
+        type=Path,
+        default=Path(os.getenv("MAC_EMBEDDING_CACHE_DIR", str(DEFAULT_EMBEDDING_CACHE_DIR))),
+        help="Persistent embedding index cache directory.",
+    )
+    parser.add_argument(
+        "--embedding-api-key-env",
+        default=os.getenv("MAC_EMBEDDING_API_KEY_ENV", "EMBEDDING_API"),
+    )
+    parser.add_argument("--embedding-base-url", default=os.getenv("MAC_EMBEDDING_BASE_URL") or os.getenv("EMBEDDING_BASE"))
+    parser.add_argument("--rrf-k", type=int, default=int(os.getenv("MAC_RRF_K", "60")))
+    parser.add_argument(
+        "--mac-token-budget",
+        type=int,
+        default=int(os.getenv("MAC_PROMPT_TOKEN_BUDGET", "1500")),
+        help="Approximate token budget for rendered MAC reminders.",
+    )
+    parser.add_argument(
+        "--mac-store-dir",
+        type=Path,
+        default=Path(os.getenv("MAC_BENCH_STORE_DIR", str(DEFAULT_MAC_STORE_DIR))),
+        help="Directory for persisted per-task MAC runtime stores when enabled.",
+    )
+    parser.add_argument(
+        "--mac-persist-store",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Persist per-task MAC stores instead of using in-memory stores.",
+    )
+    parser.add_argument(
+        "--mac-load-store-dir",
+        type=Path,
+        default=None,
+        help="Reuse persisted per-task MAC SQLite stores from this directory (skip history extraction).",
+    )
+    parser.add_argument(
+        "--mac-ask-pass",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Bench test mode: treat MAC gate ask decisions as allow.",
+    )
+    parser.add_argument("--mem0-user-id-prefix", default=os.getenv("MAC_MEM0_USER_ID_PREFIX", "mac-bench"))
+    parser.add_argument(
+        "--mem0-ingest-cache-dir",
+        type=Path,
+        default=Path(os.getenv("MAC_MEM0_INGEST_CACHE_DIR", str(DEFAULT_MEM0_INGEST_CACHE_DIR))),
+        help="Local manifest directory used to avoid duplicate Mem0 ingest.",
+    )
+    parser.add_argument(
+        "--mem0-faiss-dir",
+        type=Path,
+        default=Path(os.getenv("MAC_MEM0_FAISS_DIR", str(DEFAULT_MEM0_FAISS_DIR))),
+        help="Local FAISS index directory for Mem0 OSS.",
+    )
+    parser.add_argument("--mem-llm-model", default=os.getenv("MEM_LLM_MODEL", ""))
+    parser.add_argument("--mem-api-key-env", default=os.getenv("MAC_MEM_API_KEY_ENV", "MEM_API_KEY"))
+    parser.add_argument("--mem-base-url", default=os.getenv("MEM_BASE_URL"))
+    parser.add_argument("--mem0-infer", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--mem0-rerank", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--mem0-threshold", type=float)
+    parser.add_argument("--mem0-force-reingest", action=argparse.BooleanOptionalAction, default=False)
 
     parser.add_argument(
         "--tool-executor",
@@ -187,6 +285,77 @@ def tool_return_llm_config_from_args(args: argparse.Namespace, agent_llm: LLMCon
         temperature=args.tool_return_llm_temperature,
         max_tokens=args.tool_return_llm_max_tokens,
     )
+
+
+def memory_provider_from_args(args: argparse.Namespace):
+    top_k = max(1, args.memory_top_k)
+    max_chars = args.memory_max_chars if args.memory_max_chars > 0 else None
+    normalized = args.memory_system.strip().lower().replace("-", "_")
+    if normalized == "bm25":
+        return BM25MemoryProvider(BM25Config(top_k=top_k, max_chars=max_chars))
+    if normalized == "embedding":
+        return EmbeddingMemoryProvider(
+            EmbeddingConfig(
+                top_k=top_k,
+                max_chars=max_chars,
+                model=args.embedding_model,
+                cache_dir=args.embedding_cache_dir,
+                api_key_env=args.embedding_api_key_env,
+                base_url=args.embedding_base_url,
+            )
+        )
+    if normalized == "rrf":
+        embedding_config = EmbeddingConfig(
+            top_k=top_k,
+            max_chars=max_chars,
+            model=args.embedding_model,
+            cache_dir=args.embedding_cache_dir,
+            api_key_env=args.embedding_api_key_env,
+            base_url=args.embedding_base_url,
+        )
+        return RRFMemoryProvider(
+            RRFConfig(
+                top_k=top_k,
+                max_chars=max_chars,
+                rrf_k=max(1, args.rrf_k),
+                embedding=embedding_config,
+            )
+        )
+    if normalized == "mac":
+        return MACMemoryProvider(
+            MACMemoryConfig(
+                top_k=top_k,
+                token_budget=max(1, args.mac_token_budget),
+                store_dir=args.mac_store_dir,
+                persist_store=args.mac_persist_store,
+                load_store_dir=args.mac_load_store_dir,
+                ask_pass=args.mac_ask_pass,
+                mem_llm_model=args.mem_llm_model,
+                mem_api_key_env=args.mem_api_key_env,
+                mem_base_url=args.mem_base_url,
+            )
+        )
+    if normalized == "mem0":
+        return Mem0MemoryProvider(
+            Mem0Config(
+                top_k=top_k,
+                max_chars=max_chars,
+                user_id_prefix=args.mem0_user_id_prefix,
+                ingest_cache_dir=args.mem0_ingest_cache_dir,
+                faiss_dir=args.mem0_faiss_dir,
+                rerank=args.mem0_rerank,
+                threshold=args.mem0_threshold,
+                force_reingest=args.mem0_force_reingest,
+                infer=args.mem0_infer,
+                mem_llm_model=args.mem_llm_model,
+                mem_api_key_env=args.mem_api_key_env,
+                mem_base_url=args.mem_base_url,
+                embedding_model=args.embedding_model,
+                embedding_api_key_env=args.embedding_api_key_env,
+                embedding_base_url=args.embedding_base_url,
+            )
+        )
+    return get_memory_provider(args.memory_system)
 
 
 def resolve_run_id(args: argparse.Namespace) -> str:
@@ -370,6 +539,7 @@ def memory_request_from_loop_input(loop_input, memory_llm: LLMConfig) -> MemoryR
         user_prompt=loop_input.user_prompt,
         past_user_turns=loop_input.past_user_turns,
         task=loop_input.task,
+        agent_tools=list(loop_input.tools),
         memory_llm=memory_llm.to_metadata(),
     )
 
@@ -393,6 +563,7 @@ async def run_one_task(
     progress_lock: asyncio.Lock,
 ) -> dict[str, Any]:
     task_uid = str(task.get("task_uid") or "")
+    mac_state = None
     try:
         loop_input = build_agent_loop_input(
             task,
@@ -436,6 +607,15 @@ async def run_one_task(
                     max_payload_chars=args.tool_return_max_payload_chars,
                 ),
             )
+        if memory_result.system_name == "mac" and hasattr(memory_provider, "runtime_for_task"):
+            mac_state = memory_provider.runtime_for_task(loop_input.task_uid)
+            if mac_state is not None:
+                ask_pass = getattr(getattr(memory_provider, "config", None), "ask_pass", False)
+                executor = MACHookedToolExecutor(
+                    state=mac_state,
+                    inner=executor or HeuristicToolExecutor(agent=loop_input.agent),
+                    ask_pass=ask_pass,
+                )
         result = await run_agent_loop(
             agent=loop_input.agent,
             system_prompt=loop_input.system_prompt,
@@ -446,6 +626,20 @@ async def run_one_task(
             executor=executor,
             max_iterations=args.max_iterations,
         )
+        mac_graph_output = None
+        if mac_state is not None:
+            run_id = args.run_id or resolve_run_id(args)
+            graph_payload = export_mac_constraint_graph(
+                mac_state,
+                metadata={
+                    **(memory_result.metadata or {}),
+                    "mac_events": list(getattr(executor, "mac_events", [])),
+                },
+            )
+            mac_graph_output = write_mac_constraint_graph(
+                mac_graph_path(args.memory_system, args.bench, run_id, task_uid),
+                graph_payload,
+            )
         if hasattr(executor, "close"):
             executor.close()
         row = {
@@ -467,6 +661,15 @@ async def run_one_task(
         }
         if args.save_messages:
             row["messages"] = result.messages
+        if "executor" in locals() and hasattr(executor, "mac_events"):
+            row["mac_events"] = list(executor.mac_events)
+        if mac_graph_output is not None:
+            row["mac_constraint_graph_path"] = str(mac_graph_output)
+            if args.mac_persist_store:
+                safe_task = "".join(
+                    char if char.isalnum() or char in {"-", "_"} else "_" for char in task_uid
+                )
+                row["mac_store_sqlite_path"] = str(Path(args.mac_store_dir) / f"{safe_task}.sqlite")
     except Exception as exc:  # noqa: BLE001 - keep benchmark row-level failures isolated.
         if "executor" in locals() and hasattr(executor, "close"):
             executor.close()
@@ -514,7 +717,11 @@ async def run(args: argparse.Namespace) -> None:
     agent_llm = llm_config_from_args(args, "agent_llm")
     memory_llm = llm_config_from_args(args, "memory_llm")
     tool_return_llm = tool_return_llm_config_from_args(args, agent_llm)
-    memory_provider = get_memory_provider(args.memory_system)
+    run_id = resolve_run_id(args)
+    args.run_id = run_id
+    if args.memory_system == "mac" and args.mac_persist_store:
+        args.mac_store_dir = Path(args.mac_store_dir) / run_id
+    memory_provider = memory_provider_from_args(args)
     model_client = model_client_from_config(agent_llm, dry_run=args.dry_run)
     if args.tool_executor in {"heuristic", "cctu"}:
         tool_return_model_client = None
@@ -522,7 +729,6 @@ async def run(args: argparse.Namespace) -> None:
         tool_return_model_client = DryRunToolReturnModelClient()
     else:
         tool_return_model_client = model_client_from_config(tool_return_llm, dry_run=False)
-    run_id = resolve_run_id(args)
     output = merge_into or args.output or default_output_path(args)
     error_output = memory_output_error_path(output, bench=args.bench)
     header = {
@@ -539,6 +745,27 @@ async def run(args: argparse.Namespace) -> None:
         "checkpoint_interval": args.checkpoint_interval,
         "agent_llm": agent_llm.to_metadata(),
         "memory_llm": memory_llm.to_metadata(),
+        "memory_top_k": max(1, args.memory_top_k),
+        "memory_max_chars": args.memory_max_chars if args.memory_max_chars > 0 else None,
+        "embedding_model": args.embedding_model if args.memory_system in {"embedding", "rrf"} else None,
+        "embedding_cache_dir": str(args.embedding_cache_dir) if args.memory_system in {"embedding", "rrf"} else None,
+        "rrf_k": max(1, args.rrf_k) if args.memory_system == "rrf" else None,
+        "mac_token_budget": max(1, args.mac_token_budget) if args.memory_system == "mac" else None,
+        "mac_store_dir": str(args.mac_store_dir) if args.memory_system == "mac" else None,
+        "mac_persist_store": args.mac_persist_store if args.memory_system == "mac" else None,
+        "mac_load_store_dir": str(args.mac_load_store_dir) if args.mac_load_store_dir else None,
+        "mac_ask_pass": args.mac_ask_pass if args.memory_system == "mac" else None,
+        "mac_mem_llm_model": args.mem_llm_model if args.memory_system == "mac" else None,
+        "mac_mem_api_key_env": args.mem_api_key_env if args.memory_system == "mac" else None,
+        "mac_mem_base_url": args.mem_base_url if args.memory_system == "mac" else None,
+        "mem0_user_id_prefix": args.mem0_user_id_prefix if args.memory_system == "mem0" else None,
+        "mem0_ingest_cache_dir": str(args.mem0_ingest_cache_dir) if args.memory_system == "mem0" else None,
+        "mem0_faiss_dir": str(args.mem0_faiss_dir) if args.memory_system == "mem0" else None,
+        "mem0_infer": args.mem0_infer if args.memory_system == "mem0" else None,
+        "mem_llm_model": args.mem_llm_model if args.memory_system == "mem0" else None,
+        "mem0_rerank": args.mem0_rerank if args.memory_system == "mem0" else None,
+        "mem0_threshold": args.mem0_threshold if args.memory_system == "mem0" else None,
+        "mem0_force_reingest": args.mem0_force_reingest if args.memory_system == "mem0" else None,
         "tool_executor": args.tool_executor,
         "tool_return_llm": tool_return_llm.to_metadata() if args.tool_executor != "heuristic" else None,
         "tool_return_max_attempts": args.tool_return_max_attempts,
