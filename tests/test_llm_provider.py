@@ -11,9 +11,11 @@ class FakeCompletions:
     def __init__(self, outcomes):
         self.outcomes = iter(outcomes)
         self.calls = 0
+        self.last_kwargs = {}
 
     def create(self, **kwargs):
         self.calls += 1
+        self.last_kwargs = kwargs
         outcome = next(self.outcomes)
         if isinstance(outcome, BaseException):
             raise outcome
@@ -29,6 +31,7 @@ def provider_with(outcomes) -> tuple[OpenAIChatResponseProvider, FakeCompletions
         openai_api_key="test",
         openai_base_url=None,
         llm_model="test-model",
+        llm_max_tokens=4096,
         db_path=Path(":memory:"),
         llm_timeout_seconds=1.0,
         log_path=Path("mac.log"),
@@ -49,6 +52,7 @@ def test_openai_provider_retries_timeouts_and_returns_third_attempt() -> None:
 
     assert provider("prompt") == "ok"
     assert completions.calls == 3
+    assert completions.last_kwargs["max_tokens"] == 4096
 
 
 def test_openai_provider_returns_stable_error_after_three_timeouts() -> None:

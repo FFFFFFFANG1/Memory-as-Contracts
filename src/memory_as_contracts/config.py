@@ -12,6 +12,7 @@ class MacConfig:
     openai_api_key: str | None
     openai_base_url: str | None
     llm_model: str | None
+    llm_max_tokens: int
     db_path: Path
     llm_timeout_seconds: float
     log_path: Path
@@ -30,6 +31,7 @@ def load_config(env_file: str | Path | None = None) -> MacConfig:
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_base_url=os.getenv("OPENAI_BASE_URL"),
         llm_model=os.getenv("MAC_LLM_MODEL"),
+        llm_max_tokens=int(os.getenv("MAC_LLM_MAX_TOKENS", "4096")),
         db_path=Path(os.getenv("MAC_DB_PATH", ".mac/contracts.sqlite")),
         llm_timeout_seconds=float(os.getenv("MAC_LLM_TIMEOUT_SECONDS", "60")),
         log_path=Path(os.getenv("MAC_LOG_PATH", ".mac/mac.log")),

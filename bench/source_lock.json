@@ -1,0 +1,50 @@
+{
+  "decision_date": "2026-06-12",
+  "sources": {
+    "scbench_runner": {
+      "official_repository": "https://github.com/SprocketLab/slop-code-bench",
+      "local_path": "bench/sources/scbench-runner",
+      "checked_revision": "13de1a7a6b8b3dc5cc532a0c322a0997afa5bec7",
+      "license_note": "MIT"
+    },
+    "scbench_problems": {
+      "official_repository": "https://github.com/gabeorlanski/scb-problems",
+      "local_path": "bench/sources/scbench-problems",
+      "checked_revision": "ef6a9dd13911566b6b01075ca121758c9f7b5c5f",
+      "license_note": "Apache-2.0"
+    },
+    "swe_bench": {
+      "official_repository": "https://github.com/princeton-nlp/SWE-bench",
+      "local_path": "bench/sources/swe-bench",
+      "checked_revision": "f7bbbb2ccdf479001d6467c9e34af59e44a840f9",
+      "license_note": "MIT; upstream repositories retain their own licenses"
+    },
+    "toolsandbox": {
+      "official_repository": "https://github.com/apple/ToolSandbox",
+      "local_path": "bench/sources/toolsandbox",
+      "checked_revision": "165848b9a78cead7ca7fe7c89c688b58e6501219",
+      "license_note": "Apple sample-code license; preserve its notice and audit redistribution terms"
+    },
+    "tau3_bench": {
+      "benchmark_name": "tau3-bench",
+      "official_repository": "https://github.com/sierra-research/tau2-bench",
+      "repository_note": "tau3-bench is distributed from the tau2-bench repository; keep the local checkout path unchanged.",
+      "local_path": "bench/sources/tau2-bench",
+      "internal_adapter": "tau",
+      "checked_revision": "5ebebbe827b455b3ed04fcb9294235c6ef4e5fd6",
+      "license_note": "MIT"
+    }
+  },
+  "agents": {
+    "openhands": {
+      "official_repository": "https://github.com/All-Hands-AI/OpenHands",
+      "local_path": "bench/agents/openhands",
+      "checked_revision": "faf0e08f23b09a4eaf24a48dfce26bfcdf55039d"
+    },
+    "opencode": {
+      "official_repository": "https://github.com/sst/opencode",
+      "local_path": "bench/agents/opencode",
+      "checked_revision": "2c5335d84c2048902022c918b738b84c7220c561"
+    }
+  }
+}

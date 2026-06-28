@@ -48,6 +48,7 @@ def env(json_output: bool = typer.Option(False, "--json", help="Print machine-re
         "openai_api_key_set": bool(config.openai_api_key),
         "openai_base_url": config.openai_base_url,
         "llm_model": config.llm_model,
+        "llm_max_tokens": config.llm_max_tokens,
         "llm_timeout_seconds": config.llm_timeout_seconds,
         "db_path": str(config.db_path),
         "log_path": str(config.log_path),
@@ -61,6 +62,7 @@ def env(json_output: bool = typer.Option(False, "--json", help="Print machine-re
     typer.echo(f"OPENAI_API_KEY set: {payload['openai_api_key_set']}")
     typer.echo(f"OPENAI_BASE_URL: {payload['openai_base_url'] or ''}")
     typer.echo(f"MAC_LLM_MODEL: {payload['llm_model'] or ''}")
+    typer.echo(f"MAC_LLM_MAX_TOKENS: {payload['llm_max_tokens']}")
     typer.echo(f"MAC_LLM_TIMEOUT_SECONDS: {payload['llm_timeout_seconds']}")
     typer.echo(f"MAC_DB_PATH: {payload['db_path']}")
     typer.echo(f"MAC_LOG_PATH: {payload['log_path']}")

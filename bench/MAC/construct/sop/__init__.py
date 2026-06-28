@@ -1,0 +1,1 @@
+"""SOPBench → MAC construct pipeline."""

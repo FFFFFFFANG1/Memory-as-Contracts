@@ -244,6 +244,8 @@ def test_validator_generator_prompt_includes_shapes_apis_and_examples() -> None:
     assert "ACTION LOG SEARCH API" not in prompt
     assert "VERDICT API" not in prompt
     assert "MATCHED COMMITTED ACTION EXAMPLES" in prompt
+    assert "Return one strict JSON object containing the hook code" in prompt
+    assert "check_code as a Python source string" in prompt
     assert '"price": "$12.00"' in prompt
     assert "Purchased domain for $12.00" not in prompt
     assert "large prompt must not be included" not in prompt

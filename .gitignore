@@ -14,15 +14,8 @@ dist/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
-bench/*
-!bench/__init__.py
-!bench/README.md
-!bench/MAC/
-!bench/MAC/**
-bench/CCTU/
 bench/MemoryArena/
 bench/MAC/agent/memory/repo/
-bench/SOPBench/
 bench/MAC/.cache/
 bench/MAC/**/results/
 bench/MAC/**/__pycache__/
@@ -30,4 +23,4 @@ bench/MAC/**/.DS_Store
 bench_backup/
 nanobot/
 AgentIF/
-/CCTU/
+CCTU/

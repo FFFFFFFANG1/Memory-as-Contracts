@@ -214,6 +214,12 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Bench test mode: treat MAC gate ask decisions as allow.",
     )
+    parser.add_argument(
+        "--mac-live-validator",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable live validator LLM generation during MAC contract installation.",
+    )
     parser.add_argument("--mem0-user-id-prefix", default=os.getenv("MAC_MEM0_USER_ID_PREFIX", "mac-bench"))
     parser.add_argument(
         "--mem0-ingest-cache-dir",
@@ -230,6 +236,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mem-llm-model", default=os.getenv("MEM_LLM_MODEL", ""))
     parser.add_argument("--mem-api-key-env", default=os.getenv("MAC_MEM_API_KEY_ENV", "MEM_API_KEY"))
     parser.add_argument("--mem-base-url", default=os.getenv("MEM_BASE_URL"))
+    parser.add_argument("--mem-llm-max-tokens", type=int, default=int(os.getenv("MEM_LLM_MAX_TOKENS", "4096")))
     parser.add_argument("--mem0-infer", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--mem0-rerank", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--mem0-threshold", type=float)
@@ -330,9 +337,11 @@ def memory_provider_from_args(args: argparse.Namespace):
                 persist_store=args.mac_persist_store,
                 load_store_dir=args.mac_load_store_dir,
                 ask_pass=args.mac_ask_pass,
+                live_validator=args.mac_live_validator,
                 mem_llm_model=args.mem_llm_model,
                 mem_api_key_env=args.mem_api_key_env,
                 mem_base_url=args.mem_base_url,
+                mem_llm_max_tokens=max(1, args.mem_llm_max_tokens),
             )
         )
     if normalized == "mem0":
@@ -758,6 +767,7 @@ async def run(args: argparse.Namespace) -> None:
         "mac_mem_llm_model": args.mem_llm_model if args.memory_system == "mac" else None,
         "mac_mem_api_key_env": args.mem_api_key_env if args.memory_system == "mac" else None,
         "mac_mem_base_url": args.mem_base_url if args.memory_system == "mac" else None,
+        "mac_mem_llm_max_tokens": max(1, args.mem_llm_max_tokens) if args.memory_system == "mac" else None,
         "mem0_user_id_prefix": args.mem0_user_id_prefix if args.memory_system == "mem0" else None,
         "mem0_ingest_cache_dir": str(args.mem0_ingest_cache_dir) if args.memory_system == "mem0" else None,
         "mem0_faiss_dir": str(args.mem0_faiss_dir) if args.memory_system == "mem0" else None,

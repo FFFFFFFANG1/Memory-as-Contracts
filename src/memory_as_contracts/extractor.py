@@ -121,14 +121,13 @@ Return one object: {"contracts": [<contract>, ...]}. Each <contract> has:
 - effect: one of deny, allow, require, prefer.
 - scope: {"level": one of global|session|project|module, ...}. For project/module include "project"; for module also include "module".
 - semantics: {"actions": [...], "tags": [...]} — retrieval/dedup/relation labels only; they do not enforce anything.
-- validator_enforcement_shape: one of no_validator, check_only, check_update.
+- validator_enforcement_shape: one of check_only, check_update.
 - check_patterns: native tool patterns for pending actions, using only tool names and arg names from the user-provided tool capsules.
 - update_patterns: native tool patterns for committed actions that update validator state.
 - state_fields: state keys maintained by check_update validators.
 
 # Enforcement plan
-Choose the lightest enforcement shape that can represent the contract:
-- no_validator: no generated validator and no action-time gate. Use for prompt-only contracts such as response style, planning/reporting preferences, or durable guidance that should be retrieved into the agent prompt. Set check_patterns, update_patterns, and state_fields to [].
+Choose the lightest enforcement shape that can represent the contract. 
 - check_only: action-time enforcement that can be decided from the pending action plus a bounded action-log lookup. Requires non-empty check_patterns; update_patterns and state_fields must be [].
 - check_update: stateful action-time enforcement. Use only when enforcement needs maintained state across committed actions. Requires non-empty check_patterns, non-empty update_patterns, and explicit state_fields.
 - If a deny/allow/require contract needs action-time enforcement but cannot be grounded to a native tool from the capsules, omit it rather than inventing tools or args.
@@ -337,6 +336,7 @@ class OpenAIChatResponseProvider:
                 response = self.client.chat.completions.create(
                     model=self.config.llm_model or "",
                     temperature=0,
+                    max_tokens=self.config.llm_max_tokens,
                     messages=[
                         {
                             "role": "system",

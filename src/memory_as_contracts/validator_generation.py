@@ -235,8 +235,11 @@ def build_validator_generator_prompt(
         "",
         "TASK",
         (
-            "Translate the immutable rule into hook functions. Use the patterns to decide "
-            "which actions should be gated and the tool capsules to locate runtime fields."
+            "Return one strict JSON object containing the hook code. The JSON object must "
+            "include check_code as a Python source string, update_code as a Python source "
+            "string or null, shared_states as an object, and optional notes. Use the patterns "
+            "to decide which actions should be gated and the tool capsules to locate runtime "
+            "fields."
         ),
     ]
     if committed_examples:

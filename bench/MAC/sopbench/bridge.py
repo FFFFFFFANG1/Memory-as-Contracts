@@ -10,6 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MAC_SOPBENCH_DIR = REPO_ROOT / "bench" / "MAC" / "sopbench"
 MAC_SOPBENCH_DATA_DIR = MAC_SOPBENCH_DIR / "data"
+MAC_SOPBENCH_MID_DATA_DIR = MAC_SOPBENCH_DIR / "mid_data"
 MAC_SOPBENCH_RESULTS_DIR = MAC_SOPBENCH_DIR / "results"
 SOPBENCH_ROOT = REPO_ROOT / "bench" / "SOPBench"
 

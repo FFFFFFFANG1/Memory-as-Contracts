@@ -5,17 +5,28 @@ from __future__ import annotations
 import inspect
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
 from bench.MAC.agent.memory.base import MemoryRequest, MemoryResult
-from memory_as_contracts.adapters.base import AdapterCapabilities, AdapterContext, BaseAdapter
+from memory_as_contracts.adapters.base import (
+    PERIODIC_USER_TURN_BATCH_SIZE,
+    AdapterCapabilities,
+    AdapterContext,
+    BaseAdapter,
+)
 from memory_as_contracts.config import MacConfig
 from memory_as_contracts.extractor import (
     CandidateJsonContractExtractor,
     OpenAIChatResponseProvider,
+)
+from memory_as_contracts.hook_runtime import _render_user_turn_batch
+from memory_as_contracts.extraction_dedup import build_similar_rule_context
+from memory_as_contracts.validator_generation import (
+    VALIDATOR_GENERATION_SYSTEM_PROMPT,
+    ValidatorSnippetGenerator,
 )
 from memory_as_contracts.models import (
     ActionOutcome,
@@ -55,10 +66,12 @@ class MACMemoryConfig:
     persist_store: bool = False
     load_store_dir: Path | None = None
     ask_pass: bool = False
+    live_validator: bool = False
     mem_llm_model: str = ""
     mem_api_key_env: str = "MEM_API_KEY"
     mem_base_url: str | None = None
     mem_llm_timeout_seconds: float = 60.0
+    mem_llm_max_tokens: int = 4096
 
 
 @dataclass(slots=True)
@@ -85,11 +98,28 @@ class BenchMACAdapter(BaseAdapter):
         native_auto_install=False,
     )
 
-    def __init__(self, *, agent: str, tools: list[dict[str, Any]], token_budget: int) -> None:
+    def __init__(
+        self,
+        *,
+        agent: str,
+        tools: list[dict[str, Any]],
+        token_budget: int,
+        memory_config: MACMemoryConfig | None = None,
+        live_validator: bool = False,
+        llm_call_stats: dict[str, int] | None = None,
+    ) -> None:
         host_tools = _host_tools(tools)
+        stats = llm_call_stats if llm_call_stats is not None else {}
+        if live_validator:
+            def validator_factory() -> ValidatorSnippetGenerator | _FailValidatorGenerator:
+                return _live_validator_generator(memory_config or MACMemoryConfig(), stats)
+        else:
+            def validator_factory() -> _FailValidatorGenerator:
+                return _FailValidatorGenerator()
+
         super().__init__(
             available_actions=_available_actions_from_host_tools(host_tools),
-            validator_generator_factory=lambda: _FailValidatorGenerator(),
+            validator_generator_factory=validator_factory,
         )
         self.agent_name = agent
         self.prompt_token_budget = token_budget
@@ -120,10 +150,14 @@ class MACMemoryProvider:
 
     def build_memory(self, request: MemoryRequest) -> MemoryResult:
         self.close_runtime(request.task_uid)
+        llm_call_stats = {"extractor_calls": 0, "validator_calls": 0}
         adapter = BenchMACAdapter(
             agent=request.agent,
             tools=_agent_tools(request),
             token_budget=self.config.token_budget,
+            memory_config=self.config,
+            live_validator=self.config.live_validator,
+            llm_call_stats=llm_call_stats,
         )
         store_path = _store_path(self.config, request.task_uid)
         if self.config.load_store_dir is not None and not Path(store_path).exists():
@@ -168,7 +202,7 @@ class MACMemoryProvider:
                 store.close()
                 raise
 
-        extractor = self.extractor or _live_extractor(self.config)
+        extractor = _counting_extractor(self.extractor or _live_extractor(self.config), llm_call_stats)
         extracted: list[Contract] = []
 
         try:
@@ -180,12 +214,20 @@ class MACMemoryProvider:
                     context,
                     turn_id=str(turn.get("turn_index", index)) if isinstance(turn, dict) else str(index),
                 )
+                store.append_user_turn(
+                    adapter_id=adapter.host,
+                    session_id=turn_context.session_id,
+                    task_id=turn_context.task_id,
+                    conversation_id=turn_context.conversation_id,
+                    turn_id=turn_context.turn_id,
+                    text=content,
+                    observed_at=turn_context.current_time(),
+                )
                 extracted.extend(
-                    _extract_and_store_user_turn(
+                    _flush_pending_extractor_batches(
                         adapter=adapter,
                         store=store,
                         extractor=extractor,
-                        text=content,
                         context=turn_context,
                     )
                 )
@@ -208,6 +250,9 @@ class MACMemoryProvider:
                 "token_budget": self.config.token_budget,
                 "contract_ids": [contract.id for contract in extracted],
                 "error": result.error,
+                "extract_batch_size": PERIODIC_USER_TURN_BATCH_SIZE,
+                "live_validator": self.config.live_validator,
+                "llm_call_stats": dict(llm_call_stats),
             }
             state = MACRuntimeState(
                 task_uid=request.task_uid,
@@ -370,53 +415,123 @@ class _FailValidatorGenerator:
         )
 
 
-def _extract_and_store_user_turn(
+class _CountingResponseProvider:
+    def __init__(
+        self,
+        inner: Callable[[str], str],
+        stats: dict[str, int],
+        *,
+        counter_key: str,
+    ) -> None:
+        self._inner = inner
+        self._stats = stats
+        self._counter_key = counter_key
+
+    def __call__(self, prompt: str, *, system_prompt: str | None = None) -> str:
+        self._stats[self._counter_key] = self._stats.get(self._counter_key, 0) + 1
+        if system_prompt is None:
+            return self._inner(prompt)
+        return self._inner(prompt, system_prompt=system_prompt)
+
+
+class _CountingExtractor:
+    def __init__(self, inner: OnlineExtractor, stats: dict[str, int]) -> None:
+        self._inner = inner
+        self._stats = stats
+
+    def extract_online_turn(
+        self,
+        *,
+        role: str,
+        text: str,
+        context: Any,
+    ) -> list[Contract]:
+        self._stats["extractor_calls"] = self._stats.get("extractor_calls", 0) + 1
+        return self._inner.extract_online_turn(role=role, text=text, context=context)
+
+
+def _counting_extractor(inner: OnlineExtractor, stats: dict[str, int]) -> _CountingExtractor:
+    return _CountingExtractor(inner, stats)
+
+
+def _flush_pending_extractor_batches(
     *,
     adapter: BenchMACAdapter,
     store: ContractStore,
     extractor: OnlineExtractor,
-    text: str,
     context: AdapterContext,
 ) -> list[Contract]:
-    seq = store.append_user_turn(
-        adapter_id=adapter.host,
-        session_id=context.session_id,
-        task_id=context.task_id,
-        conversation_id=context.conversation_id,
-        turn_id=context.turn_id,
-        text=text,
-        observed_at=context.current_time(),
+    extracted: list[Contract] = []
+    while True:
+        pending = store.pending_user_turns(
+            adapter_id=adapter.host,
+            session_id=context.session_id,
+            limit=PERIODIC_USER_TURN_BATCH_SIZE,
+        )
+        if len(pending) < PERIODIC_USER_TURN_BATCH_SIZE:
+            break
+        batch_text = _render_user_turn_batch(pending)
+        extraction_context = adapter._extraction_context(context)
+        similar_rule_context = build_similar_rule_context(
+            store,
+            batch_text,
+            extraction_context,
+            limit=5,
+        )
+        if similar_rule_context:
+            extraction_context = replace(
+                extraction_context,
+                similar_rules_system_prompt=similar_rule_context,
+            )
+        candidates = extractor.extract_online_turn(
+            role="user",
+            text=batch_text,
+            context=extraction_context,
+        )
+        candidates = [_normalize_history_contract(contract) for contract in candidates]
+        resolved = adapter._resolve_and_store(store, candidates, context)
+        store.mark_user_turns_extracted(row["seq"] for row in pending)
+        extracted.extend(resolved)
+    return extracted
+
+
+def _live_validator_generator(
+    config: MACMemoryConfig,
+    stats: dict[str, int],
+) -> ValidatorSnippetGenerator:
+    provider = OpenAIChatResponseProvider(
+        _memory_llm_config(config, purpose="MAC validator generation"),
+        system_prompt=VALIDATOR_GENERATION_SYSTEM_PROMPT,
     )
-    extraction_context = adapter._extraction_context(context)
-    candidates = extractor.extract_online_turn(
-        role="user",
-        text=text,
-        context=extraction_context,
+    counting_provider = _CountingResponseProvider(
+        provider,
+        stats,
+        counter_key="validator_calls",
     )
-    candidates = [_normalize_history_contract(contract) for contract in candidates]
-    resolved = adapter._resolve_and_store(store, candidates, context)
-    store.mark_user_turns_extracted([seq])
-    return resolved
+    return ValidatorSnippetGenerator(counting_provider)
 
 
 def _live_extractor(config: MACMemoryConfig) -> CandidateJsonContractExtractor:
+    provider = OpenAIChatResponseProvider(_memory_llm_config(config, purpose="MAC memory extraction"))
+    return CandidateJsonContractExtractor(provider)
+
+
+def _memory_llm_config(config: MACMemoryConfig, *, purpose: str) -> MacConfig:
     if not config.mem_llm_model:
-        raise RuntimeError("Missing MEM_LLM_MODEL for MAC memory extraction")
+        raise RuntimeError(f"Missing MEM_LLM_MODEL for {purpose}")
     api_key = os.getenv(config.mem_api_key_env)
     if not api_key:
-        raise RuntimeError(f"Missing {config.mem_api_key_env} for MAC memory extraction")
-    provider = OpenAIChatResponseProvider(
-        MacConfig(
-            openai_api_key=api_key,
-            openai_base_url=config.mem_base_url,
-            llm_model=config.mem_llm_model,
-            db_path=Path(":memory:"),
-            llm_timeout_seconds=config.mem_llm_timeout_seconds,
-            log_path=Path(".mac/mac.log"),
-            log_level="INFO",
-        )
+        raise RuntimeError(f"Missing {config.mem_api_key_env} for {purpose}")
+    return MacConfig(
+        openai_api_key=api_key,
+        openai_base_url=config.mem_base_url,
+        llm_model=config.mem_llm_model,
+        llm_max_tokens=config.mem_llm_max_tokens,
+        db_path=Path(":memory:"),
+        llm_timeout_seconds=config.mem_llm_timeout_seconds,
+        log_path=Path(".mac/mac.log"),
+        log_level="INFO",
     )
-    return CandidateJsonContractExtractor(provider)
 
 
 def _normalize_history_contract(contract: Contract) -> Contract:
