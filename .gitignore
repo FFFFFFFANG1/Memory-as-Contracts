@@ -20,6 +20,7 @@ bench/MAC/.cache/
 bench/MAC/**/results/
 bench/MAC/cctu/mid_data/
 bench/MAC/sopbench/mid_data/
+bench/cctu/mid_data/
 bench/MAC/**/__pycache__/
 bench/MAC/**/.DS_Store
 bench_backup/

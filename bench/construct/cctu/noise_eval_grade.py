@@ -22,8 +22,8 @@ from bench.MAC.agent.trajectory import build_raw_history  # noqa: E402
 from bench.MAC.cctu.bridge import MAC_CCTU_DATA_DIR, cctu_samples_by_id, load_cctu_eval_tasks  # noqa: E402
 from bench.MAC.scripts.grade_cctu_answer import grade_one  # noqa: E402
 
-DEFAULT_MANIFEST = Path("bench/cctu/mid_data/eval_step5_noise_eval_specs.json")
-DEFAULT_OUTPUT = Path("bench/cctu/mid_data/eval_step6_noise_eval_grade.json")
+DEFAULT_MANIFEST = Path("bench/MAC/cctu/data/mac-cctu-noise_eval_specs.json")
+DEFAULT_OUTPUT = Path("bench/MAC/cctu/results/noise_eval_grade.json")
 DEFAULT_TASKS = Path("bench/MAC/cctu/data/mac-cctu-tasks.json")
 
 
