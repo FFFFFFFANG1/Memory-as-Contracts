@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00112",
+    "node_id": "mac-cctu-t-00112-c0004-g2",
+    "constraint_text": "Limit every final answer to a single numeric figure with no surrounding prose, no labels, and no punctuation, so that crime statistics can be ingested directly by downstream spreadsheets.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00112-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

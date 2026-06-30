@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00007",
+    "node_id": "mac-cctu-t-00007-c0005-c3",
+    "constraint_text": "The answer must be between 15 and 20 words inclusive, end with a period, use a comma to separate the two country names, and include a valid JSON object containing a \"countries\" array of two country names and a \"date\" field formatted as \"March 2023\"; total tool calls must stay between 1 and 5, and total interaction rounds between 2 and 5.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00007-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/7/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

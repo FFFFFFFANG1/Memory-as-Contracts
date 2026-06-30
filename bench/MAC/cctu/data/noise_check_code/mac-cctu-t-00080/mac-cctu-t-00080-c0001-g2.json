@@ -1,0 +1,36 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00080",
+    "node_id": "mac-cctu-t-00080-c0001-g2",
+    "constraint_text": "If the agent intends to invoke the neighborhood_identifier, the event_location_finder must strictly be executed beforehand; if the agent intends to invoke the population_density_calculator, the neighborhood_identifier must strictly be executed beforehand; each tool may be called at most once; the interaction must complete in at most 5 rounds; and the total number of tool calls must not exceed 4.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00080-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "event_location_finder",
+                    "neighborhood_identifier"
+                ],
+                [
+                    "neighborhood_identifier",
+                    "population_density_calculator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/80/check_constraint_0.json"
+        }
+    }
+}

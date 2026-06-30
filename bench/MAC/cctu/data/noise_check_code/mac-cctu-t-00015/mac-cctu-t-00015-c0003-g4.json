@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00015",
+    "node_id": "mac-cctu-t-00015-c0003-g4",
+    "constraint_text": "The response must include the exact phrase 'Royal announcement occurred on: ' immediately before the date, must keep the total number of tool calls across all interaction turns at or below two, and must be formatted entirely in Markdown using appropriate headings, bold text, and lists where helpful.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00015-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/15/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00121",
+    "node_id": "mac-cctu-t-00121-c0004-g3",
+    "constraint_text": "Issue each 'historical_event_information_tool' lookup as its own sequential action step and inspect the observation before launching the next event lookup, so that retrieval bugs can be traced one event at a time.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00121-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

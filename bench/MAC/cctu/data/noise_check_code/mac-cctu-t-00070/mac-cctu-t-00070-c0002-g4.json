@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00070",
+    "node_id": "mac-cctu-t-00070-c0002-g4",
+    "constraint_text": "The agent must invoke landmark_structure_finder at least twice during the solution process to confirm geolocation consistency across independent landmark records.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00070-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "landmark_structure_finder": {
+                    "min": 2,
+                    "max": null
+                }
+            }
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

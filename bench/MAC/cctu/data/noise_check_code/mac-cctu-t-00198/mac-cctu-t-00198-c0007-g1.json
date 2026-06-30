@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00198",
+    "node_id": "mac-cctu-t-00198-c0007-g1",
+    "constraint_text": "Older drafting passes in this project required the final comparative answer to be written as a single plain-text paragraph of no more than 80 words with no Markdown styling.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00198-c0007",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

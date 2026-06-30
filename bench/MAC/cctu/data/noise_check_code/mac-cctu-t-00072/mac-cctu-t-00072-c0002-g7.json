@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00072",
+    "node_id": "mac-cctu-t-00072-c0002-g7",
+    "constraint_text": "Format the response as a peer-review-ready LaTeX manuscript section with numbered citations to ethnomusicology sources and an abstract of no more than 150 words.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00072-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": 150
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

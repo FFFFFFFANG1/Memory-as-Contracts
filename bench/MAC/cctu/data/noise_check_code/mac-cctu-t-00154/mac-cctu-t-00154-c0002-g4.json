@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00154",
+    "node_id": "mac-cctu-t-00154-c0002-g4",
+    "constraint_text": "For the TransContinentalRailNetworkMapping project the agent must call 'railway_connection_finder' before any other tool and must store the resulting station list under the key 'rail_corridor_index'.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00154-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

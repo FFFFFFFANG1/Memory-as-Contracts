@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00184",
+    "node_id": "mac-cctu-t-00184-c0002-g6",
+    "constraint_text": "Lake references must be pre-indexed by running lake_volume_calculator on a placeholder query and caching the schema response before any park_feature_locator call is made.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00184-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "lake_volume_calculator",
+                    "park_feature_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

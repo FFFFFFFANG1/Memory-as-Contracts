@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00070",
+    "node_id": "mac-cctu-t-00070-c0004-g6",
+    "constraint_text": "The agent must consult economic_data_retriever before any other tool and report all monetary figures in USD with the retrieval timestamp.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00070-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

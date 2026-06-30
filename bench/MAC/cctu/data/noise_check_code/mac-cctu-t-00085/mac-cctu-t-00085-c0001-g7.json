@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00085",
+    "node_id": "mac-cctu-t-00085-c0001-g7",
+    "constraint_text": "When a host-city ambiguity arises, use the event_host_locator tool a second time with a refined year filter and reconcile both outputs in the working notes.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00085-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

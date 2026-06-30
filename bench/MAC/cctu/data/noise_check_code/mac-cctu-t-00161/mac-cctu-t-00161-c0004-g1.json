@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0004-g1",
+    "constraint_text": "During preliminary scoping, restrict tool usage to landmark_identifier and cultural_landmark_identifier so that the candidate set of cultural sites can be enumerated before any biological or geographic enrichment begins.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "cultural_landmark_identifier",
+                "landmark_identifier"
+            ],
+            "forbidden_tools": [
+                "biologist_catalog_search",
+                "geographical_feature_info",
+                "green_belt_identifier",
+                "historical_biological_catalog_query",
+                "historical_figure_residence_finder",
+                "historical_location_associator",
+                "landmark_city_identifier",
+                "landmark_region_identifier",
+                "natural_landmark_locator",
+                "tax_revenue_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

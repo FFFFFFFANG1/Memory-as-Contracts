@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00176",
+    "node_id": "mac-cctu-t-00176-c0006-p3",
+    "constraint_text": "Tourist arrival counts sourced from tourist_statistics_aggregator must be normalized to the most recent full calendar year and annotated with the provider's freshness timestamp.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00176-c0006",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

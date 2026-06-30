@@ -1,0 +1,30 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00168",
+    "node_id": "mac-cctu-t-00168-c0005-g7",
+    "constraint_text": "Expose every comparative answer as a JSON object with stable field keys so downstream services can parse novel and hospital metrics programmatically.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00168-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_format",
+        "spec": {
+            "checks": [
+                {
+                    "name": "json_object"
+                }
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

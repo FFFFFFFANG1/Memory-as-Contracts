@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00037",
+    "node_id": "mac-cctu-t-00037-c0004-g5",
+    "constraint_text": "During the Internal Scratchpad Verification phase of the Durand Line Seismic Inquiry, enumerate at least three candidate epicenter coordinates retrieved from the earthquake_event_retriever before selecting one for the final answer.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00037-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

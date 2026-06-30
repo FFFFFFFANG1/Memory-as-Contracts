@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00159",
+    "node_id": "mac-cctu-t-00159-c0002-g3",
+    "constraint_text": "During preliminary feature scoping, the agent must issue only one tool call per turn and log each candidate valley before any mine lookup is attempted.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00159-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

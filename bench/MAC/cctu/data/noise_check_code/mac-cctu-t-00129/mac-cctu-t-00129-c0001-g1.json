@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00129",
+    "node_id": "mac-cctu-t-00129-c0001-g1",
+    "constraint_text": "For every user query about an aviation mishap, the agent must call aviation_incident_info_merged at least twice to cross-verify the reported casualty count before responding.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00129-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "aviation_incident_info_merged": {
+                    "min": 2,
+                    "max": null
+                }
+            }
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

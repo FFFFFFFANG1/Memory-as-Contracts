@@ -1,0 +1,30 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00095",
+    "node_id": "mac-cctu-t-00095-c0004-g4",
+    "constraint_text": "Invoke fisherman_locator first on every request and cross-validate supplier records through chef_supplier_locator before reporting any sourcing finding.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00095-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "chef_supplier_locator",
+                "fisherman_locator"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00188",
+    "node_id": "mac-cctu-t-00188-c0001-g6",
+    "constraint_text": "Include at least three citations sourced from cultural_event_locator in any draft passage that mentions a national festival.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00188-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

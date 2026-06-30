@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00116",
+    "node_id": "mac-cctu-t-00116-c0002-g5",
+    "constraint_text": "Every numeric figure included in the response must be independently confirmed by three separate historical_event_retriever or historical_event_info_retriever calls, and the response must list each confirming source inline next to the figure.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00116-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

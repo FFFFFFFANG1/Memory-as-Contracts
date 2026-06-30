@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00004",
+    "node_id": "mac-cctu-t-00004-c0005-g4",
+    "constraint_text": "Each candidate location must be enumerated as a numbered list with at least five entries before narrowing down.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00004-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00186",
+    "node_id": "mac-cctu-t-00186-c0001-g6",
+    "constraint_text": "When the user query references an ambiguous campus or institute name, nearby_college_locator must be invoked to disambiguate before any research_location_finder call.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00186-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "nearby_college_locator",
+                    "research_location_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00117",
+    "node_id": "mac-cctu-t-00117-c0001-g4",
+    "constraint_text": "The agent must rely on a single linguistic tool per query and prefer `language_speaker_estimator` as the sole source of speaker counts, returning results as a plain-text bulleted list.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00117-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

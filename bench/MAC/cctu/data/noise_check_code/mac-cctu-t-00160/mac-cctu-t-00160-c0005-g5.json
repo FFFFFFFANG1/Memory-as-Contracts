@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00160",
+    "node_id": "mac-cctu-t-00160-c0005-g5",
+    "constraint_text": "During the initial discovery phase, the agent must restrict itself to one tool call per interaction turn to allow careful inspection of each result.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00160-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "'initial discovery phase' is heuristically the first half (min 2) of tool-using turns"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

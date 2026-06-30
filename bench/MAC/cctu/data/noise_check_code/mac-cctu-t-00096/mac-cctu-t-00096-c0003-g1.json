@@ -1,0 +1,36 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00096",
+    "node_id": "mac-cctu-t-00096-c0003-g1",
+    "constraint_text": "Follow the standard multi-hop tool chain business_district_locator, business_locator, consulting_client_finder, corporate_housing_locator, rental_price_analyzer for any housing-rent question in this brief, with a budget of up to 12 interaction turns, a 300-word narrative answer, and no cap on how many times a single tool may be invoked.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00096-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "business_district_locator",
+                    "business_locator",
+                    "consulting_client_finder",
+                    "corporate_housing_locator",
+                    "rental_price_analyzer"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

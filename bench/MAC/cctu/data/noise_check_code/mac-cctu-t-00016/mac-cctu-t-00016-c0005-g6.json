@@ -1,0 +1,33 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00016",
+    "node_id": "mac-cctu-t-00016-c0005-g6",
+    "constraint_text": "Electoral date lookups must rely exclusively on election_result_analyzer and report results as a CSV-style string keyed on country and election cycle.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00016-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_format",
+        "spec": {
+            "checks": [
+                {
+                    "name": "contains_terms",
+                    "terms": [
+                        "csv"
+                    ]
+                }
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

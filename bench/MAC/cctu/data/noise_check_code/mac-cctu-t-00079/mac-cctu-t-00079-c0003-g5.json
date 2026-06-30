@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00079",
+    "node_id": "mac-cctu-t-00079-c0003-g5",
+    "constraint_text": "Within the CorporateMergerAudit project, corporate_property_info must be invoked before corporate_acquisition_finder to establish a baseline property ledger for each entity under review.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00079-c0003",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "corporate_property_info",
+                    "corporate_acquisition_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

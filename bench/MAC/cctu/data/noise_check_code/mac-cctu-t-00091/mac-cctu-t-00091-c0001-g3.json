@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00091",
+    "node_id": "mac-cctu-t-00091-c0001-g3",
+    "constraint_text": "The final response must be at most 200 characters long to ensure conciseness and focus.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00091-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": 0,
+            "max": 200
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/91/check_constraint_0.json"
+        }
+    }
+}

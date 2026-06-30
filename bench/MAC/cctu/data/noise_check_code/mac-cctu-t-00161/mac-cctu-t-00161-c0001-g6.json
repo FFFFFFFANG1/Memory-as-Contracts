@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0001-g6",
+    "constraint_text": "Route any query involving municipal tax revenue through tax_revenue_analyzer before invoking any geographic or biological tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

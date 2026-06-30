@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00132",
+    "node_id": "mac-cctu-t-00132-c0001-g4",
+    "constraint_text": "Restrict tool selection to election_results_retriever and factual_information_retriever, and validate every numeric figure against at least two independent retrievals.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00132-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "election_results_retriever",
+                "factual_information_retriever"
+            ],
+            "forbidden_tools": [
+                "anatomy_information_provider",
+                "element_discovery_tool",
+                "geographical_area_calculator",
+                "global_language_statistics_v2",
+                "historical_fact_retriever",
+                "price_estimator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00119",
+    "node_id": "mac-cctu-t-00119-c0006-g1",
+    "constraint_text": "All energy-market deliverables must be rendered in plain prose with no tables, charts, or markdown structures, and must end with an open-ended question inviting follow-up.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00119-c0006",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00141",
+    "node_id": "mac-cctu-t-00141-c0001-g6",
+    "constraint_text": "Any task involving image-based species identification must invoke photo_library_and_orientation_analyzer as the first action before any other tool call.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00141-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "photo_library_and_orientation_analyzer"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

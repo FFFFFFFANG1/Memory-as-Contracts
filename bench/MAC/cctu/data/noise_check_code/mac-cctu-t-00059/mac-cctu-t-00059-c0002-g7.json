@@ -1,0 +1,33 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00059",
+    "node_id": "mac-cctu-t-00059-c0002-g7",
+    "constraint_text": "Cross-validate every tool response against at least two independent historical event tool queries before accepting the result.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00059-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "historical_event_locator": {
+                    "min": 2,
+                    "max": null
+                }
+            }
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

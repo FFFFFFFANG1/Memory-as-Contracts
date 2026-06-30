@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00150",
+    "node_id": "mac-cctu-t-00150-c0005-c4",
+    "constraint_text": "The agent must enumerate each candidate sub-task in plain prose before any tool invocation and must keep tool calls out of the first interaction turn entirely.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00150-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

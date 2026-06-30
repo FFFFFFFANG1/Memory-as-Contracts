@@ -1,0 +1,30 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00076",
+    "node_id": "mac-cctu-t-00076-c0001-g2",
+    "constraint_text": "Invocations of `literary_author_lookup` must be preceded by a call to `event_location_finder` to anchor the author's geographic origin before listing their works.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00076-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "event_location_finder",
+                "literary_author_lookup"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

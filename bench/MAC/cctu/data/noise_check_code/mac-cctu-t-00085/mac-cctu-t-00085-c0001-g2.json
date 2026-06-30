@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00085",
+    "node_id": "mac-cctu-t-00085-c0001-g2",
+    "constraint_text": "The answer must be concise, not exceed 10 characters in length, must not include any punctuation marks except comma, and must include the identifier Answer immediately before the numerical result, and the solution process must complete within 5 to 8 interaction turns and use between 4 to 7 tool calls in total.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00085-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/85/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

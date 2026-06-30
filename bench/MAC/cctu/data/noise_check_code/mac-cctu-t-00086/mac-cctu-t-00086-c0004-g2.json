@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00086",
+    "node_id": "mac-cctu-t-00086-c0004-g2",
+    "constraint_text": "The answer must be formatted using Markdown syntax with appropriate use of headings, lists, bold/italic text, and code blocks for readability. The tool 'orchestra_conductor_finder' may be used at most once, and the tool 'regional_cuisine_explorer' may be used at most once. The final answer must begin with the identifier '**Final Answer:**' followed by a colon and a space, and must end with a period. The total response must be between 500 and 1000 characters in length.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00086-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/86/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

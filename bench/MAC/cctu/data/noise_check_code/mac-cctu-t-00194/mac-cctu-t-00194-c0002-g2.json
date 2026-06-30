@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00194",
+    "node_id": "mac-cctu-t-00194-c0002-g2",
+    "constraint_text": "Batch all independent geographic and biographical lookups (such as highest_peak_finder, region_identifier, literary_author_identifier, researcher_locator) into a single parallel tool-call turn to minimize interaction rounds.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00194-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "highest_peak_finder",
+                "literary_author_identifier",
+                "region_identifier",
+                "researcher_locator"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

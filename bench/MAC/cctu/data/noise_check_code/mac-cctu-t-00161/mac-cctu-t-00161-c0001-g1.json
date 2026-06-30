@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0001-g1",
+    "constraint_text": "Responses must remain concise, under 100 words, delivered in plain text without markdown formatting, and conclude with a one-line numeric answer only.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

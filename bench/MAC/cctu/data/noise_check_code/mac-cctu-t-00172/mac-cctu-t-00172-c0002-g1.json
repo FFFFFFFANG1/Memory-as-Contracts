@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00172",
+    "node_id": "mac-cctu-t-00172-c0002-g1",
+    "constraint_text": "Within the Cultural Cross-Reference Synthesis project, the agent may freely invoke any locator tool (including `individual_location_finder`) in any order, as long as the underlying entity name is already present in the working context, and there is no fixed cap on the number of tool calls used to assemble the final answer.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00172-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "individual_location_finder"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

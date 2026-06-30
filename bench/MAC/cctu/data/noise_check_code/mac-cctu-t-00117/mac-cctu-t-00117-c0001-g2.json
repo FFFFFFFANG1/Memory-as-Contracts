@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00117",
+    "node_id": "mac-cctu-t-00117-c0001-g2",
+    "constraint_text": "To answer the user's language-speaker comparison query, the agent must invoke both the `language_speaker_estimator` and `global_language_statistics_v2` tools in a single coordinated step, calling `language_speaker_estimator` at most twice and `global_language_statistics_v2` at most once, and return the final answer as a JSON object whose keys are the three languages and whose values are speaker counts represented as strings.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00117-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "language_speaker_estimator",
+                    "global_language_statistics_v2"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/117/check_constraint_0.json"
+        }
+    }
+}

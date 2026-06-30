@@ -1,0 +1,33 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00081",
+    "node_id": "mac-cctu-t-00081-c0001-g2",
+    "constraint_text": "The `quarry_mineral_locator` must be executed as the very first tool, and `geographic_feature_locator` must be invoked only after a mineral deposit has been identified.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00081-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "quarry_mineral_locator",
+                    "geographic_feature_locator"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

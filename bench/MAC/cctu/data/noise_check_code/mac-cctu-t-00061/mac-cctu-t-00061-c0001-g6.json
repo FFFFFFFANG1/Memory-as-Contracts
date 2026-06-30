@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00061",
+    "node_id": "mac-cctu-t-00061-c0001-g6",
+    "constraint_text": "In the LandmarkCrossCheck phase of the AwardWinnerProfileBuild project, every output from landmark_country_locator must be reported with its ISO 3166-1 alpha-2 code in parentheses.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00061-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

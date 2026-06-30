@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00085",
+    "node_id": "mac-cctu-t-00085-c0004-g2",
+    "constraint_text": "Cross-verify every Olympic host country identification by calling event_host_locator and landmark_locator in parallel before any elevation lookup proceeds.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00085-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "event_host_locator",
+                    "landmark_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

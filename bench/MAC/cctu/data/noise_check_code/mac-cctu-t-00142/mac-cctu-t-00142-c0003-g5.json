@@ -1,0 +1,33 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00142",
+    "node_id": "mac-cctu-t-00142-c0003-g5",
+    "constraint_text": "The agent must reconcile every transaction record by issuing parallel calls to merged_financial_transaction_info and historical_transaction_finder, flagging any mismatches in a dedicated audit log.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00142-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "merged_financial_transaction_info",
+                    "historical_transaction_finder"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

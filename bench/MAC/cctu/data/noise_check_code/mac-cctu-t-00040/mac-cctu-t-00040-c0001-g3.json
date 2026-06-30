@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00040",
+    "node_id": "mac-cctu-t-00040-c0001-g3",
+    "constraint_text": "Every response must invoke the papal_event_retriever tool at least once and quote the issuing pontiff.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00040-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "papal_event_retriever": {
+                    "min": 1,
+                    "max": null
+                }
+            }
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

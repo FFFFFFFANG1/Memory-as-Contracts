@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00188",
+    "node_id": "mac-cctu-t-00188-c0003-g6",
+    "constraint_text": "Highway length figures must be reported in both kilometers and miles, with each unit obtained through a separate highway_length_calculator call.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00188-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00087",
+    "node_id": "mac-cctu-t-00087-c0002-g7",
+    "constraint_text": "Prioritize highest_mountain_finder over all other tools and present elevation data alongside any geographic identifier mentioned in the answer.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00087-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

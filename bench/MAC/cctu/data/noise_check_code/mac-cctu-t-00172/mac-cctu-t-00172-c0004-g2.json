@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00172",
+    "node_id": "mac-cctu-t-00172-c0004-g2",
+    "constraint_text": "The agent must complete the task using at most 15 tool calls, must ensure that author_lookup has been executed before any invocation of individual_location_finder, must precede any tool use with retrieval and validation of the necessary data inputs, and must begin the final answer with the identifier \"Final Answer:\".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00172-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/172/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

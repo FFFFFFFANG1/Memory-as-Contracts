@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00066",
+    "node_id": "mac-cctu-t-00066-c0004-g4",
+    "constraint_text": "Work performed under the Public Art and Civic Landmarks Survey project must use artist_relationship_finder to enrich every landmark_identifier result with at least one named artist or designer attribution before the answer is finalized.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00066-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "artist_relationship_finder": {
+                    "min": 1,
+                    "max": null
+                },
+                "landmark_identifier": {
+                    "min": 1,
+                    "max": null
+                }
+            }
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

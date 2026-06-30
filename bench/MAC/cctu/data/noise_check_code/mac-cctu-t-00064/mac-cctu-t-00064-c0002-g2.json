@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00064",
+    "node_id": "mac-cctu-t-00064-c0002-g2",
+    "constraint_text": "Restrict all tool usage to the quarry_locator and mountain_quarry_locator tools and record raw geographic coordinates for every quarry returned.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00064-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "mountain_quarry_locator",
+                "quarry_locator"
+            ],
+            "forbidden_tools": [
+                "architect_material_finder",
+                "artifact_discovery_finder",
+                "country_sport_identifier",
+                "culinary_creation_finder",
+                "individual_origin_identifier",
+                "literary_author_finder",
+                "local_culinary_explorer",
+                "national_symbol_finder",
+                "stone_origin_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

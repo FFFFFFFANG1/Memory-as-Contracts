@@ -1,0 +1,42 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00179",
+    "node_id": "mac-cctu-t-00179-c0002-g3",
+    "constraint_text": "Within the Urban Architecture Audit project, the agent must rely exclusively on `architectural_designer_finder` and `city_area_calculator` and refrain from invoking any biodiversity or space-related tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00179-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "architectural_designer_finder",
+                "city_area_calculator"
+            ],
+            "forbidden_tools": [
+                "biodiversity_database",
+                "satellite_info_retriever",
+                "academic_paper_finder",
+                "biographical_info_retriever",
+                "capital_city_lookup",
+                "innovation_country_identifier",
+                "organization_locator",
+                "research_location_identifier",
+                "sports_venue_info"
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

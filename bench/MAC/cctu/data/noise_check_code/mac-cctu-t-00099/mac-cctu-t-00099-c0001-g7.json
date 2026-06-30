@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00099",
+    "node_id": "mac-cctu-t-00099-c0001-g7",
+    "constraint_text": "Final answers must be limited to a single sentence of at most 15 words and must omit any leading identifier prefix.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00099-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": 15
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

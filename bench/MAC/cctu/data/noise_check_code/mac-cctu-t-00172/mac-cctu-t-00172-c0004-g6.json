@@ -1,0 +1,42 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00172",
+    "node_id": "mac-cctu-t-00172-c0004-g6",
+    "constraint_text": "The agent must restrict its tool use to flora_geography_locator and tree_species_analyzer and avoid invoking any music-related retrieval tool.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00172-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "flora_geography_locator",
+                "tree_species_analyzer"
+            ],
+            "forbidden_tools": [
+                "author_lookup",
+                "book_illustrator_finder",
+                "book_info_retriever",
+                "cultural_origin_locator",
+                "district_feature_locator",
+                "enhanced_nearby_artist_locator",
+                "hit_song_finder",
+                "individual_location_finder",
+                "museum_exhibit_counter",
+                "release_year_finder",
+                "species_counter"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

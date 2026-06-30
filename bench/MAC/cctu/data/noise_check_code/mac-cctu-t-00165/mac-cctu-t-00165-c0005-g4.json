@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00165",
+    "node_id": "mac-cctu-t-00165-c0005-g4",
+    "constraint_text": "The film_award_winner_finder tool must be invoked before any artwork_information_retriever call, and total interaction turns must be capped at 5.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00165-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "film_award_winner_finder",
+                    "artwork_information_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

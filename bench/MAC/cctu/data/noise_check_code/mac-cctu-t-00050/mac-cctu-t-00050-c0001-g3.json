@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00050",
+    "node_id": "mac-cctu-t-00050-c0001-g3",
+    "constraint_text": "Determine the answer by calling the available tools so that the total number of tool calls is between 5 and 10 and the total number of interaction turns is between 5 and 12, conclude the response with the exact phrase \"The local fish in the area is: [Species]\", and keep the entire response under 100 words.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00050-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/50/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

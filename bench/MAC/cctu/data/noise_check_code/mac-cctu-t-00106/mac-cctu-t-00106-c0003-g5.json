@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00106",
+    "node_id": "mac-cctu-t-00106-c0003-g5",
+    "constraint_text": "Coral species comparisons must be expressed as bullet-point lists with one bullet per anatomical feature, rather than as prose sentences.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00106-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

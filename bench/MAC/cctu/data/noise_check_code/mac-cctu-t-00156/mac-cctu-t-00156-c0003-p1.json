@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00156",
+    "node_id": "mac-cctu-t-00156-c0003-p1",
+    "constraint_text": "Polymath profiling work must begin with a 'polymath_identifier' call, and every subsequent tool invocation must reference the canonical identifier it returns.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00156-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

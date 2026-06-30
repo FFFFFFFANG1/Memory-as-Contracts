@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00020",
+    "node_id": "mac-cctu-t-00020-c0002-g4",
+    "constraint_text": "The agent must produce a structured audit report of at least 500 words summarizing all retrieved findings, with section headers for each subject person.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00020-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": 500,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

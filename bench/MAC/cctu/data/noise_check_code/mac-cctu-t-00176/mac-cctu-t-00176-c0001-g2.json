@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00176",
+    "node_id": "mac-cctu-t-00176-c0001-g2",
+    "constraint_text": "Before any invocation of chef_dish_associator, the agent must first call restaurant_locator; whenever both island_feature_locator and restaurant_locator are invoked, they must be executed simultaneously in a single action step; the total number of tool calls across all interaction turns must not exceed 15; at least one interaction turn must invoke at least two distinct tools; and the final response must end with a period and with the exact phrase \"Tourist comparison completed.\"",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00176-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/176/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

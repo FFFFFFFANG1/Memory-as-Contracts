@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00146",
+    "node_id": "mac-cctu-t-00146-c0001-g3",
+    "constraint_text": "Symphony counts for the target composers must be retrieved via historical_composer_info_retriever in a single parallel action step. The full solution must occupy 2 to 6 interaction turns and 2 to 5 total tool calls. The final answer must be at most 150 characters and formatted in Markdown with headings, bold or italic emphasis, and code blocks.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00146-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/146/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

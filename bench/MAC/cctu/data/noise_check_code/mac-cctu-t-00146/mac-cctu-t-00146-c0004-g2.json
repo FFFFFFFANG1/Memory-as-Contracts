@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00146",
+    "node_id": "mac-cctu-t-00146-c0004-g2",
+    "constraint_text": "Use of historical_composer_info_retriever must produce symphony counts for the target composers, completing the solution within 2 to 6 total interaction turns and using between 2 and 5 total tool calls across all steps. The final answer must be capped at 150 characters and formatted entirely in Markdown, including headings, bold/italic text, and code blocks for readability and structure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00146-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/146/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

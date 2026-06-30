@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00157",
+    "node_id": "mac-cctu-t-00157-c0003-g4",
+    "constraint_text": "All bibliographic lookups about the writer behind the acclaimed novel set in Japan must be performed exclusively with the `bibliographic_search_tool`, and the `literary_search_tool` must not be invoked at all.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00157-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

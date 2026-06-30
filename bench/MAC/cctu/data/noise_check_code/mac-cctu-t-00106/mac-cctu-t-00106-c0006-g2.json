@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00106",
+    "node_id": "mac-cctu-t-00106-c0006-g2",
+    "constraint_text": "The answer must be presented as a complete sentence ending with a period, use between 2 and 4 total tool calls, fit within 2 to 3 interaction turns, span between 10 and 20 words, and limit calls to the 'marine_biology_facts' tool to at most 2. Whenever both the 'marine_biology_facts' and 'factual_information_retriever' tools are needed, they must be issued together as a single parallel batch action.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00106-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "marine_biology_facts",
+                    "factual_information_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/106/check_constraint_5.json"
+        }
+    }
+}

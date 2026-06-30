@@ -1,0 +1,33 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00005",
+    "node_id": "mac-cctu-t-00005-c0003-g2",
+    "constraint_text": "Verification of any sports medal outcome must rely on the sports_event_winner_finder tool and cite at least two independent retrievals before concluding.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00005-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "sports_event_winner_finder": {
+                    "min": 2,
+                    "max": null
+                }
+            }
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

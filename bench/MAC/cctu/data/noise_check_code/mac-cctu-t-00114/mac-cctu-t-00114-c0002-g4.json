@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00114",
+    "node_id": "mac-cctu-t-00114-c0002-g4",
+    "constraint_text": "You must obtain information by calling tools and ensure the solution involves at least 2 tool calls to retrieve the average altitudes of both mountain ranges. The total number of interaction turns (tool calls) must not exceed 4 in the solution process. If altitude_tool is used for both mountain ranges, the two calls must be issued in a single parallel action step. altitude_tool must be invoked no more than 2 times across the entire solution.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00114-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/114/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

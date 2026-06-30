@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00083",
+    "node_id": "mac-cctu-t-00083-c0003-g3",
+    "constraint_text": "Within the CulturalSymbolEducationKit project, the final answer must end with a period, the solution must use at most 15 total tool calls across all interaction steps, and the response must be formatted using Markdown syntax with proper headings (e.g., ### Section), bullet points, bold text (**bold**), and line breaks for readability, while all factual claims are written in plain text and only organizational elements use Markdown conventions.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00083-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/83/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

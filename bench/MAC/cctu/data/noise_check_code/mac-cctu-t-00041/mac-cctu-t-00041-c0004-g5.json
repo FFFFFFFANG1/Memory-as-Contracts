@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00041",
+    "node_id": "mac-cctu-t-00041-c0004-g5",
+    "constraint_text": "Report each aviation incident finding as a chronological timeline table that lists date, location, aircraft type, and outcome retrieved exclusively via aviation_incident_finder and aviation_incident_retriever.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00041-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

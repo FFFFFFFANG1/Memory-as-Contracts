@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00017",
+    "node_id": "mac-cctu-t-00017-c0001-g3",
+    "constraint_text": "Your answer must use between 18 and 20 words, involve at least 1 but no more than 3 total tool calls to external functions, be formatted using Markdown syntax with proper use of elements like headings, bold/italic text, and lists, and explicitly include the wind speed value in bold using Markdown (e.g., **165 mph**).",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00017-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/17/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00184",
+    "node_id": "mac-cctu-t-00184-c0004-g6",
+    "constraint_text": "Briefings on polar regions must rely exclusively on `ice_sheet_thickness_calculator` and `highest_point_locator` for terrain claims, and must omit any demographic or literary commentary from the final report.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00184-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

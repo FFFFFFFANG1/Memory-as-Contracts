@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00018",
+    "node_id": "mac-cctu-t-00018-c0003-g3",
+    "constraint_text": "Retrieve all information by calling the provided tools rather than internal knowledge, retrying with corrected parameters whenever a tool call fails, while limiting historical_event_finder to at most one call across the task and keeping the total interaction turns within 1 to 3 inclusive; the response must end with a period and include a semicolon after the date to separate it from surrounding context.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00018-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/18/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

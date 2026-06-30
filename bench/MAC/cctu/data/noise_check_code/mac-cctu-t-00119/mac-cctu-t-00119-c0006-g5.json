@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00119",
+    "node_id": "mac-cctu-t-00119-c0006-g5",
+    "constraint_text": "During source validation, every quoted price must be cross-verified by invoking merged_price_checker and fuel_price_checker sequentially and recording both raw responses in a verification log paragraph of at least 300 characters.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00119-c0006",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": 300,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,30 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00071",
+    "node_id": "mac-cctu-t-00071-c0002-g6",
+    "constraint_text": "Comparisons between the local beverages of two different cities must be returned as a side-by-side markdown table with one column per city.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00071-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_format",
+        "spec": {
+            "checks": [
+                {
+                    "name": "markdown_any"
+                }
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

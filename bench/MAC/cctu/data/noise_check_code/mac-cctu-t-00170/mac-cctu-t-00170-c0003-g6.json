@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00170",
+    "node_id": "mac-cctu-t-00170-c0003-g6",
+    "constraint_text": "The agent must double-check every numeric result by invoking advanced_calculator at least twice on the same expression and must present intermediate arithmetic in fully expanded long-form notation without tables.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00170-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

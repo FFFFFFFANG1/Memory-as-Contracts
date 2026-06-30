@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00032",
+    "node_id": "mac-cctu-t-00032-c0004-g3",
+    "constraint_text": "The response must include the exact phrase \"[Answer]\" immediately before the final sentence that explicitly states the banned vehicle type, the final sentence must end with a period, and the entire response must be between 15 and 50 words in length.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00032-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/32/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

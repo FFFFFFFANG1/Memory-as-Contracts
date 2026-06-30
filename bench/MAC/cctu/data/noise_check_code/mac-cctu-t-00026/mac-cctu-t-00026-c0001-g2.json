@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00026",
+    "node_id": "mac-cctu-t-00026-c0001-g2",
+    "constraint_text": "Your response must be derived by interacting with the provided tools, must not exceed 8 interaction rounds, must format the answer as a valid JSON object containing the key 'reelected_candidate' with the candidate's name as the value, must ensure the natural language explanation ends with a period to ensure proper sentence closure, and must limit calls to the election_result_analyzer tool to a maximum of 3 times.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00026-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/26/check_constraint_0.json",
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

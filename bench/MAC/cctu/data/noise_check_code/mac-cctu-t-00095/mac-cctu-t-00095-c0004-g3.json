@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00095",
+    "node_id": "mac-cctu-t-00095-c0004-g3",
+    "constraint_text": "You must obtain the answer by making between 6 and 8 total tool calls, inclusive, derive every fact from tool outputs rather than internal knowledge, retry failed tool calls after analyzing the error, end the response with a period, and format the reply using Markdown elements such as headings, lists, bold or italic text, links, and code blocks to enhance readability and structure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00095-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/95/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

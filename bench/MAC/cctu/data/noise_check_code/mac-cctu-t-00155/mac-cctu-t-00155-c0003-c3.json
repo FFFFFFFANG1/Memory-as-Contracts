@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00155",
+    "node_id": "mac-cctu-t-00155-c0003-c3",
+    "constraint_text": "Desert_city_locator must be the first tool called and its output must be cross-checked with cuisine_ingredient_identifier before any country_info_retriever invocation.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00155-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "cuisine_ingredient_identifier",
+                    "country_info_retriever"
+                ],
+                [
+                    "desert_city_locator",
+                    "country_info_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

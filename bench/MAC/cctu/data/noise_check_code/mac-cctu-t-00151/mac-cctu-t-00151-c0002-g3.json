@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00151",
+    "node_id": "mac-cctu-t-00151-c0002-g3",
+    "constraint_text": "The agent must invoke between 1 and 2 unique tools simultaneously in at least one interaction turn during the solution process, never exceed 2 simultaneous tool invocations in any turn, and stay within a maximum of 10 total tool calls. Before invoking artwork_artist_locator the agent must have executed desert_museum_locator; before invoking biographical_info_retriever it must have executed artwork_artist_locator; before invoking population_data_retriever it must have executed biographical_info_retriever; before invoking explorer_achievement_finder it must have executed population_data_retriever; before invoking age_calculator it must have executed explorer_achievement_finder; and before invoking advanced_calculator it must have executed age_calculator. The final response must end with a period to ensure proper sentence closure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00151-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/151/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

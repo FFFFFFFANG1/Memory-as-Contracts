@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00189",
+    "node_id": "mac-cctu-t-00189-c0002-g4",
+    "constraint_text": "During the Initial Query Triage phase, restrict tool usage to 'philosopher_topic_finder' and 'historical_invention_info' for preliminary entity identification, and defer all spatial lookups to a later phase.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00189-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "historical_invention_info",
+                "philosopher_topic_finder"
+            ],
+            "forbidden_tools": [
+                "book_info_retriever",
+                "elevation_retriever",
+                "filmography_counter",
+                "historical_experiment_locator",
+                "mountain_peak_altitude_finder",
+                "nearby_reserve_locator",
+                "park_feature_locator",
+                "philosophical_literature_finder",
+                "protected_area_info_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

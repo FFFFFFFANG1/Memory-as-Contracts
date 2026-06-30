@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00133",
+    "node_id": "mac-cctu-t-00133-c0002-g3",
+    "constraint_text": "The answer must be formatted as a valid JSON object containing the two distances in miles under the keys \"flight_distance\" (for the B-50 Superfortress Lucky Lady II's flight) and \"train_distance\" (for the California Zephyr train route), and the agent must insert an explicit key-value pair \"separator_tag\": \"DISTANCE_SEPARATOR\" immediately after the flight_distance entry to bridge the two distance fields.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00133-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/133/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

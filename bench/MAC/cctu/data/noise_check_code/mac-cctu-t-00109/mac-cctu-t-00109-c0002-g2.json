@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00109",
+    "node_id": "mac-cctu-t-00109-c0002-g2",
+    "constraint_text": "All comparative genomics queries within the Primate Comparative Genomics project must be resolved with exactly one consolidated call to comprehensive_biological_info_retriever, and the response must contain only the raw numerical result with no labels, headers, or trailing punctuation.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00109-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "comprehensive_biological_info_retriever"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

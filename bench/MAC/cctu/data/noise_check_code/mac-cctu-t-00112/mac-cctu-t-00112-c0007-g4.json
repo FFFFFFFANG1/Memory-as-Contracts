@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00112",
+    "node_id": "mac-cctu-t-00112-c0007-g4",
+    "constraint_text": "Restrict all tool usage to the 'aviation_incident_info_retriever' and 'satellite_information_tool' and forbid invocation of any historical event retriever for casualty cross-checks.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00112-c0007",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "aviation_incident_info_retriever",
+                "satellite_information_tool"
+            ],
+            "forbidden_tools": [
+                "earthquake_data_retriever",
+                "employee_statistics_predictor_v2",
+                "historical_crime_data_analyzer",
+                "historical_event_retriever",
+                "historical_incident_data_retriever",
+                "historical_rocket_data_retriever",
+                "software_release_info",
+                "sunlight_calculator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

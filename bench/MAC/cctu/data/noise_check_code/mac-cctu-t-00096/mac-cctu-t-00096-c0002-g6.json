@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00096",
+    "node_id": "mac-cctu-t-00096-c0002-g6",
+    "constraint_text": "Every vendor lookup must be corroborated by at least two independent invocations of `business_locator` against differing district keywords before being entered into the audit ledger.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00096-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

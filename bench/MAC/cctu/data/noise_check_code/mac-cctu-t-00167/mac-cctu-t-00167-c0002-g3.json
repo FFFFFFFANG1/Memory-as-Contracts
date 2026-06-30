@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00167",
+    "node_id": "mac-cctu-t-00167-c0002-g3",
+    "constraint_text": "Before invoking the geographical_area_calculator tool, the urban_forest_locator tool must have already been executed; the scientist_research_finder and historical_visit_locator tools must be invoked simultaneously in the same interaction turn; at least one interaction turn during the task must invoke between 2 and 4 unique tool types simultaneously; and the final answer must begin with the identifier \"Answer:\", end with the identifier \"End of Answer.\", and conclude with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00167-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/167/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

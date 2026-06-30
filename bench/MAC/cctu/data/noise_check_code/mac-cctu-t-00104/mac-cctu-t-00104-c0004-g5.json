@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00104",
+    "node_id": "mac-cctu-t-00104-c0004-g5",
+    "constraint_text": "During the PreliminaryScoping phase of the IndustrialAccidentComparativeAnalysis project, the agent must restrict itself to a single exploratory call to historical_event_tool and must not yet invoke historical_event_info_retriever.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00104-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "historical_event_info_retriever",
+                "historical_event_tool"
+            ],
+            "forbidden_tools": [
+                "everest_summit_records",
+                "historical_event_date_finder",
+                "merged_subscriber_data_tool",
+                "olympic_medal_tracker",
+                "species_counter",
+                "volcano_activity_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

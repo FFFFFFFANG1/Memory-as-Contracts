@@ -1,0 +1,33 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00104",
+    "node_id": "mac-cctu-t-00104-c0005-g5",
+    "constraint_text": "During the TimelineReconstruction phase the agent must produce a chronologically ordered bullet list of events and avoid any tabular formatting in intermediate deliverables.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00104-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_format",
+        "spec": {
+            "checks": [
+                {
+                    "name": "contains_terms",
+                    "terms": [
+                        "timeline"
+                    ]
+                }
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

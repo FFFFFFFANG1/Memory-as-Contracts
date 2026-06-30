@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00077",
+    "node_id": "mac-cctu-t-00077-c0004-ph1",
+    "constraint_text": "Sub-tasks must be enumerated as a numbered plain-text list that maps each hop of the multi-hop query (explorer, region, mineral, industry, economic theory, economist's city, dessert) to its corresponding tool before any tool is invoked.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00077-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

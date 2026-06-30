@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00173",
+    "node_id": "mac-cctu-t-00173-c0001-g3",
+    "constraint_text": "Rank the following from smallest to largest: (a) the tallest forest tree species, (b) the height in meters of the iconic bell tower in the city where the artist of The Birth of Venus was born, and (c) the weight in kilograms of the world's heaviest known turtle. Solve this by calling available tools, ensuring the total number of tool calls executed does not exceed 10.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00173-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/173/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

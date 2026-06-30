@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00066",
+    "node_id": "mac-cctu-t-00066-c0004-g5",
+    "constraint_text": "The solution must be derived entirely through tool calls, the full reasoning trace must complete within at most ten interaction turns, the final answer must end with a period, the response must contain at least three hundred words to fully explain the multi-step chain, and the entire response must be formatted using Markdown syntax with headings, lists, and bold or italic emphasis to enhance readability.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00066-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/66/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

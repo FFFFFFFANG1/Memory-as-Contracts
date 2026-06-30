@@ -1,0 +1,32 @@
+def evaluate(trace):
+    response = str(trace.get('final_response') or '')
+    calls = trace.get('tool_calls') or []
+    if not response.strip() and not calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    ok = True
+    evidence = []
+    reasons = []
+    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
+    text_l = response.lower()
+    required = ['advanced_arithmetic_calculator', 'comprehensive_biographical_info_retriever', 'museum_artwork_locator', 'museum_event_locator']
+    matched = [name for name in required if name in names or name in text_l]
+    if not matched:
+        ok = False
+        reasons.append('named operation not observed')
+    else:
+        evidence.append({'type': 'operation_names', 'names': matched})
+    marks = ['**', '__', '`', '# ', '- ', '* ']
+    if not any(mark in response for mark in marks):
+        ok = False
+        reasons.append('format marker missing')
+    has_number = any(ch.isdigit() for ch in response)
+    if not has_number:
+        ok = False
+        reasons.append('numeric value missing')
+    pieces = response.split()
+    if not pieces:
+        ok = False
+        reasons.append('response text missing')
+    if ok:
+        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
+    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}

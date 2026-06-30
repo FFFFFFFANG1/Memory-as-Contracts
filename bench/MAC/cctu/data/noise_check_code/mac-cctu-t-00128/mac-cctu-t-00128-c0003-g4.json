@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00128",
+    "node_id": "mac-cctu-t-00128-c0003-g4",
+    "constraint_text": "The final answer must contain a table with at least three columns listing the feature name, its depth, and the difference from the average depth of the Pacific Ocean, include a header row, vertically align the data, run between 200 and 300 characters in total length, and end with a period; combined invocations of factual_data_retriever or ocean_depth_analyzer must not exceed two calls per tool.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00128-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/128/check_constraint_2.py",
+            "repair": "verifier_token_aligned_python"
+        },
+        "notes": [
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ]
+    }
+}

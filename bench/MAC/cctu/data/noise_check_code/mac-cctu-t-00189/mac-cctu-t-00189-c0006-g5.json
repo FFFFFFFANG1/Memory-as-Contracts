@@ -1,0 +1,30 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00189",
+    "node_id": "mac-cctu-t-00189-c0006-g5",
+    "constraint_text": "Within the Himalayan Peak Survey project, the agent must call mountain_peak_altitude_finder and elevation_retriever and cross-validate that the two altitudes agree within 10 meters before reporting any summit elevation.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00189-c0006",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "elevation_retriever",
+                "mountain_peak_altitude_finder"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

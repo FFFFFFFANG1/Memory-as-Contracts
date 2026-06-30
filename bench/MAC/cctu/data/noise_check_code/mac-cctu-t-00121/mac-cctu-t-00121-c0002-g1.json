@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00121",
+    "node_id": "mac-cctu-t-00121-c0002-g1",
+    "constraint_text": "During work on the HistoricalCasualtyComparison project, retrieve the required information using the provided tools, keep the total number of tool calls at no more than 2, limit the 'historical_event_information_tool' to a single call (batching multiple events into one action step if needed), complete the task in 3 to 5 interaction rounds, and present the final answer as a table with columns for event names, locations, casualty numbers, and the difference in casualties.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00121-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/121/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

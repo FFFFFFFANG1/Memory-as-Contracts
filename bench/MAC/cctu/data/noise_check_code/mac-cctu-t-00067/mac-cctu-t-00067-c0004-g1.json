@@ -1,0 +1,56 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00067",
+    "node_id": "mac-cctu-t-00067-c0004-g1",
+    "constraint_text": "You must use tool calls to answer this question, and you can make at most 10 tool calls. The final answer must include a statement regarding the traditional headwear of the identified country. The agent must call `academic_founder_identifier` before `academic_institution_locator`, `academic_institution_locator` before `institution_location_finder`, `institution_location_finder` before `river_locator`, `river_locator` before `river_source_locator`, `river_source_locator` before `geographer_identifier`, `geographer_identifier` before `biographical_info_retriever`, and `biographical_info_retriever` before `cultural_artifact_identifier`.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00067-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "academic_founder_identifier",
+                    "academic_institution_locator"
+                ],
+                [
+                    "academic_institution_locator",
+                    "institution_location_finder"
+                ],
+                [
+                    "institution_location_finder",
+                    "river_locator"
+                ],
+                [
+                    "river_locator",
+                    "river_source_locator"
+                ],
+                [
+                    "river_source_locator",
+                    "geographer_identifier"
+                ],
+                [
+                    "geographer_identifier",
+                    "biographical_info_retriever"
+                ],
+                [
+                    "biographical_info_retriever",
+                    "cultural_artifact_identifier"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/67/check_constraint_3.json"
+        }
+    }
+}

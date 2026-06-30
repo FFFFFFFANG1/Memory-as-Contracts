@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00189",
+    "node_id": "mac-cctu-t-00189-c0003-g3",
+    "constraint_text": "The response must include the exact phrases \"The area of the national reserve is **[value]** [unit]\" and \"The book has **[value]** pages\" to clearly separate the two values, followed by the final answer in bold using the format \"**Answer:** (a)/(b)\". The response must be formatted in Markdown syntax with proper use of bold, headings, and paragraph structure. At least one interaction turn must invoke at least 2 unique tools simultaneously. The total number of interaction turns must be in the inclusive range 5 to 10, the total number of tool calls must be in the inclusive range 6 to 8, and the response must end with a period. Before invoking the 'historical_experiment_locator' tool, the 'historical_invention_info' tool must have been executed.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00189-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/189/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

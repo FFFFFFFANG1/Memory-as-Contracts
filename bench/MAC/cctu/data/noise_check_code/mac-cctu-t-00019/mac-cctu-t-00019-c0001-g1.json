@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00019",
+    "node_id": "mac-cctu-t-00019-c0001-g1",
+    "constraint_text": "Format every historical date referenced in the final response as ISO 8601 (YYYY-MM-DD), including the event date and any retrieval timestamps.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00019-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_format",
+        "spec": {
+            "checks": [
+                {
+                    "name": "date_format",
+                    "format": "iso"
+                }
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

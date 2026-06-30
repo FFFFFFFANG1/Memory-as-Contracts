@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00192",
+    "node_id": "mac-cctu-t-00192-c0006-g1",
+    "constraint_text": "Solve the task exclusively through the provided tools without relying on internal knowledge. Limit calls to 'product_price_checker' to at most 2 over the entire run. Keep the total number of interaction turns between 6 and 8 inclusive. Present the final response as a table with two columns, \"Product\" and \"Price (USD)\", and clearly include the combined price as a row in that table. End the response with a period. Any invocation of 'car_price_analyzer' together with 'product_price_comparator' must be issued concurrently in a single step.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00192-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "car_price_analyzer",
+                    "product_price_comparator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/192/check_constraint_5.json"
+        }
+    }
+}

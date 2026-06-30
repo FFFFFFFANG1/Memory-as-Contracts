@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00192",
+    "node_id": "mac-cctu-t-00192-c0005-g1",
+    "constraint_text": "Responses in the ecommerce_dashboard_pricing project must be wrapped in a single declarative sentence summarizing the combined price, with no tables, lists, or code blocks, and product_price_checker may be called at most once per response.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00192-c0005",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1,
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

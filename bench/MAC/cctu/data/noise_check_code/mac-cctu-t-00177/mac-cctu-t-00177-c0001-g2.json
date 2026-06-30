@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00177",
+    "node_id": "mac-cctu-t-00177-c0001-g2",
+    "constraint_text": "The final answer must be concise and contain only the numeric result with a length between 3 and 10 characters; the historical_filmmaker_search tool must be executed strictly before any invocation of residence_locator; and each of historical_filmmaker_search, residence_locator, cultural_geography_mapper, historical_monument_counter, landmark_info_retriever, and advanced_calculator may be used at most once.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00177-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "historical_filmmaker_search",
+                    "residence_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/177/check_constraint_0.json"
+        }
+    }
+}

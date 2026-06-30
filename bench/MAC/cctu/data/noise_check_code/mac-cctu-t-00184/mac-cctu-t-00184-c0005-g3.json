@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00184",
+    "node_id": "mac-cctu-t-00184-c0005-g3",
+    "constraint_text": "Whenever `literary_verse_finder` is invoked, `event_city_identifier` must be invoked in the same turn, `park_feature_locator` may only run after `biographical_data_retriever` has already executed, the final response must contain the keyword \"Delimiting Identifier: [Comparison Result]\" to separate the answer from the reasoning, the final response must be between 300 and 500 characters, and the final answer must end with an exclamation mark.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00184-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/184/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

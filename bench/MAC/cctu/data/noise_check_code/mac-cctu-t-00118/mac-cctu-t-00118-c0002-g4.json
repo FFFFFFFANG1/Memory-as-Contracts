@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00118",
+    "node_id": "mac-cctu-t-00118-c0002-g4",
+    "constraint_text": "The Agent must produce a long-form narrative answer of at least 500 characters that weaves together political, social, and economic context for each sovereignty event.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00118-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": 500,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00014",
+    "node_id": "mac-cctu-t-00014-c0004-c2",
+    "constraint_text": "Perform at least one tool interaction before producing the answer, ensure the response is at least 50 words, keep the total number of tool calls across all turns to no more than 2, and invoke any tool used for historical event date queries no more than once.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00014-c0004",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/14/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

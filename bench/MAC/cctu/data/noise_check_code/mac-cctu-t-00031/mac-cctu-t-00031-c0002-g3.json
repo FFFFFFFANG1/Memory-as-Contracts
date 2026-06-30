@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00031",
+    "node_id": "mac-cctu-t-00031-c0002-g3",
+    "constraint_text": "You must obtain the answer by calling the provided tools. If a tool call fails, you may retry, but the total number of tool calls across all interaction turns must not exceed 3. The final answer must be enclosed in a box (e.g., $$\\n\\boxed{\\text{...}}\\n$$) and must be between 10 and 20 words in length.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00031-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/31/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

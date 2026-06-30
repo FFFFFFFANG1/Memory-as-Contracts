@@ -1,0 +1,36 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00021",
+    "node_id": "mac-cctu-t-00021-c0001-g7",
+    "constraint_text": "Restrict tool usage to medical_event_finder and never produce tabular output during the preliminary scoping phase.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00021-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "medical_event_finder"
+            ],
+            "forbidden_tools": [
+                "election_result_analyzer",
+                "election_result_finder",
+                "eurovision_winner_info",
+                "historical_agreement_finder",
+                "historical_event_analyzer",
+                "political_event_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

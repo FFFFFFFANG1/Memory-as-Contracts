@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00106",
+    "node_id": "mac-cctu-t-00106-c0002-g2",
+    "constraint_text": "The answer must be presented as a complete sentence ending with a period, must use between 2 and 4 total tool calls, must be completed within 2 to 3 interaction turns, must be between 10 and 20 words in length, must not invoke 'marine_biology_facts' more than twice, and any combined use of 'marine_biology_facts' and 'factual_information_retriever' must be dispatched together in a single batched action.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00106-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/106/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

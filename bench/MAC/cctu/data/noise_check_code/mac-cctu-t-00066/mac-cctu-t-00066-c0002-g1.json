@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00066",
+    "node_id": "mac-cctu-t-00066-c0002-g1",
+    "constraint_text": "During the Educator Identification phase, restrict tool calls to educational_figure_identifier and educational_history_search before moving on to any other lookup.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00066-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "educational_figure_identifier",
+                "educational_history_search"
+            ],
+            "forbidden_tools": [
+                "artist_relationship_finder",
+                "educational_program_finder",
+                "educational_theory_mapper",
+                "hospital_survival_rate_analyzer",
+                "landmark_identifier",
+                "psychological_theory_identifier",
+                "scientific_discovery_lookup",
+                "theory_influence_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

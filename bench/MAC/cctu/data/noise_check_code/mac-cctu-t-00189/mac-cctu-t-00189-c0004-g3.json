@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00189",
+    "node_id": "mac-cctu-t-00189-c0004-g3",
+    "constraint_text": "During the initial query triage, restrict tool usage to a single clarification call to 'philosopher_topic_finder' and defer all geographic lookups until the next phase.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00189-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "philosopher_topic_finder"
+            ],
+            "forbidden_tools": [
+                "book_info_retriever",
+                "elevation_retriever",
+                "filmography_counter",
+                "historical_experiment_locator",
+                "historical_invention_info",
+                "mountain_peak_altitude_finder",
+                "nearby_reserve_locator",
+                "park_feature_locator",
+                "philosophical_literature_finder",
+                "protected_area_info_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,38 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00097",
+    "node_id": "mac-cctu-t-00097-c0002-g6",
+    "constraint_text": "Restrict tool usage to biographical_info_retriever and historical_fact_finder, and present results as a short biographical paragraph.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00097-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "biographical_info_retriever",
+                "historical_fact_finder"
+            ],
+            "forbidden_tools": [
+                "climate_data_retriever",
+                "continent_locator",
+                "economic_data_retriever",
+                "landmark_city_locator",
+                "rainforest_info_provider",
+                "sports_event_locator",
+                "sports_event_venue_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

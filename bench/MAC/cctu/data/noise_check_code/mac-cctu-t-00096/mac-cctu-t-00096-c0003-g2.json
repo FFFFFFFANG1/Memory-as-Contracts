@@ -1,0 +1,38 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00096",
+    "node_id": "mac-cctu-t-00096-c0003-g2",
+    "constraint_text": "Restrict tool usage to urban_area_identifier and business_district_locator alone, and produce a one-paragraph hypothesis memo without committing to any final numeric answer.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00096-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "business_district_locator",
+                "urban_area_identifier"
+            ],
+            "forbidden_tools": [
+                "biographical_info_retriever",
+                "business_locator",
+                "consulting_client_finder",
+                "corporate_housing_locator",
+                "cultural_heritage_folk_tale_finder",
+                "rental_price_analyzer",
+                "university_program_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

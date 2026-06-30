@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00089",
+    "node_id": "mac-cctu-t-00089-c0005-p1",
+    "constraint_text": "The agent must restrict tool invocations to locator-class tools only and defer any call to hospital_survival_rate_analyzer until a later phase, capturing all locator payloads verbatim for downstream reuse.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00089-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "hospital_survival_rate_analyzer"
+            ],
+            "forbidden_tools": [
+                "attraction_locator",
+                "biographical_data_search",
+                "cultural_geography_locator",
+                "facility_locator",
+                "historical_landmark_locator",
+                "historical_region_locator",
+                "medical_research_center_locator",
+                "nearby_supplier_locator",
+                "supplier_hospital_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

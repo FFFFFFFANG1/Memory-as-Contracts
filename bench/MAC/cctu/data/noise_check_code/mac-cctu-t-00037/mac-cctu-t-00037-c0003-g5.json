@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00037",
+    "node_id": "mac-cctu-t-00037-c0003-g5",
+    "constraint_text": "Produce the disaster preparedness report in plain prose with a minimum of three retrieval tool calls per regional sub-section to triangulate casualty and damage estimates.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00037-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_call_count",
+        "spec": {
+            "min": 3,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

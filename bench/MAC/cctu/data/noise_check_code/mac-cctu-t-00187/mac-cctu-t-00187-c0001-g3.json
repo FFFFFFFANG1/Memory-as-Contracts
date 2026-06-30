@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00187",
+    "node_id": "mac-cctu-t-00187-c0001-g3",
+    "constraint_text": "The agent's final answer must be presented as a valid JSON object containing both the numerical result and the reasoning process; the population_data_retriever tool may be invoked at most once; the total number of tool calls must not exceed ten; at least one interaction turn must invoke two or more unique tool types simultaneously; and the response length must be between 500 and 1500 characters inclusive.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00187-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/187/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

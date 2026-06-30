@@ -1,0 +1,48 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00071",
+    "node_id": "mac-cctu-t-00071-c0001-g4",
+    "constraint_text": "Tasks initiated with `countryside_distillery_locator` must continue with the strict sequence `business_locator` -> `distillery_spirit_identifier` -> `bartender_matcher` -> `individual_location_finder` -> `local_specialty_finder`, finish within at most 8 interaction turns, call `distillery_spirit_identifier` no more than 3 times, and end the final answer with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00071-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "countryside_distillery_locator",
+                    "business_locator"
+                ],
+                [
+                    "business_locator",
+                    "distillery_spirit_identifier"
+                ],
+                [
+                    "distillery_spirit_identifier",
+                    "bartender_matcher"
+                ],
+                [
+                    "bartender_matcher",
+                    "individual_location_finder"
+                ],
+                [
+                    "individual_location_finder",
+                    "local_specialty_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/71/check_constraint_0.json"
+        }
+    }
+}

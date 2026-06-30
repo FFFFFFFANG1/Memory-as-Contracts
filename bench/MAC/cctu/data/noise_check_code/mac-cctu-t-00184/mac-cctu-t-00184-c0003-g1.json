@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00184",
+    "node_id": "mac-cctu-t-00184-c0003-g1",
+    "constraint_text": "Whenever the agent invokes `literary_verse_finder`, it must also utilize `event_city_identifier` in the same workflow, and `park_feature_locator` may only be invoked after `biographical_data_retriever` has already executed; every fact must be sourced through tool calls with iterative retry on failure; the final response must include the keyword \"Delimiting Identifier: [Comparison Result]\" to clearly separate the answer from the reasoning, be between 300 and 500 characters in length, and end with an exclamation mark (!).",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00184-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "biographical_data_retriever",
+                    "park_feature_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/184/check_constraint_2.json"
+        }
+    }
+}

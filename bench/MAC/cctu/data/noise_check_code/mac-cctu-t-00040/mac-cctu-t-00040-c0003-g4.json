@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00040",
+    "node_id": "mac-cctu-t-00040-c0003-g4",
+    "constraint_text": "Restrict tool selection to papal_event_retriever and membership_info_retriever exclusively.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00040-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "membership_info_retriever",
+                "papal_event_retriever"
+            ],
+            "forbidden_tools": [
+                "election_result_analyzer",
+                "election_result_retriever",
+                "event_locator",
+                "historical_event_analyzer",
+                "historical_event_lookup",
+                "historical_event_retriever",
+                "historical_incident_data_retriever",
+                "object_tracking_analyzer",
+                "sports_event_result_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

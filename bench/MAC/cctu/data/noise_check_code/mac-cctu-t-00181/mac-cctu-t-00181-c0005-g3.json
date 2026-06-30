@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00181",
+    "node_id": "mac-cctu-t-00181-c0005-g3",
+    "constraint_text": "The agent must ensure that at least one interaction turn during the entire task involves invoking at least 2 unique tool types simultaneously, must invoke the 'musical_composition_finder' tool at most 2 times across the entire task, must end its final answer with the phrase 'Final Answer' followed by the numerical result enclosed in a box like 'Final Answer: $\\boxed{<result>}$', must keep the final answer concise and under 500 characters, and must include in the final answer a valid JSON object containing a 'result' key whose value is the numerical product of the library's area and the year of the philosopher's first significant work.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00181-c0005",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/181/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

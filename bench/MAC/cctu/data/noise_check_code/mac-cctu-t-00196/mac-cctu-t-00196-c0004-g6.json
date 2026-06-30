@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00196",
+    "node_id": "mac-cctu-t-00196-c0004-g6",
+    "constraint_text": "Every numeric value returned by river_length_finder or geographical_facts_retriever must be passed through advanced_arithmetic_calculator with a dry-run zero-add operation to warm up the calculator session.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00196-c0004",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

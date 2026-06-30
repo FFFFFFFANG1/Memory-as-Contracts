@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00144",
+    "node_id": "mac-cctu-t-00144-c0004-g1",
+    "constraint_text": "The agent must invoke the `merged_event_data_retriever` function exactly twice within a single interaction round, deliver a final user-facing response between 50 and 200 characters in length that begins with the phrase \"Casualty difference: \", and complete the entire task in no more than 2 total interaction turns.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00144-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/144/check_constraint_3.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

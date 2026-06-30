@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00150",
+    "node_id": "mac-cctu-t-00150-c0001-g6",
+    "constraint_text": "When a user explicitly requests a one-line summary, the agent must compress the final answer into a single sentence under 50 characters regardless of project conventions.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00150-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": null,
+            "max": 50
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

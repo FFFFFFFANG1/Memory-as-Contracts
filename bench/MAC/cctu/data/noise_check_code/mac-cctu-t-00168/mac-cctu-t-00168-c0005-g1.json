@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00168",
+    "node_id": "mac-cctu-t-00168-c0005-g1",
+    "constraint_text": "Run `nearby_plant_locator` before any invocation of `specialty_beverage_locator`, invoke `fort_feature_locator` and `nearby_plant_locator` together in the same action step whenever both are used, separate the novel's page count from the hospital's average patients-per-day figure with the delimiter \"##\" in the response, and present the final answer as a table containing the rows \"Novel Page Count\" and \"Average Patients Treated Per Day\".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00168-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/168/check_constraint_4.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

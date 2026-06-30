@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0006-p1",
+    "constraint_text": "Restrict all biological catalog lookups to biologist_catalog_search and forbid use of historical_biological_catalog_query for any species count question.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0006",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "biologist_catalog_search",
+                "historical_biological_catalog_query"
+            ],
+            "forbidden_tools": [
+                "cultural_landmark_identifier",
+                "geographical_feature_info",
+                "green_belt_identifier",
+                "historical_figure_residence_finder",
+                "historical_location_associator",
+                "landmark_city_identifier",
+                "landmark_identifier",
+                "landmark_region_identifier",
+                "natural_landmark_locator",
+                "tax_revenue_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00127",
+    "node_id": "mac-cctu-t-00127-c0001-g4",
+    "constraint_text": "The answer must be at least 150 characters and include both wingspan measurements and their difference. Invoke aircraft_specifications_retriever exactly twice in a single parallel action, and execute at least one interaction turn with two or more simultaneous tool calls. Format the entire response in Markdown with headings, lists, and bold/italic text, separating the wingspan values and the difference using bold formatting, and including the keywords 'wingspan', 'difference', and 'centimeters' in their respective sections. Do not invoke aircraft_specifications_retriever more than 2 times in total.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00127-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/127/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

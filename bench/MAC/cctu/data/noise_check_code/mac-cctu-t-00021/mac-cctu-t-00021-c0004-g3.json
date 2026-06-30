@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00021",
+    "node_id": "mac-cctu-t-00021-c0004-g3",
+    "constraint_text": "Your answer must include the identifier 'AGREEMENT:' immediately before stating the name of the agreement to clearly delimit the agreement's name in the response. The response must present supporting data in a tabular format using rows and columns, with proper headers, consistent column widths, and aligned columns to enhance clarity and accessibility. The total number of tool calls executed across all interaction turns must not exceed three, and the tool historical_agreement_finder can be used at most once. The response must end with a period to ensure proper sentence closure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00021-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/21/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

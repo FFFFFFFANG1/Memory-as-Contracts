@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00039",
+    "node_id": "mac-cctu-t-00039-c0001-g3",
+    "constraint_text": "Your response must be derived through a maximum of 3 total interaction turns with the provided tools, must be presented in a tabular format with columns for \"Chemical Name\" and \"Description\" (where the \"Description\" column includes their hazardous properties or effects), must end with a period as the final punctuation mark, and the chemical_release_tracker tool must be used at most once during the process.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00039-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/39/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

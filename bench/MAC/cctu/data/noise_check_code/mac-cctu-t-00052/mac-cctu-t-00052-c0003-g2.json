@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00052",
+    "node_id": "mac-cctu-t-00052-c0003-g2",
+    "constraint_text": "The response must begin with the phrase \"The main crop is\", stay between 50 and 100 words, complete within 3 to 6 interaction turns, use no more than 5 total tool calls, invoke earthquake_event_locator before any call to agricultural_data_analyzer, and call earthquake_event_locator at most once and agricultural_data_analyzer at most once.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00052-c0003",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/52/check_constraint_2.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

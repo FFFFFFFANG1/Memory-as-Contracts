@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00002",
+    "node_id": "mac-cctu-t-00002-c0002-g2",
+    "constraint_text": "Your answer must end with a period to ensure proper sentence closure. Additionally, you may make at most 5 tool calls in total across all interaction turns, and the game_release_date_finder tool may be used at most 2 times during the process. The response must explicitly separate platform names with a hyphen when listing multiple platforms (e.g., \"Windows-Xbox 360\").",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00002-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/2/check_constraint_1.json",
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

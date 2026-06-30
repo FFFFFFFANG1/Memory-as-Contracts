@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00158",
+    "node_id": "mac-cctu-t-00158-c0004-g2",
+    "constraint_text": "The agent's final response must begin with the phrase \"The answer is (a)\" or \"The answer is (b)\" depending on which value is higher, must use between 6 and 10 tool calls, must invoke scientific_discovery_finder before historical_site_locator, must invoke bestselling_book_author_finder before residence_finder, and must invoke enhanced_nearby_national_park_locator before biodiversity_info_tool. The agent must also invoke at least one pair from {scientific_discovery_finder and bestselling_book_author_finder}, {historical_site_locator and residence_finder}, or {enhanced_nearby_national_park_locator and nearby_mountain_locator} in parallel within a single action step. The final response must end with a period and must be organized as a standard two-column table with a header row, one column naming the value being compared (species count or mountain height) and the other column giving the corresponding value.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00158-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "scientific_discovery_finder",
+                    "bestselling_book_author_finder"
+                ],
+                [
+                    "historical_site_locator",
+                    "residence_finder"
+                ],
+                [
+                    "enhanced_nearby_national_park_locator",
+                    "nearby_mountain_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/158/check_constraint_3.json"
+        }
+    }
+}

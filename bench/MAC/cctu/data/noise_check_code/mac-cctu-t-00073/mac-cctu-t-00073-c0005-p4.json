@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00073",
+    "node_id": "mac-cctu-t-00073-c0005-p4",
+    "constraint_text": "The answer must end with a period, the final response must be formatted using Markdown with the festival name in bold, the response must contain between 10 and 50 characters inclusive, the solution must complete within 6 to 8 interaction turns, and each of conservation_award_winner_finder, nature_reserve_association_finder, species_locator, zoological_research_finder, individual_location_finder, and festival_finder must be called at most once.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00073-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/73/check_constraint_4.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

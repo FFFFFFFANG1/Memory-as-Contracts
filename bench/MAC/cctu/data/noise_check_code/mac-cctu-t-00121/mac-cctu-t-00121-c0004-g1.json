@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00121",
+    "node_id": "mac-cctu-t-00121-c0004-g1",
+    "constraint_text": "Restrict tool usage to the provided historical-event tools, cap total tool invocations at two, allow at most one call to the 'historical_event_information_tool', batch all events that need it into a single parallel action, finish the work within three to five interaction rounds, and present the final answer as a table with columns for event name, location, casualty count, and casualty difference.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00121-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "historical_event_information_tool"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/121/check_constraint_3.json"
+        }
+    }
+}

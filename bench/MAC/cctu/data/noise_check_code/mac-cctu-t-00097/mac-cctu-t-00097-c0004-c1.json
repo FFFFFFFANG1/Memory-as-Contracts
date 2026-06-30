@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00097",
+    "node_id": "mac-cctu-t-00097-c0004-c1",
+    "constraint_text": "Your response must conclude with the identifier \"**target temperature**\" and end with a period to indicate the final result clearly. Your actions is constrained to a maximum of 6 tool calls in total, while the task execution must span at least 6 interaction turns and each tool must be called at most once.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00097-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "interaction_rounds",
+        "spec": {
+            "min": 6,
+            "max": null
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/97/check_constraint_3.json"
+        }
+    }
+}

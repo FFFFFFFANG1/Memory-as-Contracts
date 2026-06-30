@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00111",
+    "node_id": "mac-cctu-t-00111-c0005-ph3",
+    "constraint_text": "The agent must include an exhaustive breakdown of every decomposition branch with at least 600 words of narrative justification in the response body.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00111-c0005",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": 600,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

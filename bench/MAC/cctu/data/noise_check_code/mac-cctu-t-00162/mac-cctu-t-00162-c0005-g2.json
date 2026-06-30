@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00162",
+    "node_id": "mac-cctu-t-00162-c0005-g2",
+    "constraint_text": "Determine the higher value between (a) the attendance of the parade held in the capital of the land where the tribe converses in a language related to the institute researching ancient civilizations, and (b) the capacity of the famous theater in the city considered the heart of the Renaissance. The response must be concise and not exceed 500 words. For part (a), if the agent intends to invoke the `event_attendance_tracker` tool, it must first execute `tribal_language_identifier`, then `ethnic_group_locator`, then `capital_city_finder` in that sequence, and `event_locator` followed by `event_attendance_tracker` must be executed after that sequence. For part (b), if the agent intends to invoke the `venue_information_retriever` tool, `historical_city_identifier` must be executed first, followed by `cultural_landmark_locator`. The total number of tool calls made by the agent to solve the question must be within the range of 6 to 10. The final comparison of the two values must be presented in a tabular format with rows for each value and columns for the description and numeric value, using the '||' symbol to separate columns for clarity and standardization.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00162-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/162/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

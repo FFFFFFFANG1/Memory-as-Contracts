@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00198",
+    "node_id": "mac-cctu-t-00198-c0001-g3",
+    "constraint_text": "The answer must be formatted using Markdown syntax with headings, lists, bold/italic text, links, and code blocks to enhance readability and structure. The response must exclude exclamation marks. The solution must include at least one interaction turn where the agent invokes at least two unique tool types simultaneously with another unique tool type, and the total number of tool calls must not exceed 10. Any use of 'biologist_specialization_finder' must be preceded by 'habitat_species_associator', and any use of 'biographical_affiliation_finder' must follow 'biologist_specialization_finder'. 'biologist_specialization_finder' may be called at most once. Calls to 'habitat_species_associator' and 'historical_landmark_finder' must be issued in a single action step. The final response must be between 150 and 300 words.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00198-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/198/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

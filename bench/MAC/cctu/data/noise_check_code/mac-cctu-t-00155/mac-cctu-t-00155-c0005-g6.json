@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00155",
+    "node_id": "mac-cctu-t-00155-c0005-g6",
+    "constraint_text": "The solution must call business_location_finder before country_info_retriever, keep total interaction turns between 10 and 12 inclusive, invoke country_info_retriever and geographical_feature_associator concurrently in one action step once the target country and region are confirmed, and end the response with the exact phrase \"Final Answer: \" followed by the numerical result in bold, with the final answer not exceeding 1000 characters.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00155-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/155/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

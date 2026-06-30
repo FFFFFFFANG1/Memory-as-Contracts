@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00157",
+    "node_id": "mac-cctu-t-00157-c0001-g4",
+    "constraint_text": "Rank the three values from greatest to least: (a) the water volume in cubic meters of the waterfall nearest the residence of the writer behind the acclaimed novel set in Japan, (b) the number of languages spoken by the diplomat who opened trade routes, and (c) the length in kilometers of the historic road paved by the emperor of a major dynasty. The historical_leader_infrastructure_finder must be executed before any call to the historical_road_length_calculator. The literary_search_tool may be invoked at most twice. The final answer must contain a syntactically valid JSON object enclosed in curly braces with keys 'a', 'b', and 'c' mapped to the three ranked values, must not exceed 200 characters in total length, and must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00157-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/157/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

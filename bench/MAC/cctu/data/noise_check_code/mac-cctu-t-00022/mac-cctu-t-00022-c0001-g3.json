@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00022",
+    "node_id": "mac-cctu-t-00022-c0001-g3",
+    "constraint_text": "Your answer must be derived by making between 1 and 2 total tool calls using the available tools. Use only the provided tools and never rely on internal knowledge. The total number of interaction turns (including tool calls and responses) must not exceed 3. The final response must be formatted using Markdown syntax to enhance readability and structure, and must end with a period to ensure proper sentence closure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00022-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/22/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

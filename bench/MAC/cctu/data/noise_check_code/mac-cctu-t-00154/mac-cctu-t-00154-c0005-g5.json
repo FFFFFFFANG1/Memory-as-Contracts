@@ -1,0 +1,30 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00154",
+    "node_id": "mac-cctu-t-00154-c0005-g5",
+    "constraint_text": "The agent must invoke 'railway_connection_finder' and 'historical_infrastructure_designer_finder' as paired calls for every candidate cross-border rail corridor and must produce a tabular mapping of corridor to designer before issuing any narrative summary.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00154-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "historical_infrastructure_designer_finder",
+                "railway_connection_finder"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

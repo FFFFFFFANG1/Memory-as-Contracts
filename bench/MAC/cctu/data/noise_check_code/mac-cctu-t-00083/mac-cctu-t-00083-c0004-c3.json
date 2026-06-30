@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00083",
+    "node_id": "mac-cctu-t-00083-c0004-c3",
+    "constraint_text": "The final answer must end with a period, use at most 15 total tool calls across all interaction steps, and be formatted in Markdown using headings (e.g., ### Section), bullet points, bold text, and line breaks for readability, while keeping all factual claims in plain text without formatting and reserving Markdown syntax only for organizational elements.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00083-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/83/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

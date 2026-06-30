@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00176",
+    "node_id": "mac-cctu-t-00176-c0007-c7",
+    "constraint_text": "The agent must run individual_location_identifier and research_location_identifier as a single parallel batch and refrain from issuing tourist_statistics_aggregator calls until that batch returns.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00176-c0007",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "individual_location_identifier",
+                    "research_location_identifier",
+                    "tourist_statistics_aggregator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

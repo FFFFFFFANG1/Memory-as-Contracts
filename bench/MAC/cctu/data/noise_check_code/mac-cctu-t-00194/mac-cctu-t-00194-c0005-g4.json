@@ -1,0 +1,43 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00194",
+    "node_id": "mac-cctu-t-00194-c0005-g4",
+    "constraint_text": "Restrict highway_length_calculator and historical_infrastructure_info to United States targets only, and disregard any non-US infrastructure returned by these tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00194-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "highway_length_calculator",
+                "historical_infrastructure_info"
+            ],
+            "forbidden_tools": [
+                "advanced_calculator",
+                "cultural_attribution_analyzer",
+                "highest_peak_finder",
+                "historical_event_retriever",
+                "historical_residence_finder",
+                "landmark_country_skyscraper_finder",
+                "literary_author_identifier",
+                "museum_artwork_locator",
+                "museum_collection_inquiry",
+                "region_identifier",
+                "research_location_identifier",
+                "researcher_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

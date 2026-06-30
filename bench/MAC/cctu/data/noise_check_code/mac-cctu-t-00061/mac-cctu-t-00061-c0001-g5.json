@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00061",
+    "node_id": "mac-cctu-t-00061-c0001-g5",
+    "constraint_text": "Limit final responses in the FinalAnswerSynthesis phase of the DeltaSeafoodTrace project to at most 8 interaction turns with the tools, conclude with the phrase \"[End of Answer]\", invoke seafood_origin_locator at most once and only after port_locator has already been executed, and present the final answer using Markdown with at least one bolded element highlighting the local spice.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00061-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/61/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

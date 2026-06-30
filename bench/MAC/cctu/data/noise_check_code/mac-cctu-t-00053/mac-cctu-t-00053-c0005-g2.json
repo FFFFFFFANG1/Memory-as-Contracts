@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00053",
+    "node_id": "mac-cctu-t-00053-c0005-g2",
+    "constraint_text": "Within the Coastal Tourism Survey project, the agent must invoke the beach_locator tool at least once per task and report results as a bulleted list of coastal cities.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00053-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "beach_locator": {
+                    "min": 1,
+                    "max": null
+                }
+            }
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

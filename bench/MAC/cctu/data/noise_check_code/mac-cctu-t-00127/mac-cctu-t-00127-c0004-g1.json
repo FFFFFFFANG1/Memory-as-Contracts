@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00127",
+    "node_id": "mac-cctu-t-00127-c0004-g1",
+    "constraint_text": "Default to a concise plain-text answer of no more than 80 characters that simply states the numeric difference between the two aircraft specifications.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00127-c0004",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": null,
+            "max": 80
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

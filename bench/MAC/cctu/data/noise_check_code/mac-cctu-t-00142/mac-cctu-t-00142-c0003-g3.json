@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00142",
+    "node_id": "mac-cctu-t-00142-c0003-g3",
+    "constraint_text": "The agent must restrict all data retrieval to the earthquake_data_retriever and disaster_data_info_retriever tools, cross-validating magnitudes between both before recording any seismic figure.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00142-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "disaster_data_info_retriever",
+                "earthquake_data_retriever"
+            ],
+            "forbidden_tools": [
+                "composer_works_merged",
+                "historical_event_date_finder",
+                "historical_event_finder",
+                "historical_event_retriever",
+                "historical_event_tool",
+                "historical_transaction_finder",
+                "merged_financial_transaction_info",
+                "merged_subscriber_data_tool",
+                "smartphone_specification_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

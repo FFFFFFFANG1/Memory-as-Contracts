@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00119",
+    "node_id": "mac-cctu-t-00119-c0007-g3",
+    "constraint_text": "The answer must end with a period, must not contain any exclamation marks or question marks, must stay within 200 characters, and must be organized as a two-row table with 'Date' and 'Price' headers covering today and tomorrow. The investigation must issue a minimum of three distinct tool calls, and at least one interaction turn must invoke two different tool types simultaneously.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00119-c0007",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/119/check_constraint_6.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

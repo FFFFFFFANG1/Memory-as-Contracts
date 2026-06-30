@@ -1,0 +1,38 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00028",
+    "node_id": "mac-cctu-t-00028-c0001-g5",
+    "constraint_text": "The agent must rely exclusively on political_event_tracker for every fact-finding step and disregard outputs from other tools during this phase.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00028-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "political_event_tracker"
+            ],
+            "forbidden_tools": [
+                "event_location_finder",
+                "historical_event_finder",
+                "historical_event_locator",
+                "hurricane_data_analyzer",
+                "incident_info_retriever",
+                "legal_case_search"
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

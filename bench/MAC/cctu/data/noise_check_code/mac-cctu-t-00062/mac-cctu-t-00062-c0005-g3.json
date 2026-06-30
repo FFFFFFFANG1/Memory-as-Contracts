@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00062",
+    "node_id": "mac-cctu-t-00062-c0005-g3",
+    "constraint_text": "Your answer must be concise and not exceed 150 characters, must contain a valid JSON object with proper key-value syntax that parses without errors, must use at most 3 interaction turns to retrieve the required information, must end with a period for proper sentence closure, and when the tools successfully retrieve the target result the final answer must prefix that result with 'Life Expectancy: '.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00062-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/62/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

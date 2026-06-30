@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00123",
+    "node_id": "mac-cctu-t-00123-c0002-g2",
+    "constraint_text": "The response must end with the phrase \"Total: [number] operas combined.\", where [number] is the actual sum derived from tool responses, the solution must be completed in at most 3 tool interaction turns, and the final answer must contain between 30 and 60 words.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00123-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/123/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

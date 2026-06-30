@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00186",
+    "node_id": "mac-cctu-t-00186-c0004-g1",
+    "constraint_text": "Before invoking geographical_proximity_finder, desert_feature_locator must have been executed; before scientific_discovery_finder, geographical_proximity_finder must have been executed; before research_location_finder, scientific_discovery_finder must have been executed; before geographical_area_calculator, research_location_finder must have been executed; before landmark_country_skyscraper_finder, geographical_area_calculator must have been executed; before building_info_retriever, landmark_country_skyscraper_finder must have been executed; and before advanced_calculator, building_info_retriever must have been executed. Each of desert_feature_locator, geographical_proximity_finder, scientific_discovery_finder, research_location_finder, geographical_area_calculator, landmark_country_skyscraper_finder, building_info_retriever, and advanced_calculator must be used at most one time across the solution, and geographical_area_calculator and landmark_country_skyscraper_finder must be invoked together in the same batched action turn.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00186-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/186/check_constraint_3.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

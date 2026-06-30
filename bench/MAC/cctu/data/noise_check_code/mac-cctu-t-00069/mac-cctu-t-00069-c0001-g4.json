@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00069",
+    "node_id": "mac-cctu-t-00069-c0001-g4",
+    "constraint_text": "You must use at least 5 interaction turns. When invoking the listed tools, follow the exact order business_magnate_identifier, historical_company_finder, company_device_inquiry, tech_phenomenon_mapper_v2, scientific_discovery_lookup, historical_figure_locator, regional_cuisine_identifier. Format the final answer in Markdown with headings and bullet points and conclude with the phrase 'Final Answer: [target dessert]' where [target dessert] is replaced with the identified dessert.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00069-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/69/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

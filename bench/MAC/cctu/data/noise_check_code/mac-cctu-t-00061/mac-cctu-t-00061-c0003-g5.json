@@ -1,0 +1,42 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00061",
+    "node_id": "mac-cctu-t-00061-c0003-g5",
+    "constraint_text": "Restrict all tool calls to stone_origin_locator and location_identifier and ignore any culinary or seafood tools entirely.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00061-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "location_identifier",
+                "stone_origin_locator"
+            ],
+            "forbidden_tools": [
+                "award_winner_finder",
+                "chef_dish_finder",
+                "delta_port_locator",
+                "landmark_country_locator",
+                "local_cuisine_explorer",
+                "organization_locator",
+                "person_location_finder",
+                "port_locator",
+                "professor_identifier",
+                "seafood_origin_locator",
+                "supplier_store_linker"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

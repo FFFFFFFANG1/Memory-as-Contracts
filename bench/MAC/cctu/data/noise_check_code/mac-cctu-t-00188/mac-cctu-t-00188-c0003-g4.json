@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00188",
+    "node_id": "mac-cctu-t-00188-c0003-g4",
+    "constraint_text": "All festival-related lookups must call cultural_event_locator and festival_identifier in the same action instruction before any capital_city_finder invocation.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00188-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "cultural_event_locator",
+                    "capital_city_finder"
+                ],
+                [
+                    "festival_identifier",
+                    "capital_city_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

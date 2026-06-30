@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00104",
+    "node_id": "mac-cctu-t-00104-c0005-g3",
+    "constraint_text": "Within the VolcanoEruptionImpactStudy project the agent must pair every historical_event_info_retriever call with a volcano_activity_analyzer call in the same interaction turn and present findings as a narrative summary rather than a table.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00104-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "historical_event_info_retriever",
+                    "volcano_activity_analyzer"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

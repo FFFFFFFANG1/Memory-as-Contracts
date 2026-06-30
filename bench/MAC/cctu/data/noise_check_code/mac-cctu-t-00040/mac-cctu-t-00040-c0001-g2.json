@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00040",
+    "node_id": "mac-cctu-t-00040-c0001-g2",
+    "constraint_text": "You must solve this by calling the provided tools, the total number of tool calls you make must be between 1 and 3, you must use at most one call to the historical_event_retriever tool, your final answer must be formatted using Markdown syntax with the ruling date in bold (e.g., **target date**), your response must end with a period, and your final response must not exceed 100 characters.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00040-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/40/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

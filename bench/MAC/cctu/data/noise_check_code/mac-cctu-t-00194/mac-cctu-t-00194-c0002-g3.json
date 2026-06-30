@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00194",
+    "node_id": "mac-cctu-t-00194-c0002-g3",
+    "constraint_text": "You must use the provided tools to answer the question, ensuring that the tool historical_infrastructure_info is called before the tool historical_event_retriever, and the tool literary_author_identifier is called before the tool historical_residence_finder. The agent may invoke the advanced_calculator tool at most 2 times and the historical_infrastructure_info tool at most 2 times. The total number of interaction rounds (tool calls) must not exceed 12. In at least one turn, the agent must invoke at least 2 unique tools simultaneously to improve efficiency. Do not answer the question directly; instead, use the tools to derive the answer step by step. The final answer must begin with the exact phrase: \"The number of years passed is: \" followed by the result in numerical form, and must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00194-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/194/check_constraint_1.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

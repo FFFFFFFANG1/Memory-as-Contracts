@@ -1,0 +1,33 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00126",
+    "node_id": "mac-cctu-t-00126-c0001-g1",
+    "constraint_text": "During the Rocket Launch Timeline Reconstruction project, you must call historical_rocket_data_retriever at least three times per query and cross-check each launch date with two independent tool responses before reporting.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00126-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "historical_rocket_data_retriever": {
+                    "min": 3,
+                    "max": null
+                }
+            }
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

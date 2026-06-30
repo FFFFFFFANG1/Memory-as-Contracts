@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00026",
+    "node_id": "mac-cctu-t-00026-c0004-c4",
+    "constraint_text": "Restrict all factual claims about candidate vote shares to figures cross-checked against at least two independent calls of the event_data_retriever tool before they are included in the briefing.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00026-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "event_data_retriever"
+            ],
+            "forbidden_tools": [
+                "astronomical_event_identifier",
+                "corporate_acquisition_lookup",
+                "disaster_impact_analyzer",
+                "earthquake_data_retriever",
+                "election_result_analyzer",
+                "event_personnel_identifier",
+                "historical_event_lookup",
+                "space_mission_identifier",
+                "space_mission_tracker"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00150",
+    "node_id": "mac-cctu-t-00150-c0005-c2",
+    "constraint_text": "The agent must restrict tool usage to historical_fact_retriever and artwork_artist_identifier and must avoid invoking botanical or geographical tools during scoping work.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00150-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "artwork_artist_identifier",
+                "historical_fact_retriever"
+            ],
+            "forbidden_tools": [
+                "botanical_discovery_finder",
+                "enhanced_calculator",
+                "individual_work_locator",
+                "lake_shape_identifier",
+                "largest_lake_finder",
+                "mountain_info_retriever",
+                "rare_flower_locator",
+                "river_width_calculator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

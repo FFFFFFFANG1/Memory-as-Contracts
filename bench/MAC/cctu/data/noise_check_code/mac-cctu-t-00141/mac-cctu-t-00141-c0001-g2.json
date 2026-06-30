@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00141",
+    "node_id": "mac-cctu-t-00141-c0001-g2",
+    "constraint_text": "The response must include the phrases '• Human: [X]' and '• Shark: [Y]' as delimiters before stating the difference. The solution must involve at least two separate tool calls to retrieve information about human and shark teeth. No individual tool may be called more than twice during this process, and the task must be completed within at most 3 interaction turns including all tool calls and the final response.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00141-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/141/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

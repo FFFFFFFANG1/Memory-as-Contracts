@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00047",
+    "node_id": "mac-cctu-t-00047-c0001-g1",
+    "constraint_text": "Format every final answer as a valid JSON object with a key 'casualties' containing the exact fatality count, keep the response between 10 and 30 words, use only a reasonable number of tool calls, and do not exceed a reasonable number of interaction turns.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00047-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/47/check_constraint_0.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

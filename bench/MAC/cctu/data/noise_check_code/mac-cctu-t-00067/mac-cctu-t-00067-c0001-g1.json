@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00067",
+    "node_id": "mac-cctu-t-00067-c0001-g1",
+    "constraint_text": "You must use tool calls to answer this question, and you can make at most 10 tool calls. The response must strictly conclude with the specific phrase 'The traditional hat is: [result].', where '[result]' is replaced by the actual name of the hat identified. If the agent intends to invoke the `cultural_artifact_identifier`, the `biographical_info_retriever` must strictly be executed beforehand. If the agent intends to invoke the `biographical_info_retriever`, the `geographer_identifier` must strictly be executed beforehand. If the agent intends to invoke the `geographer_identifier`, the `river_source_locator` must strictly be executed beforehand. If the agent intends to invoke the `river_source_locator`, the `river_locator` must strictly be executed beforehand. If the agent intends to invoke the `river_locator`, the `institution_location_finder` must strictly be executed beforehand. If the agent intends to invoke the `institution_location_finder`, the `academic_institution_locator` must strictly be executed beforehand. If the agent intends to invoke the `academic_institution_locator`, the `academic_founder_identifier` must strictly be executed beforehand.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00067-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/67/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

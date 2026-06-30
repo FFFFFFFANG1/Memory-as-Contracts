@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00004",
+    "node_id": "mac-cctu-t-00004-c0005-g1",
+    "constraint_text": "The answer must be formatted using Markdown syntax with bold text emphasizing the location. The solution must require between 2 and 5 interaction turns inclusive. The final answer must not exceed 50 words and must end with the identifier \"END\". The event_locator tool may be called at most 2 times during the process.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00004-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/4/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

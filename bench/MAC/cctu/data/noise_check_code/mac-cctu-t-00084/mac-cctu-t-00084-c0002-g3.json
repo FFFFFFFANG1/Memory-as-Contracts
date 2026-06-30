@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00084",
+    "node_id": "mac-cctu-t-00084-c0002-g3",
+    "constraint_text": "You must use the provided tools to find the answer, and you must complete the task with at most 10 tool calls. The agent is not allowed to call the 'literary_author_identifier' tool more than 1 time. The agent is not allowed to call the 'historical_contemporary_finder' tool more than 1 time. The agent is not allowed to call the 'literary_work_identifier' tool more than 1 time. The agent is not allowed to call the 'literary_character_finder' tool more than 1 time. The agent is not allowed to call the 'asteroid_name_matcher' tool more than 1 time. The agent is not allowed to call the 'astronomical_discovery_finder' tool more than 1 time. The agent is not allowed to call the 'biographical_lookup' tool more than 1 time. The agent is not allowed to call the 'national_symbol_finder' tool more than 1 time. The final answer must be concise and must be between 50 and 150 words in length.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00084-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/84/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

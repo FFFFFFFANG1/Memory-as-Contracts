@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00120",
+    "node_id": "mac-cctu-t-00120-c0001-g4",
+    "constraint_text": "The 'space_mission_info_retriever' must be invoked at least three times per task and cross-validated against 'celestial_discovery_info' before any conclusion is drawn.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00120-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "celestial_discovery_info": {
+                    "min": 3,
+                    "max": null
+                },
+                "space_mission_info_retriever": {
+                    "min": 3,
+                    "max": null
+                }
+            }
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

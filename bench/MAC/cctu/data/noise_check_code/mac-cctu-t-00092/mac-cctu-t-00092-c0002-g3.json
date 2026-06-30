@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00092",
+    "node_id": "mac-cctu-t-00092-c0002-g3",
+    "constraint_text": "The answer must be concise, at most 20 words, formatted as a valid JSON object with a single key \"answer\", with the final identified sport enclosed in double square brackets such as [[Baseball]] to serve as the unique identifier; tools in the sequence [capital_identifier, literary_award_search, author_works_finder, book_to_movie_adapter, film_metadata_retriever, biographical_data_search, country_sport_identifier] must be invoked in strict order with each used at most once.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00092-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/92/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

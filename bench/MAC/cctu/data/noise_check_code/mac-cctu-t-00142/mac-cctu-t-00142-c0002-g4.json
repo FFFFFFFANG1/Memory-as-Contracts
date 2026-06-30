@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00142",
+    "node_id": "mac-cctu-t-00142-c0002-g4",
+    "constraint_text": "If the agent intends to use the historical_event_date_finder, it must execute two distinct function calls within a single action step. Additionally, the historical_event_date_finder tool may be called at most 2 times during the entire task execution. The final response must start with the exact phrase \"The number of days is\" and end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00142-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "historical_event_date_finder",
+                    "historical_event_date_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/142/check_constraint_1.json"
+        }
+    }
+}

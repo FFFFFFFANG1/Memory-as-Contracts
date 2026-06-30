@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00166",
+    "node_id": "mac-cctu-t-00166-c0004-g1",
+    "constraint_text": "The solution must use between 8 and 12 total tool calls across all interaction steps, must complete within at most 15 interaction turns, and must emit a final answer as a JSON object whose sole key 'answer' maps to either 'Yes.' or 'No.' with the JSON itself ending in a period and containing no additional keys or metadata.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00166-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/166/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

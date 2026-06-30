@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00124",
+    "node_id": "mac-cctu-t-00124-c0005-g4",
+    "constraint_text": "The answer must be concise, contain at most 10 words, be structured as a valid JSON object with a single key-value pair where the key is \"days\" and the value is an integer indicating the number of days, and during the solution process there must be at least one interaction turn in which the agent invokes at least two unique tool types simultaneously, with the response ending in a period to ensure proper sentence closure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00124-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/124/check_constraint_4.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

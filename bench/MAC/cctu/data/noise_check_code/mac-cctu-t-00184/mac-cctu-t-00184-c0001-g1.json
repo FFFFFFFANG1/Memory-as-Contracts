@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00184",
+    "node_id": "mac-cctu-t-00184-c0001-g1",
+    "constraint_text": "During work on the Interdisciplinary Comparative Query Resolution project in the Multi-Hop Synthesis phase, invocations of `literary_verse_finder` must be paired with simultaneous invocations of `event_city_identifier` in the same action, and `park_feature_locator` may only be called after `biographical_data_retriever` has executed; the final response must contain the keyword \"Delimiting Identifier: [Comparison Result]\", be between 300 and 500 characters in length, and end with an exclamation mark.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00184-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "literary_verse_finder",
+                    "event_city_identifier"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/184/check_constraint_0.json"
+        }
+    }
+}

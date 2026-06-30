@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00133",
+    "node_id": "mac-cctu-t-00133-c0003-g1",
+    "constraint_text": "Format the answer as a valid JSON object containing the two distances in miles, using the keys \"flight_distance\" for the B-50 Superfortress Lucky Lady II and \"train_distance\" for the California Zephyr, and place the literal identifier \"DISTANCE_SEPARATOR\" between the flight_distance value and the train_distance value to clearly separate the two distances in the JSON output.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00133-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/133/check_constraint_2.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

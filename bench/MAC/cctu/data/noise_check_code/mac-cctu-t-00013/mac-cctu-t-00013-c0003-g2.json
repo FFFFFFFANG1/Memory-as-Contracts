@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00013",
+    "node_id": "mac-cctu-t-00013-c0003-g2",
+    "constraint_text": "The response must end with a period to ensure proper sentence closure and must be organized in a tabular format with a single row and column to clearly present the date, ensuring proper use of headers, consistent column widths, and alignment to enhance clarity and accessibility of the information.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00013-c0003",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/13/check_constraint_2.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

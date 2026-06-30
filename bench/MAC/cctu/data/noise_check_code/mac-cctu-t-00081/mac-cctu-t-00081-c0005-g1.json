@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00081",
+    "node_id": "mac-cctu-t-00081-c0005-g1",
+    "constraint_text": "Invocations must follow this strict ordering: geographic_feature_locator before space_agency_locator, space_agency_locator before satellite_launch_info_retriever, satellite_launch_info_retriever before corporate_partnership_finder, corporate_partnership_finder before software_algorithm_identifier, software_algorithm_identifier before algorithm_insight_extractor, algorithm_insight_extractor before math_formula_origin_finder, math_formula_origin_finder before biographical_info_finder, biographical_info_finder before cuisine_explorer, and cuisine_explorer before culinary_ingredient_identifier; each tool may be invoked at most once across the entire solution; the final answer must be written in Markdown with clear headings, bullet points, and emphasized terms, and must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00081-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/81/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

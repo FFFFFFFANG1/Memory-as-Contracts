@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00052",
+    "node_id": "mac-cctu-t-00052-c0001-g7",
+    "constraint_text": "Quick-summary replies must be delivered as a single sentence of no more than 25 words with no leading boilerplate.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00052-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": 25
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

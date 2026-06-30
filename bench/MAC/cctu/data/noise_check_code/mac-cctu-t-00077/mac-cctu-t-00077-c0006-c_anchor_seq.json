@@ -1,0 +1,52 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00077",
+    "node_id": "mac-cctu-t-00077-c0006-c_anchor_seq",
+    "constraint_text": "The answer must be formatted using Markdown syntax with proper headings, lists, bold/italic text, links, and code blocks, and must conclude with the exact phrase \"Answer: [dessert name].\" where [dessert name] is the specific dessert identified. The response must be produced within a maximum of 10 interaction rounds, must require between 7 and 10 tool calls, and must follow the strict tool order: historical_explorer_finder before exploration_history_analyzer, exploration_history_analyzer before mineral_resource_identifier, mineral_resource_identifier before industry_material_usage_finder, industry_material_usage_finder before economic_theory_influence_finder, economic_theory_influence_finder before historical_figure_locator, and historical_figure_locator before regional_cuisine_identifier. Each tool must complete successfully before the next is invoked, with no parallel execution permitted.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00077-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "historical_explorer_finder",
+                    "exploration_history_analyzer"
+                ],
+                [
+                    "exploration_history_analyzer",
+                    "mineral_resource_identifier"
+                ],
+                [
+                    "mineral_resource_identifier",
+                    "industry_material_usage_finder"
+                ],
+                [
+                    "industry_material_usage_finder",
+                    "economic_theory_influence_finder"
+                ],
+                [
+                    "economic_theory_influence_finder",
+                    "historical_figure_locator"
+                ],
+                [
+                    "historical_figure_locator",
+                    "regional_cuisine_identifier"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/77/check_constraint_5.json"
+        }
+    }
+}

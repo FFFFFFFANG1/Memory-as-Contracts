@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00098",
+    "node_id": "mac-cctu-t-00098-c0001-g4",
+    "constraint_text": "Restrict tool usage to business_district_locator and city_district_locator and produce a written scoping plan before any other tool is invoked.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00098-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "business_district_locator",
+                "city_district_locator"
+            ],
+            "forbidden_tools": [
+                "amenity_locator",
+                "business_rating_aggregator",
+                "nearby_business_locator",
+                "nearby_road_locator",
+                "political_event_finder",
+                "species_data_retriever",
+                "supplier_based_coworking_locator",
+                "supplier_relationship_finder",
+                "venue_capacity_checker"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

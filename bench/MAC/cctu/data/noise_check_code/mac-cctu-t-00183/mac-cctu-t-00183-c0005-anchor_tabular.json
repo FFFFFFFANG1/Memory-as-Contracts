@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00183",
+    "node_id": "mac-cctu-t-00183-c0005-anchor_tabular",
+    "constraint_text": "The answer must be obtained by invoking the provided tools and must include at least one interaction turn where two unique tool types are invoked simultaneously; if train_speed_analyzer is invoked, landmark_information_retriever must be invoked within the same interaction turn; the solution must be derived within a maximum of 10 interaction turns; the final answer must be presented in a tabular format with two columns Entity and Value separated by a delimiter such as a comma or tab, and the response must not use any period character",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00183-c0005",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/183/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

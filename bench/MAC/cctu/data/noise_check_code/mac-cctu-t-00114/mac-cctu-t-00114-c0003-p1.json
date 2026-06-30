@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00114",
+    "node_id": "mac-cctu-t-00114-c0003-p1",
+    "constraint_text": "Invoke the altitude_tool for the Rocky Mountains and the Alps as concurrent calls bundled into a single parallel action step, cap the entire solution at no more than 4 tool-call turns, and invoke altitude_tool at most 2 times across the whole solution.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00114-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "altitude_tool",
+                    "altitude_tool"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/114/check_constraint_2.json"
+        }
+    }
+}

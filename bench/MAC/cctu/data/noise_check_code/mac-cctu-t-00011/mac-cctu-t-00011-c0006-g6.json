@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00011",
+    "node_id": "mac-cctu-t-00011-c0006-g6",
+    "constraint_text": "Restrict all factual lookups to the maritime_incident_finder tool and reject any answer that cannot be sourced from a maritime incident record.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00011-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "maritime_incident_finder"
+            ],
+            "forbidden_tools": [
+                "election_result_fetcher",
+                "historical_event_search",
+                "historical_figure_identifier",
+                "political_event_retriever",
+                "political_leadership_tracker"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

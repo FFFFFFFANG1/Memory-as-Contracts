@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00072",
+    "node_id": "mac-cctu-t-00072-c0003-g4",
+    "constraint_text": "The answer must be formatted using Markdown syntax with headings, bold text, and bullet points to clearly outline each step in the solution process; the response must begin with the identifier \"### Final Answer:\" and must be at least 500 characters in length.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00072-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": 500,
+            "max": null
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/72/check_constraint_2.json"
+        }
+    }
+}

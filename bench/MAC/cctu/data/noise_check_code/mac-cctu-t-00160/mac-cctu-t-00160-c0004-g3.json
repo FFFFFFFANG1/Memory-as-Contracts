@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00160",
+    "node_id": "mac-cctu-t-00160-c0004-g3",
+    "constraint_text": "The museum_event_locator must be called before museum_artwork_locator. The total number of interaction rounds must be between 10 and 12 inclusive, and the total number of tool calls must be between 9 and 12. The agent's response must start with the phrase \"The sum of the founding year and the debut year is:\", include the keyword \"Academy founding year:\" before the academy's founding year and the keyword \"Singer debut year:\" before the singer's debut year, and end with the phrase \"calculated using the advanced_arithmetic_calculator.\" The response length must be between 150 and 200 words, formatted in Markdown with a heading for the final result, bold text for the keywords \"Academy founding year:\" and \"Singer debut year:\", and a clearly labeled section for the final calculation. The agent must perform at least one interaction turn invoking at least two unique tool types simultaneously, and the comprehensive_biographical_info_retriever must be called at most twice.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00160-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/160/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

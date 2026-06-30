@@ -1,0 +1,38 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00127",
+    "node_id": "mac-cctu-t-00127-c0007-g7",
+    "constraint_text": "Specification retrievals are restricted to the specification_retriever tool, and aircraft_specifications_retriever must not be used for any sub-task in this project.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00127-c0007",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "aircraft_specifications_retriever",
+                "specification_retriever"
+            ],
+            "forbidden_tools": [
+                "anatomical_info_retriever",
+                "comprehensive_biological_info_retriever",
+                "historical_event_finder",
+                "historical_sales_data_retriever",
+                "infrastructure_info_retriever",
+                "language_information_tool",
+                "unread_email_counter"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

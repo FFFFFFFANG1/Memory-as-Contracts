@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00077",
+    "node_id": "mac-cctu-t-00077-c0001-g1",
+    "constraint_text": "The response must be presented as a structured JSON object containing keys for 'reasoning_chain', 'tools_used', and 'final_answer', with no Markdown formatting anywhere in the output.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00077-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

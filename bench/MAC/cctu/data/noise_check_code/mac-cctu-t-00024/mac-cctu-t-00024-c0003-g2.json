@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00024",
+    "node_id": "mac-cctu-t-00024-c0003-g2",
+    "constraint_text": "Begin every final answer with the phrase \"The nurses were released on\" and return a valid JSON object containing the key \"release_date\" whose value is the exact date in \"YYYY-MM-DD\" format; complete the task in 1 to 3 interaction turns and use no more than 2 total tool calls.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00024-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/24/check_constraint_2.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

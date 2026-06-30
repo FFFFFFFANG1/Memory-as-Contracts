@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00149",
+    "node_id": "mac-cctu-t-00149-c0006-c1",
+    "constraint_text": "Limit the academic_score_retriever tool to a single invocation per sub-task and return each retrieved score as a one-line plaintext key-value pair with no formatting characters.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00149-c0006",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 2,
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

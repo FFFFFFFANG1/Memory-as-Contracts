@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00197",
+    "node_id": "mac-cctu-t-00197-c0001-g3",
+    "constraint_text": "Produce the final answer with at least 50 words that explicitly states both numerical values and compares the artifact's dollar price against the theater's seating capacity, structured as a valid JSON object with keys 'comparison' (containing the numerical values) and 'result' (stating whether the price exceeds the capacity); additionally, never invoke historical_affiliation_finder unless historian_finder has already been called in the trajectory, and never invoke astronomical_historian unless historical_affiliation_finder has already been executed in the trajectory.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00197-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/197/check_constraint_0.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

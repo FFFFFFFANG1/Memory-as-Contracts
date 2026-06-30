@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00087",
+    "node_id": "mac-cctu-t-00087-c0002-g2",
+    "constraint_text": "You must determine the answer by calling the provided tools, and your solution must involve between 3 and 5 tool calls to complete the task. The final answer must be between 5 and 10 words in length to ensure conciseness and clarity. Additionally, the final answer must be formatted using Markdown syntax, including appropriate headings and bold text to enhance clarity and structure. If the agent intends to invoke the `sports_team_venue_locator` function, the `sports_event_winner_retriever` function must be executed beforehand. If the agent intends to invoke the `stadium_info_retriever` function, the `sports_team_venue_locator` function must be executed beforehand. Parallel execution of these functions is not permitted.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00087-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/87/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

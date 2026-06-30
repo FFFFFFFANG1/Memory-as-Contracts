@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00116",
+    "node_id": "mac-cctu-t-00116-c0007-p3",
+    "constraint_text": "Final outputs must be compressed to a telegraph-style summary of no more than 40 words, with all numerals written as digits and all proper nouns capitalized.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00116-c0007",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": 40
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

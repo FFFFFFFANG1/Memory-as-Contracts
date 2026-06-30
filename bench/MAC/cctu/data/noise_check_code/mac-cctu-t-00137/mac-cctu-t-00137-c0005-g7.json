@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00137",
+    "node_id": "mac-cctu-t-00137-c0005-g7",
+    "constraint_text": "Render every delivered answer as a long-form narrative paragraph of at least 150 words summarizing comparative evolutionary context.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00137-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": 150,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

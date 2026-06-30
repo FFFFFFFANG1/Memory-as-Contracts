@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00016",
+    "node_id": "mac-cctu-t-00016-c0001-g7",
+    "constraint_text": "Within the Proxy Conflict Atlas project, every final answer must include a 'sources' array listing the names of all tools invoked, and the total number of tool calls must be at least three to satisfy redundancy checks.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00016-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

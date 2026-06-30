@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00047",
+    "node_id": "mac-cctu-t-00047-c0003-c3",
+    "constraint_text": "Your response must be between 10 and 30 words in length to ensure conciseness while including the exact casualty count, the agent must use an appropriate number of tool calls to arrive at the answer with the historical_event_data_retriever invoked at most twice, the total number of interaction turns must not exceed a reasonable limit, and the final answer must be formatted as a valid JSON object with a key 'casualties' containing the exact number of fatalities.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00047-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/47/check_constraint_2.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00136",
+    "node_id": "mac-cctu-t-00136-c0003-g3",
+    "constraint_text": "The solution must involve at least 2 interaction steps with at least one turn invoking two tool calls simultaneously, use no more than 5 total tool calls, call 'historical_event_tool' at most twice and only as two simultaneous calls in the same step, keep the response within 100 characters, end with a period, and conclude with 'Final Answer: [X days]'.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00136-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/136/check_constraint_2.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

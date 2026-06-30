@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00058",
+    "node_id": "mac-cctu-t-00058-c0004-n4",
+    "constraint_text": "The agent must not call 'cultural_information_retriever' more than 2 times during the process; the tool 'workshop_locator' must be called after the tool 'business_locator' in the execution sequence; the agent must complete the task in 6 to 8 interaction turns (inclusive); and the agent's final response must be formatted using Markdown syntax, including appropriate headings and bold text for clarity and structure, and must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00058-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/58/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

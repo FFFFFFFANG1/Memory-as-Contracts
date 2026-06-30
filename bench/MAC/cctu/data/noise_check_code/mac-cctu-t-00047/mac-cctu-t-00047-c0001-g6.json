@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00047",
+    "node_id": "mac-cctu-t-00047-c0001-g6",
+    "constraint_text": "Accompany every casualty figure with a narrative summary of at least 100 words covering perpetrator background, location context, and victim demographics.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00047-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": 100,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

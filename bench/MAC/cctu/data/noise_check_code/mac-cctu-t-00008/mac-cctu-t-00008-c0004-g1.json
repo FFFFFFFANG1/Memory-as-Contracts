@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00008",
+    "node_id": "mac-cctu-t-00008-c0004-g1",
+    "constraint_text": "For every answer, use Markdown formatting with the keyword \"Commander: \" immediately preceding the individual's name in bold, keep the total response under 50 words, end the first sentence with a question mark, and complete the task in at most two tool interaction rounds.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00008-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/8/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

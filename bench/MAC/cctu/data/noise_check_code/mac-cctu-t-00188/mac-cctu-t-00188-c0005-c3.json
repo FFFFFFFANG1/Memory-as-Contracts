@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00188",
+    "node_id": "mac-cctu-t-00188-c0005-c3",
+    "constraint_text": "During preliminary drafting, the agent may submit an outline-only response that lists the planned tool calls without executing them, and need not include final numeric comparisons.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00188-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "Permission-style constraint; default to followed when any trajectory exists."
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

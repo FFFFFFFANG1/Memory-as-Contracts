@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00027",
+    "node_id": "mac-cctu-t-00027-c0002-g5",
+    "constraint_text": "Restrict tool usage to `event_location_finder` for at most one call, and keep the total number of tool calls across all interaction turns to no more than two; no other constraints apply.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00027-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/27/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

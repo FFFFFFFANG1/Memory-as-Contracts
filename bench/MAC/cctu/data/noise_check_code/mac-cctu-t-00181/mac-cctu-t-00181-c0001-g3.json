@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00181",
+    "node_id": "mac-cctu-t-00181-c0001-g3",
+    "constraint_text": "During the entire Cultural Cross-Reference Inquiry project, the agent must ensure that at least one interaction turn invokes at least 2 unique tool types simultaneously, and the musical_composition_finder tool may be called at most 2 times across the project. The final answer must be a valid JSON object containing a \"result\" key whose value is the numerical product of the library's area and the year of the philosopher's first significant work, must not exceed 500 characters, and must end with the phrase \"Final Answer\" followed by the numerical result enclosed in a box, like \"Final Answer: $\\boxed{<result>}$\".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00181-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/181/check_constraint_0.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

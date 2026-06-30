@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00186",
+    "node_id": "mac-cctu-t-00186-c0003-g1",
+    "constraint_text": "Tool invocations must follow this strict order with each used at most once: desert_feature_locator, then geographical_proximity_finder, then scientific_discovery_finder, then research_location_finder, then geographical_area_calculator together with landmark_country_skyscraper_finder in the same batched step, then building_info_retriever, then advanced_calculator.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00186-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "geographical_area_calculator",
+                    "landmark_country_skyscraper_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/186/check_constraint_2.json"
+        }
+    }
+}

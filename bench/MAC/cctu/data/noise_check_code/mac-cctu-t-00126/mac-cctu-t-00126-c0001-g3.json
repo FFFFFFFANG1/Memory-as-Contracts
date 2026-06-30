@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00126",
+    "node_id": "mac-cctu-t-00126-c0001-g3",
+    "constraint_text": "You must obtain all information by calling the provided tools and not by answering the question directly. If a tool call fails, you must analyze the error, correct its parameters, and retry until success. You must invoke between 1 and 2 unique tool types simultaneously in at least one interaction turn, but must not invoke more than 2 unique tool types simultaneously in any turn. The total number of tool calls must be between 2 and 3 inclusive. Your final response must end with the phrase 'Based on historical records.' to indicate the source of the information.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00126-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "parallel_call_count",
+        "spec": {
+            "min": 1,
+            "max": 2,
+            "unit": "type"
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/126/check_constraint_0.json"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00159",
+    "node_id": "mac-cctu-t-00159-c0002-g4",
+    "constraint_text": "You must use the specified tools to obtain all information and ensure your response contains a valid JSON object with a \"comparison\" key holding a boolean and a \"reasoning\" key holding a string. Operations that identify the valley and the mine must be executed simultaneously in a single action turn using the `natural_feature_locator` and `subterranean_mine_locator` tools respectively. Use of `element_discovery_info` is permitted only after `mineral_finder` has already been executed. The total number of interaction turns must fall between 10 and 15, inclusive.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00159-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/159/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

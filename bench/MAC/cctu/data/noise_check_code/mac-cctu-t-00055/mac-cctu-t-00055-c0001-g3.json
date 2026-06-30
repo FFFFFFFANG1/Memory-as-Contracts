@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00055",
+    "node_id": "mac-cctu-t-00055-c0001-g3",
+    "constraint_text": "Your answer must contain a tabular format that clearly summarizes the chain of information retrieval steps and the final result, must include the delimiter \"###\" to separate the retrieval steps from the final result inside that table, must use between 5 and 7 tool calls overall, and must only invoke local_culture_explorer after historical_figure_locator has already been executed within the trajectory.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00055-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/55/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

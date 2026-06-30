@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00153",
+    "node_id": "mac-cctu-t-00153-c0002-g6",
+    "constraint_text": "City identifications must be resolved by invoking landmark_identifier as the primary tool, with city_feature_identifier and city_reputation_identifier only used as sequential confirmations afterward.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00153-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "landmark_identifier",
+                    "city_feature_identifier"
+                ],
+                [
+                    "landmark_identifier",
+                    "city_reputation_identifier"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

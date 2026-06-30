@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00120",
+    "node_id": "mac-cctu-t-00120-c0003-g1",
+    "constraint_text": "Document every candidate data source for follower metrics in a markdown comparison table before invoking any retrieval tool, and defer numerical extraction until that catalog is approved.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00120-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00131",
+    "node_id": "mac-cctu-t-00131-c0001-g3",
+    "constraint_text": "You must complete this task in a number of interaction turns that falls between 1 and 3, inclusive, and your response must end with a period to ensure proper sentence closure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00131-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "interaction_rounds",
+        "spec": {
+            "min": 1,
+            "max": 3
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/131/check_constraint_0.json"
+        }
+    }
+}

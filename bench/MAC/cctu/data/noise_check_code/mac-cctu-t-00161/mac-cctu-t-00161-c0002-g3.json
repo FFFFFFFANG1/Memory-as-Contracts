@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0002-g3",
+    "constraint_text": "Your response must be at least 200 words and provide a detailed justification of the reasoning steps. Prefix the final numerical answer with \"Final Answer:\" to separate it from the explanation. At least one interaction turn must invoke two distinct tool types simultaneously, and whenever cultural landmarks and their regions are identified, cultural_landmark_identifier and landmark_region_identifier must be executed concurrently within a single action step. Each tool type may be called at most once, with no more than 10 tool calls across the entire solution. Format the full response in Markdown using headings, lists, bold/italic emphasis, and code blocks for readability.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00161-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/161/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

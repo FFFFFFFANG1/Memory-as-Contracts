@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00099",
+    "node_id": "mac-cctu-t-00099-c0005-g1",
+    "constraint_text": "The agent must execute the historical_event_locator tool before invoking the average_altitude_calculator tool, must call each tool at most once, must keep the final answer between 10 and 50 words, and must begin the response with the identifier \"Answer Start: \".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00099-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/99/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

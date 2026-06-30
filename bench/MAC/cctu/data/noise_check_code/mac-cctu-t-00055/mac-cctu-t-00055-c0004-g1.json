@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00055",
+    "node_id": "mac-cctu-t-00055-c0004-g1",
+    "constraint_text": "Present the final answer in a tabular format that clearly summarizes the chain of information retrieval steps and the final result, insert the delimiter \"###\" between the retrieval-steps table and the final-result row, complete the task using between 5 and 7 tool calls in total, and invoke local_culture_explorer only after historical_figure_locator has already been executed in the trajectory.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00055-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "historical_figure_locator",
+                    "local_culture_explorer"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/55/check_constraint_3.json"
+        }
+    }
+}

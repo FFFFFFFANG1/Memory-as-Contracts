@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00170",
+    "node_id": "mac-cctu-t-00170-c0003-g2",
+    "constraint_text": "The agent must produce each deliverable as a flowing narrative paragraph with no tables, bullet lists, or numeric headers, and must weave all retrieved facts into a single descriptive prose block of at least 300 words.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00170-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": 300,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

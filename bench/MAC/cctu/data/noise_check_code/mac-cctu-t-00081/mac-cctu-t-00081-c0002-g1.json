@@ -1,0 +1,64 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00081",
+    "node_id": "mac-cctu-t-00081-c0002-g1",
+    "constraint_text": "The tools must be invoked exclusively in the following strict order, each at most once across the entire solution: geographic_feature_locator, then space_agency_locator, then satellite_launch_info_retriever, then corporate_partnership_finder, then software_algorithm_identifier, then algorithm_insight_extractor, then math_formula_origin_finder, then biographical_info_finder, then cuisine_explorer, then culinary_ingredient_identifier. The final answer must end with a period and be formatted in Markdown with clear headings, bullet points, and emphasized terms.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00081-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "geographic_feature_locator",
+                    "space_agency_locator"
+                ],
+                [
+                    "space_agency_locator",
+                    "satellite_launch_info_retriever"
+                ],
+                [
+                    "satellite_launch_info_retriever",
+                    "corporate_partnership_finder"
+                ],
+                [
+                    "corporate_partnership_finder",
+                    "software_algorithm_identifier"
+                ],
+                [
+                    "software_algorithm_identifier",
+                    "algorithm_insight_extractor"
+                ],
+                [
+                    "algorithm_insight_extractor",
+                    "math_formula_origin_finder"
+                ],
+                [
+                    "math_formula_origin_finder",
+                    "biographical_info_finder"
+                ],
+                [
+                    "biographical_info_finder",
+                    "cuisine_explorer"
+                ],
+                [
+                    "cuisine_explorer",
+                    "culinary_ingredient_identifier"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/81/check_constraint_1.json"
+        }
+    }
+}

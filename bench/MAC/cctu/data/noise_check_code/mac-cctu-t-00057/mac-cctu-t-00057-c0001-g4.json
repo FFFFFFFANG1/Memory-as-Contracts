@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00057",
+    "node_id": "mac-cctu-t-00057-c0001-g4",
+    "constraint_text": "The answer must be formatted using Markdown syntax, including elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure. The response must be between 300 and 500 words in length. If `academic_relationship_finder` is to be invoked, `literary_connection_finder` must be executed beforehand, and `literary_connection_finder` must not be invoked more than two times during this task.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00057-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/57/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

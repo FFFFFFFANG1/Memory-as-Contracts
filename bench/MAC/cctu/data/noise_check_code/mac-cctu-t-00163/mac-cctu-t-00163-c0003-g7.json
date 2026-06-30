@@ -1,0 +1,38 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00163",
+    "node_id": "mac-cctu-t-00163-c0003-g7",
+    "constraint_text": "Restrict altitude lookups to the altitude_finder tool only and report values in meters rounded to the nearest ten.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00163-c0003",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "altitude_finder"
+            ],
+            "forbidden_tools": [
+                "composer_identifier",
+                "historical_event_finder",
+                "historical_fact_finder",
+                "historical_figure_information",
+                "historical_landmark_locator",
+                "historical_maritime_event_finder",
+                "inventor_identifier",
+                "water_body_info_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

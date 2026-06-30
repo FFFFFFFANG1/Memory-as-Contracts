@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00025",
+    "node_id": "mac-cctu-t-00025-c0005-c6",
+    "constraint_text": "You must use the provided tools to obtain all information, may invoke the 'historical_event_retriever' function at most 2 times during the process, end the final answer with a period, format the response using Markdown syntax with proper use of elements like bold text, headings, or code blocks, explicitly include the keyword **Winter Olympics** in bold to denote the specific event being referenced, and ensure the answer is between 20 and 100 characters in length excluding spaces.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00025-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/25/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

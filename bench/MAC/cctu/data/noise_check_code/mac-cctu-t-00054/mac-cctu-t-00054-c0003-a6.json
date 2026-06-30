@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00054",
+    "node_id": "mac-cctu-t-00054-c0003-a6",
+    "constraint_text": "While gathering historical context, the agent must invoke 'historical_event_locator' at least twice with differing date ranges to corroborate any architectural attribution before trusting it.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00054-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

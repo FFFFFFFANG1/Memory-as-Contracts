@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00147",
+    "node_id": "mac-cctu-t-00147-c0001-g2",
+    "constraint_text": "You must answer using only data returned by tool calls and never from internal knowledge, cap the total tool calls at 4 across all turns, present the result as a table with the columns 'Event', 'Date (YYYY-MM-DD)', and 'Gap (Days)' where each event occupies one row and the final row reports the day gap between the two events, and keep the entire response between 300 and 500 characters in length.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00147-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/147/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00191",
+    "node_id": "mac-cctu-t-00191-c0007-g2",
+    "constraint_text": "The final answer must be presented as a valid JSON object containing the keys \"landmark_age\", \"mountain_height\", and \"comparison_result\" (true or false), use double colons (::) as the delimiter between key-value pairs, end with a period, be between 50 and 150 characters long, be derived using no more than 12 total tool calls, invoke between 2 and 4 unique tool types in at least one interaction turn, and use each individual tool at most 3 times.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00191-c0007",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/191/check_constraint_6.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

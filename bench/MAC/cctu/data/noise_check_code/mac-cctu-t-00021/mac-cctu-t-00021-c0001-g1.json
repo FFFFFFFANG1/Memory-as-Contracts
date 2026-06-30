@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00021",
+    "node_id": "mac-cctu-t-00021-c0001-g1",
+    "constraint_text": "Prefix the agreement's name in the final response with the literal identifier 'AGREEMENT:' so the name is clearly delimited, present the supporting facts in a properly aligned table with headers and consistent column widths, cap the total number of tool calls across all turns at three with at most one invocation of historical_agreement_finder, and ensure the response ends with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00021-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/21/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

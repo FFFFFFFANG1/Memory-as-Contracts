@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00143",
+    "node_id": "mac-cctu-t-00143-c0002-g2",
+    "constraint_text": "The agent must solve the task by calling the provided tools, present the final answer in a tabular format with columns for \"Species\" and \"Number of Ventricles\" and one row per species, complete the task within 2 to 3 interaction turns inclusive, keep the final response between 50 and 100 words, obtain all information through tool calls, and analyze and correct any failed tool calls until a successful solution is achieved.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00143-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/143/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

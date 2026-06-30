@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00089",
+    "node_id": "mac-cctu-t-00089-c0001-g3",
+    "constraint_text": "The agent must restrict its toolset to 'historical_landmark_locator', 'attraction_locator', 'cultural_geography_locator', and 'historical_region_locator', and must never call any hospital or supplier-related tool. The total number of tool calls must not exceed 4.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00089-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "attraction_locator",
+                "cultural_geography_locator",
+                "historical_landmark_locator",
+                "historical_region_locator"
+            ],
+            "forbidden_tools": [
+                "biographical_data_search",
+                "facility_locator",
+                "hospital_survival_rate_analyzer",
+                "medical_research_center_locator",
+                "nearby_supplier_locator",
+                "supplier_hospital_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

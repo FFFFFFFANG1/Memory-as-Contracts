@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00186",
+    "node_id": "mac-cctu-t-00186-c0002-g4",
+    "constraint_text": "If the agent intends to invoke the geographical_proximity_finder, the desert_feature_locator must strictly be executed beforehand; if the agent intends to invoke the scientific_discovery_finder, the geographical_proximity_finder must strictly be executed beforehand; if the agent intends to invoke the research_location_finder, the scientific_discovery_finder must strictly be executed beforehand; if the agent intends to invoke the geographical_area_calculator, the research_location_finder must strictly be executed beforehand; if the agent intends to invoke the landmark_country_skyscraper_finder, the geographical_area_calculator must strictly be executed beforehand; if the agent intends to invoke the building_info_retriever, the landmark_country_skyscraper_finder must strictly be executed beforehand; and if the agent intends to invoke the advanced_calculator, the building_info_retriever must strictly be executed beforehand. Each of the tools desert_feature_locator, geographical_proximity_finder, scientific_discovery_finder, research_location_finder, geographical_area_calculator, landmark_country_skyscraper_finder, building_info_retriever, and advanced_calculator mu\n...[truncated]",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00186-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/186/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

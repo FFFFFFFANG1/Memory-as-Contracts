@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00041",
+    "node_id": "mac-cctu-t-00041-c0004-g7",
+    "constraint_text": "Restrict the final answer to a maximum of 15 words and omit any proper-name highlighting so that briefings remain terse and uniformly styled.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00041-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": 15
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

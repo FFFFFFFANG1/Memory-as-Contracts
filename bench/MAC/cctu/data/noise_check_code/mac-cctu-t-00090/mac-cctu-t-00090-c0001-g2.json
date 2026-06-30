@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00090",
+    "node_id": "mac-cctu-t-00090-c0001-g2",
+    "constraint_text": "The solution must use a total of 8 to 12 interaction rounds (inclusive) between tool invocations and responses, ensuring efficiency while allowing for necessary retries.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00090-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "interaction_rounds",
+        "spec": {
+            "min": 8,
+            "max": 12
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/90/check_constraint_0.json"
+        }
+    }
+}

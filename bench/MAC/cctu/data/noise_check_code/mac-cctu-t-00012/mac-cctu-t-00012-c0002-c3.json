@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00012",
+    "node_id": "mac-cctu-t-00012-c0002-c3",
+    "constraint_text": "Responses must be between 10 and 30 words and formatted as a valid JSON object with proper key-value pairs, commas, colons, and quotation marks so they parse without errors. The agent must execute at most 2 tool calls in total across all interaction turns. The task must be completed within at most 2 interaction turns.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00012-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "notes": [
+            "mixed local heuristic fallback",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

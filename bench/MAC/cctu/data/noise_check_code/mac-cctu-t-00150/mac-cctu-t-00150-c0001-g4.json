@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00150",
+    "node_id": "mac-cctu-t-00150-c0001-g4",
+    "constraint_text": "While handling the River Hydrography Audit project, the agent must rely on river_width_calculator and largest_lake_finder as the primary tools and avoid invoking botanical or art-historical tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00150-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "river_width_calculator",
+                "largest_lake_finder"
+            ],
+            "forbidden_tools": [
+                "botanical_discovery_finder",
+                "rare_flower_locator",
+                "artwork_artist_identifier",
+                "individual_work_locator"
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

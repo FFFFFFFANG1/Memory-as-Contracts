@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00081",
+    "node_id": "mac-cctu-t-00081-c0004-g4",
+    "constraint_text": "If the agent intends to invoke the space_agency_locator, the geographic_feature_locator must strictly be executed beforehand. If the agent intends to invoke the satellite_launch_info_retriever, the space_agency_locator must strictly be executed beforehand. If the agent intends to invoke the corporate_partnership_finder, the satellite_launch_info_retriever must strictly be executed beforehand. If the agent intends to invoke the software_algorithm_identifier, the corporate_partnership_finder must strictly be executed beforehand. If the agent intends to invoke the algorithm_insight_extractor, the software_algorithm_identifier must strictly be executed beforehand. If the agent intends to invoke the math_formula_origin_finder, the algorithm_insight_extractor must strictly be executed beforehand. If the agent intends to invoke the biographical_info_finder, the math_formula_origin_finder must strictly be executed beforehand. If the agent intends to invoke the cuisine_explorer, the biographical_info_finder must strictly be executed beforehand. If the agent intends to invoke the culinary_ingredient_identifier, the cuisine_explorer must strictly be executed beforehand. Ea\n...[truncated]",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00081-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/81/check_constraint_3.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

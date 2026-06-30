@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00152",
+    "node_id": "mac-cctu-t-00152-c0003-g4",
+    "constraint_text": "Rank from earliest to latest: (a) the construction date of the architectural wonder located in the city with ancient aqueducts, (b) the publication year of the novel by the author known for exploring human nature in his works, and (c) the date the first manned spacecraft landed on the satellite facing our planet. Complete the task within at most 15 interaction turns, keep the final response at least 150 characters long, invoke at most 4 unique tool types in any single turn, and ensure the final response ends with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00152-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/152/check_constraint_2.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

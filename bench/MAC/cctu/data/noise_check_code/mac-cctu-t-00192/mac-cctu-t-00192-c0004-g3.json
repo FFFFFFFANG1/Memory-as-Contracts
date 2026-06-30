@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00192",
+    "node_id": "mac-cctu-t-00192-c0004-g3",
+    "constraint_text": "You must solve this using the provided tools and cannot rely on internal knowledge. You must not call the 'product_price_checker' function more than 2 times during the process. The total number of interaction turns must fall within a range of 6 to 8 (inclusive). The response must contain a table with two columns: \"Product\" and \"Price (USD)\", and the combined price must be clearly indicated in the table. The response must end with a period. If the agent chooses to invoke the 'car_price_analyzer' and 'product_price_comparator' functions, these must be executed concurrently.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00192-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/192/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

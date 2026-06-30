@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00119",
+    "node_id": "mac-cctu-t-00119-c0005-g1",
+    "constraint_text": "Every energy-market deliverable must end with a period, must not contain exclamation marks or question marks, must stay within 200 characters, and must be presented as a two-row table with 'Date' and 'Price' headers covering today and tomorrow; the underlying investigation must issue at least three distinct tool calls with at least one turn that simultaneously invokes two different tool types.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00119-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/119/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

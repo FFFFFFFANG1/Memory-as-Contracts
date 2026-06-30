@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00057",
+    "node_id": "mac-cctu-t-00057-c0002-g2",
+    "constraint_text": "Final answers must be formatted using Markdown syntax, including headings, lists, bold/italic text, links, and code blocks, and must be between 300 and 500 words in length. The literary_connection_finder must always be executed before any call to academic_relationship_finder, and literary_connection_finder must not be invoked more than two times during a task.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00057-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/57/check_constraint_1.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

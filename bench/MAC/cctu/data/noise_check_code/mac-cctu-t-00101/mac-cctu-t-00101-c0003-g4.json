@@ -1,0 +1,30 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00101",
+    "node_id": "mac-cctu-t-00101-c0003-g4",
+    "constraint_text": "The answer must be formatted in Markdown with the total number shown in bold and a bullet list giving the EU and UN language counts, the response must end with a period, and the entire solution must be completed within at most 3 interaction turns with the toolset.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00101-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template",
+            "removed tool call access for verifier final pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/101/check_constraint_2.json",
+            "repair": "response_only_final_review_fix"
+        }
+    }
+}

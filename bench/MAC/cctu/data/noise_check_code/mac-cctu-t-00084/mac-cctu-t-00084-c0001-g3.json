@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00084",
+    "node_id": "mac-cctu-t-00084-c0001-g3",
+    "constraint_text": "Use the provided tools to find the answer, complete the task with at most 10 tool calls, call literary_author_identifier, historical_contemporary_finder, literary_work_identifier, literary_character_finder, asteroid_name_matcher, astronomical_discovery_finder, biographical_lookup, and national_symbol_finder at most one time each, and deliver the final answer as a concise statement between 50 and 150 words.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00084-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/84/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

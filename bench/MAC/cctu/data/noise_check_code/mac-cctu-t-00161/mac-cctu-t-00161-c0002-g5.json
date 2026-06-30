@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0002-g5",
+    "constraint_text": "Restrict tool usage to natural_landmark_locator and geographical_feature_info, and exclude any tool that retrieves biological catalogs or biologist records from the workflow.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "geographical_feature_info",
+                "natural_landmark_locator"
+            ],
+            "forbidden_tools": [
+                "biologist_catalog_search",
+                "cultural_landmark_identifier",
+                "green_belt_identifier",
+                "historical_biological_catalog_query",
+                "historical_figure_residence_finder",
+                "historical_location_associator",
+                "landmark_city_identifier",
+                "landmark_identifier",
+                "landmark_region_identifier",
+                "tax_revenue_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

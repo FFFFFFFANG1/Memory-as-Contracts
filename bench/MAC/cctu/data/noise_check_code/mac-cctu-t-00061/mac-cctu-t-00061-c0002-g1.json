@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00061",
+    "node_id": "mac-cctu-t-00061-c0002-g1",
+    "constraint_text": "During the PortDiscovery phase, prioritize delta_port_locator over port_locator for any initial delta-region search and document the discovered port coordinates before moving on.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00061-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 2,
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

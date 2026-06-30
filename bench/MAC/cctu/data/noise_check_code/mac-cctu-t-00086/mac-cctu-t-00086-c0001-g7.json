@@ -1,0 +1,36 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00086",
+    "node_id": "mac-cctu-t-00086-c0001-g7",
+    "constraint_text": "Award-winner identification work must rely solely on 'award_winner_finder' and 'organization_locator', avoiding any cuisine or literary tools that could introduce off-topic context.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00086-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "award_winner_finder",
+                "organization_locator"
+            ],
+            "forbidden_tools": [
+                "regional_cuisine_explorer",
+                "literary_adaptation_finder",
+                "literary_author_finder"
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

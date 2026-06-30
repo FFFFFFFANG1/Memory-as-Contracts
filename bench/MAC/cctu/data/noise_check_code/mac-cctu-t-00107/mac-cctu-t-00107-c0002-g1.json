@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00107",
+    "node_id": "mac-cctu-t-00107-c0002-g1",
+    "constraint_text": "Limit the solution to exactly two distinct tool invocations, restrict each interaction turn to a single unique tool type, complete the entire process within one or two interaction turns, and keep the final response between 100 and 150 characters in length including spaces and numbers.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00107-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/107/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

@@ -1,0 +1,34 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00047",
+    "node_id": "mac-cctu-t-00047-c0002-c2",
+    "constraint_text": "Restrict casualty reporting to space mission incidents and route every lookup through the space_mission_identifier tool.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00047-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "space_mission_identifier"
+            ],
+            "forbidden_tools": [
+                "election_results_analyzer",
+                "event_casualty_tracker",
+                "historical_event_data_retriever",
+                "weather_info_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

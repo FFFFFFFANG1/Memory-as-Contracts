@@ -1,0 +1,36 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00190",
+    "node_id": "mac-cctu-t-00190-c0003-g1",
+    "constraint_text": "Rank the height of the largest waterfall visited by the artist who painted the famous mural in the city park, the capacity of the theater in the city where the poet who wrote the sonnet named after a celestial body resides, and the number of islands in the largest lake in the world from highest to lowest, returning the result as a valid JSON object containing the three ranked values, their numerical results, and an explicit ranking order; each tool may be called at most 3 times; artist_information_retriever must be executed before any call to historical_visit_locator or landmark_info_retriever; the total number of tool calls must be between 8 and 10.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00190-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "artist_information_retriever",
+                    "historical_visit_locator"
+                ],
+                [
+                    "artist_information_retriever",
+                    "landmark_info_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/190/check_constraint_2.json"
+        }
+    }
+}

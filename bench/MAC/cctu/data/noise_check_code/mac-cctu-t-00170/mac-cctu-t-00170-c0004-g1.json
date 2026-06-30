@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00170",
+    "node_id": "mac-cctu-t-00170-c0004-g1",
+    "constraint_text": "The agent must invoke between 1 and 4 unique tool types simultaneously in any single interaction turn, achieving the minimum of 1 in at least one turn and never exceeding 4 in any turn. The total number of interaction turns must fall within 8 to 10. The advanced_calculator function may be invoked at most 1 time during the solution process. The response must include the keywords \"Step X:\" for each major action or reasoning step, where X is a sequential number, to clearly delineate the logical progression of the solution. The final answer must be concise, not exceed 100 characters, and end with a period to ensure proper sentence closure. The final answer must contain a table that clearly shows the calculated difference between the flight distance and the train distance, with appropriate column headers and aligned data, including the two distances and the difference as distinct rows or columns. Additionally, the river_origin_locator must be invoked before the explorer_identifier, and the cultural_landmark_identifier must be invoked before the financial_hub_identifier.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00170-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/170/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

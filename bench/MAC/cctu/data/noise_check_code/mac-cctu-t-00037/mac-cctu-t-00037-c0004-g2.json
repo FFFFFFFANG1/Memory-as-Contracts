@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00037",
+    "node_id": "mac-cctu-t-00037-c0004-g2",
+    "constraint_text": "Your response must be formatted using Markdown syntax with appropriate elements such as headings or bold text to enhance clarity. The answer must be retrieved via the earthquake_event_retriever tool no more than once, and the solution must not require more than 2 total tool calls across all interaction steps. Your final response must include the exact phrase \"Earthquake Magnitude: [magnitude value]\" where [magnitude value] is replaced with the numeric magnitude retrieved from the tool, and must conclude with a period as the final punctuation mark.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00037-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/37/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

@@ -1,0 +1,56 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00186",
+    "node_id": "mac-cctu-t-00186-c0001-g3",
+    "constraint_text": "The desert_feature_locator must be executed before any call to geographical_proximity_finder; geographical_proximity_finder must be executed before scientific_discovery_finder; scientific_discovery_finder must be executed before research_location_finder; research_location_finder must be executed before geographical_area_calculator; geographical_area_calculator must be executed before landmark_country_skyscraper_finder; landmark_country_skyscraper_finder must be executed before building_info_retriever; and building_info_retriever must be executed before advanced_calculator. Each of desert_feature_locator, geographical_proximity_finder, scientific_discovery_finder, research_location_finder, geographical_area_calculator, landmark_country_skyscraper_finder, building_info_retriever, and advanced_calculator may be used at most once during the solution. The calls to geographical_area_calculator and landmark_country_skyscraper_finder must be issued together in the same step.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00186-c0001",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "desert_feature_locator",
+                    "geographical_proximity_finder"
+                ],
+                [
+                    "geographical_proximity_finder",
+                    "scientific_discovery_finder"
+                ],
+                [
+                    "scientific_discovery_finder",
+                    "research_location_finder"
+                ],
+                [
+                    "research_location_finder",
+                    "geographical_area_calculator"
+                ],
+                [
+                    "geographical_area_calculator",
+                    "landmark_country_skyscraper_finder"
+                ],
+                [
+                    "landmark_country_skyscraper_finder",
+                    "building_info_retriever"
+                ],
+                [
+                    "building_info_retriever",
+                    "advanced_calculator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/186/check_constraint_0.json"
+        }
+    }
+}

@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00159",
+    "node_id": "mac-cctu-t-00159-c0005-g5",
+    "constraint_text": "While reviewing the tool catalog, restrict tool invocations to read-only metadata lookups and avoid issuing any `mineral_finder` or `element_discovery_info` calls.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00159-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "element_discovery_info",
+                "mineral_finder"
+            ],
+            "forbidden_tools": [
+                "architectural_marvel_locator",
+                "biographical_information_retriever",
+                "celestial_body_surface_calculator",
+                "city_area_calculator",
+                "literary_reference_tool",
+                "natural_feature_locator",
+                "species_discovery_finder",
+                "subterranean_mine_locator",
+                "vehicle_specifications_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

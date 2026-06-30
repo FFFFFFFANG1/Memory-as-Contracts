@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00095",
+    "node_id": "mac-cctu-t-00095-c0001-g5",
+    "constraint_text": "Restrict tool usage strictly to company_headquarters_locator and employment_locator, and ignore all geographic or culinary-district tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00095-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "company_headquarters_locator",
+                "employment_locator"
+            ],
+            "forbidden_tools": [
+                "business_financial_data_retriever",
+                "chef_cuisine_locator",
+                "chef_supplier_locator",
+                "culinary_district_finder",
+                "cultural_instrument_identifier",
+                "cultural_music_explorer",
+                "district_identifier",
+                "fisherman_locator",
+                "nearby_business_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

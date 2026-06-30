@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00085",
+    "node_id": "mac-cctu-t-00085-c0002-g2",
+    "constraint_text": "Final responses for the Olympic Border Elevation Briefing must be concise, not exceed 10 characters in length, contain no punctuation marks except comma, and place the identifier Answer immediately before the numerical result; the full solution must complete within 5 to 8 interaction turns and use between 4 and 7 tool calls in total.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00085-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/85/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

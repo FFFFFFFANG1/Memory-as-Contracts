@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00158",
+    "node_id": "mac-cctu-t-00158-c0006-g2",
+    "constraint_text": "The agent's final response must begin with the phrase \"The answer is (a)\" or \"The answer is (b)\" depending on which value is higher, must use between 6 and 10 tool calls in total, must invoke scientific_discovery_finder before historical_site_locator, must invoke bestselling_book_author_finder before residence_finder, must invoke enhanced_nearby_national_park_locator before biodiversity_info_tool, must invoke at least one of the pairs (scientific_discovery_finder & bestselling_book_author_finder), (historical_site_locator & residence_finder), or (enhanced_nearby_national_park_locator & nearby_mountain_locator) in parallel within a single action step, must end with a period, and must contain a standard-syntax table with a header row and two columns presenting the compared value type (species count or mountain height) and the corresponding numeric value.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00158-c0006",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/158/check_constraint_5.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

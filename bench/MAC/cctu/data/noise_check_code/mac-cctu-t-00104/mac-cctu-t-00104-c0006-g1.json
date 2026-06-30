@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00104",
+    "node_id": "mac-cctu-t-00104-c0006-g1",
+    "constraint_text": "The agent must perform at least one interaction turn that invokes at least one unique tool type simultaneously. Whenever historical_event_info_retriever is used, it must be executed exactly twice within a single action step, and it must never be called more than twice in total during the task. The total number of tool calls across all interaction turns must not exceed three. The final answer must be presented in tabular format with at least three columns: one for event names, one for casualty numbers, and one explicitly showing the calculated difference between the two values.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00104-c0006",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/104/check_constraint_5.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

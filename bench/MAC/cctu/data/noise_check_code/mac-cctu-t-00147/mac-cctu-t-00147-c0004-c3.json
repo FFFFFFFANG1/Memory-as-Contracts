@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00147",
+    "node_id": "mac-cctu-t-00147-c0004-c3",
+    "constraint_text": "You must answer this by calling the available tools and not by internal knowledge. Additionally, you are allowed to use at most 4 tool calls in total across all interaction turns to complete this task. The final answer must be presented in a tabular format with the columns 'Event', 'Date (YYYY-MM-DD)', and 'Gap (Days)', with each row corresponding to an event and its date and the final row showing the calculated gap in days between the two events. The entire response must be between 300 and 500 characters long.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00147-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/147/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

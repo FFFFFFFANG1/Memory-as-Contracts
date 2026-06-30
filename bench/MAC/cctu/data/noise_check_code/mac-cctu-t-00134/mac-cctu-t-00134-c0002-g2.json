@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00134",
+    "node_id": "mac-cctu-t-00134-c0002-g2",
+    "constraint_text": "You must ensure that during the problem-solving process: 1) The number of unique tool types invoked simultaneously in any single interaction turn is between 1 and 2 (inclusive); 2) At least one interaction turn must include exactly 1 unique tool type; 3) No turn may exceed 2 unique tool types; 4) The total number of interaction turns must not exceed 3; 5) The final response must conclude with the phrase \"Days: [number]\" where [number] is the calculated difference in days; 6) The response must not include any punctuation marks in the ending phrase; and 7) The agent may invoke the historical_event_finder tool at most 2 times during the entire problem-solving process.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00134-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/134/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

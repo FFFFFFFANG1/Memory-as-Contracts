@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0007-g1",
+    "constraint_text": "Restrict every tool invocation to the green_belt_identifier and biologist_catalog_search tools, and produce only a bulleted shortlist of candidate biologists with no narrative summary.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0007",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "biologist_catalog_search",
+                "green_belt_identifier"
+            ],
+            "forbidden_tools": [
+                "cultural_landmark_identifier",
+                "geographical_feature_info",
+                "historical_biological_catalog_query",
+                "historical_figure_residence_finder",
+                "historical_location_associator",
+                "landmark_city_identifier",
+                "landmark_identifier",
+                "landmark_region_identifier",
+                "natural_landmark_locator",
+                "tax_revenue_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

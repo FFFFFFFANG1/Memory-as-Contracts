@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00154",
+    "node_id": "mac-cctu-t-00154-c0006-c1",
+    "constraint_text": "When invoking multiple tools, the agent must execute them concurrently in a single action, specifically pairing 'population_estimator' and 'river_length_calculator'; at least one interaction turn must invoke at least two unique tool types; 'historical_infrastructure_designer_finder' may be invoked at most twice; every response must begin with the phrase 'Answer: ' and end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00154-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/154/check_constraint_5.json",
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

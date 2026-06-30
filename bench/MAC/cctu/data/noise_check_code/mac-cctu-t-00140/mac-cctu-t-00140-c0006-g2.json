@@ -1,0 +1,53 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00140",
+    "node_id": "mac-cctu-t-00140-c0006-g2",
+    "constraint_text": "During the ToolDiscovery phase of HistoricalComparativeQA, the agent must probe each available tool at least once with an exploratory call and log the raw responses verbatim before drafting any answer.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00140-c0006",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "book_info_and_metadata_retriever": {
+                    "min": 1,
+                    "max": null
+                },
+                "historical_event_data_retriever": {
+                    "min": 1,
+                    "max": null
+                },
+                "historical_event_date_tool": {
+                    "min": 1,
+                    "max": null
+                },
+                "historical_event_tool": {
+                    "min": 1,
+                    "max": null
+                },
+                "historical_fact_retriever": {
+                    "min": 1,
+                    "max": null
+                },
+                "infrastructure_info_retriever": {
+                    "min": 1,
+                    "max": null
+                }
+            }
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

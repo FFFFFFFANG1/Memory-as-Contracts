@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00054",
+    "node_id": "mac-cctu-t-00054-c0002-g4",
+    "constraint_text": "Restrict tool usage to 'historical_location_finder' and 'traditional_food_finder' only, and avoid invoking any paleontological or architectural tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00054-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "historical_location_finder",
+                "traditional_food_finder"
+            ],
+            "forbidden_tools": [
+                "architect_material_locator",
+                "architectural_work_locator",
+                "geological_formation_comparator",
+                "historical_event_locator",
+                "paleontological_discovery_locator",
+                "paleontologist_discovery_finder",
+                "quarry_material_identifier",
+                "quarry_material_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

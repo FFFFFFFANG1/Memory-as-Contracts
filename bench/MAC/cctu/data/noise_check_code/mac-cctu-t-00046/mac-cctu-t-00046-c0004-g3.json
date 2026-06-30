@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00046",
+    "node_id": "mac-cctu-t-00046-c0004-g3",
+    "constraint_text": "Answers about the resulting entities of the Centura Health split must be presented in a table with two columns titled 'Company Name' and 'Resulting Company', with one row per company formed by the split, and the response must end with a period; the information must be obtained through the provided tools, the task must be completed in at most two interaction turns, and at most one tool call may be made in total.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00046-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/46/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

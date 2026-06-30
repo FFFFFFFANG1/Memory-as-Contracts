@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00129",
+    "node_id": "mac-cctu-t-00129-c0001-g2",
+    "constraint_text": "The agent must provide the answer within 2 to 8 interaction turns with the tools, may call each individual tool at most 3 times during the process, must keep the total number of tool calls across all interaction turns at no more than 5, and must invoke at most 2 unique tool types simultaneously in any single interaction turn.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00129-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "interaction_rounds",
+        "spec": {
+            "min": 2,
+            "max": 8
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/129/check_constraint_0.json"
+        }
+    }
+}

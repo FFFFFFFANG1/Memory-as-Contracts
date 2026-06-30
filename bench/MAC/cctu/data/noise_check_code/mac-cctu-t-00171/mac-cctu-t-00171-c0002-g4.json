@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00171",
+    "node_id": "mac-cctu-t-00171-c0002-g4",
+    "constraint_text": "Your answer must contain a valid JSON object with the structure {\"result\": \"<comparison_result>\", \"museum_capacity\": <number>, \"city_population\": <number>}, where result is exactly \"Yes\" or \"No\" and both numeric fields are integers taken directly from tool outputs; the response must end with the exact string 'END', population_data_retriever may be called at most 3 times across the solution, and the entire solution must finish within 10 interaction turns.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00171-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "notes": [
+            "mixed local heuristic fallback",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

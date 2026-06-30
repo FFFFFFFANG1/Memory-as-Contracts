@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00112",
+    "node_id": "mac-cctu-t-00112-c0001-g1",
+    "constraint_text": "Use the available tools to answer the question, keep the total number of tool calls at no more than 2, complete the task within at most 3 interaction turns, never invoke any single tool more than 2 times, end the final response with a period, include the phrase 'Total Casualties:' immediately before stating the sum, keep the final response between 50 and 100 characters in length, and when invoking 'historical_event_retriever' execute it for two distinct historical events in a single step.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00112-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/112/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

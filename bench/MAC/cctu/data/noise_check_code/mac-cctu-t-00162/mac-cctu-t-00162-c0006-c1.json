@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00162",
+    "node_id": "mac-cctu-t-00162-c0006-c1",
+    "constraint_text": "During preliminary scoping, restrict tool usage to `tribal_language_identifier` and `historical_city_identifier` only, and emit a short bulleted scoping memo rather than a final comparative answer.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00162-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "historical_city_identifier",
+                "tribal_language_identifier"
+            ],
+            "forbidden_tools": [
+                "architect_info_retriever",
+                "capital_city_finder",
+                "cultural_landmark_locator",
+                "ethnic_group_locator",
+                "event_attendance_tracker",
+                "event_locator",
+                "historical_hemisphere_locator_v2",
+                "historical_location_finder",
+                "venue_information_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

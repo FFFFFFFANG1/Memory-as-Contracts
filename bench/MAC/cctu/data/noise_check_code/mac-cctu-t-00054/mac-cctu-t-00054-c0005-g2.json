@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00054",
+    "node_id": "mac-cctu-t-00054-c0005-g2",
+    "constraint_text": "The 'paleontologist_discovery_finder' must be executed strictly before any invocation of 'paleontological_discovery_locator', and 'paleontologist_discovery_finder' must be called at most one time during the solution process. The final response must be formatted using Markdown syntax with proper headings, bold/italic text, lists, and code blocks, and must end with the phrase 'Final Answer: [traditional dessert name]'.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00054-c0005",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/54/check_constraint_4.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00130",
+    "node_id": "mac-cctu-t-00130-c0001-g3",
+    "constraint_text": "The solution must be completed in two to three interaction rounds with at least two separate tool calls to retrieve the required specifications, the product_and_appliance_specification_retriever tool must not be invoked more than two times in total, and the final response must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00130-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "interaction_rounds",
+        "spec": {
+            "min": 2,
+            "max": 3
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/130/check_constraint_0.json"
+        }
+    }
+}

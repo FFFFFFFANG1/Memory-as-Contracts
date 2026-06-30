@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00018",
+    "node_id": "mac-cctu-t-00018-c0002-g1",
+    "constraint_text": "Retrieve every piece of factual content by invoking the provided tools rather than relying on internal knowledge, and correct parameters and retry on any tool failure until it succeeds. Multiple tools may be called in parallel, but the historical_event_finder tool must be invoked at most once during the task. The total number of interaction turns must remain within the inclusive range of 1 to 3. The final response must end with a period and place a semicolon after the date to separate it from the surrounding context.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00018-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/18/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

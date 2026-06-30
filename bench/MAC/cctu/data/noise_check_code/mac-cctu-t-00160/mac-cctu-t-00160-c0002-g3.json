@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00160",
+    "node_id": "mac-cctu-t-00160-c0002-g3",
+    "constraint_text": "The museum_event_locator must be called before museum_artwork_locator; the total interaction rounds must fall between 10 and 12 inclusive; the total tool calls must fall between 9 and 12; the final response must start with \"The sum of the founding year and the debut year is:\", include the bold keyword \"Academy founding year:\" before the academy founding year and the bold keyword \"Singer debut year:\" before the singer debut year, and end with \"calculated using the advanced_arithmetic_calculator.\"; the response length must be between 150 and 200 words; the response must use Markdown with a heading for the final result and a clearly labeled section for the final calculation; at least one interaction turn must invoke at least two unique tool types simultaneously; and the comprehensive_biographical_info_retriever must be called at most 2 times.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00160-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/160/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

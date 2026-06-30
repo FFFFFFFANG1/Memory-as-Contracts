@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00180",
+    "node_id": "mac-cctu-t-00180-c0002-g2",
+    "constraint_text": "Rank the following from smallest to largest: (a) the annual number of visitors to the museum in the city where the inventor of the telephone was born, (b) the amount of rainfall in millimeters over a year in the region famous for its vineyards, and (c) the number of species inhabiting the coral reef known for its biodiversity; end the final answer with a period, obtain all information via tool calls (self-correcting on any failure), select at least two of museum_locator, climate_data_retriever, and biodiversity_database in a single action whenever a tool-invoking action is taken, and complete the task within at most 10 interaction turns.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00180-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/180/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

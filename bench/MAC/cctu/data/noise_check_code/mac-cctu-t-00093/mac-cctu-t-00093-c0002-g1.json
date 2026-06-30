@@ -1,0 +1,36 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00093",
+    "node_id": "mac-cctu-t-00093-c0002-g1",
+    "constraint_text": "For multi-hop retrieval queries about retail footfall in this project, the agent must invoke tools in the exact order urban_feature_locator, commercial_district_locator, business_locator, service_relationship_finder, mall_management_locator, footfall_analyzer, complete the full solution within 8 interaction rounds, and end the final response with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00093-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "urban_feature_locator",
+                    "commercial_district_locator",
+                    "business_locator",
+                    "service_relationship_finder",
+                    "mall_management_locator",
+                    "footfall_analyzer"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/93/check_constraint_1.json"
+        }
+    }
+}

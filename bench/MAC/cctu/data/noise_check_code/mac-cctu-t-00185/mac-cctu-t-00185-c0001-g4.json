@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00185",
+    "node_id": "mac-cctu-t-00185-c0001-g4",
+    "constraint_text": "The ancient_monument_finder tool may only be invoked after historical_residence_finder has already been executed; building_height_retriever may be used at most once; the final response must conclude with a definitive statement naming which option is taller along with both heights stated in meters, and must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00185-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "historical_residence_finder",
+                    "ancient_monument_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/185/check_constraint_0.json"
+        }
+    }
+}

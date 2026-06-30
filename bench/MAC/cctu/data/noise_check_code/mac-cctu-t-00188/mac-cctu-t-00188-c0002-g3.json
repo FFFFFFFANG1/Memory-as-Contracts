@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00188",
+    "node_id": "mac-cctu-t-00188-c0002-g3",
+    "constraint_text": "The answer must be concise and not exceed 150 words. Any invocation of biographical_info_retriever must be accompanied by a simultaneous invocation of invention_info_retriever in the same action instruction. At least two unique tool types must be invoked simultaneously in one interaction turn during the task. The final answer must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00188-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "biographical_info_retriever",
+                    "invention_info_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/188/check_constraint_1.json"
+        }
+    }
+}

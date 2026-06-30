@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00113",
+    "node_id": "mac-cctu-t-00113-c0001-g2",
+    "constraint_text": "Your response must be between 50 and 150 characters in length, including spaces and punctuation. Additionally, you may call the historical_event_tool at most 2 times during the task. Ensure that your final answer ends with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00113-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/113/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

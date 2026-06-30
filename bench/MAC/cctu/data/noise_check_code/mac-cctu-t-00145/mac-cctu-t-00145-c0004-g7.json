@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00145",
+    "node_id": "mac-cctu-t-00145-c0004-g7",
+    "constraint_text": "The final answer must be formatted in Markdown using headings, bold text, and lists, must include the exact delimiters \"### Laptops:\" and \"### Smartphones:\" to separate the per-category counts, must contain between 50 and 100 characters inclusive, and must end with a period; any invocation of merged_item_analyzer for the two categories must be issued as parallel calls in a single turn.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00145-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/145/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

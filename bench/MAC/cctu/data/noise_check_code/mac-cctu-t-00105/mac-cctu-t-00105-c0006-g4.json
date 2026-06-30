@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00105",
+    "node_id": "mac-cctu-t-00105-c0006-g4",
+    "constraint_text": "Any data-retrieval interaction turn must include at least one turn that simultaneously invokes two unique tool types; the 'historical_event_facts' and 'historical_crime_analyzer' tools may each be invoked no more than once; no more than 3 interaction turns may be used and at most 2 tool calls total may be made; the final answer must begin with the identifier \"Final Answer: \" followed by the calculated difference in the number of deaths, presented in a tabular format with columns \"Name\", \"Number of Deaths\", and \"Difference\", where the difference is calculated and displayed as the third row of the table.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00105-c0006",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/105/check_constraint_5.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

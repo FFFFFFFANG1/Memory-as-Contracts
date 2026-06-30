@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00168",
+    "node_id": "mac-cctu-t-00168-c0003-g3",
+    "constraint_text": "The agent must execute nearby_plant_locator before any invocation of specialty_beverage_locator, and whenever both fort_feature_locator and nearby_plant_locator are used they must be issued in the same action step. The final response must use the delimiter \"##\" to separate the novel's page count from the hospital's average daily patient count, and must be presented as a table containing exactly the rows \"Novel Page Count\" and \"Average Patients Treated Per Day\".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00168-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/168/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

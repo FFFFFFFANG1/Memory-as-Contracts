@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00045",
+    "node_id": "mac-cctu-t-00045-c0002-g3",
+    "constraint_text": "You must ensure that the 'historical_event_finder' tool is used no more than once during your solution process, and you must complete your response within at most 2 interaction turns including both tool calls and final answers.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00045-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/45/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

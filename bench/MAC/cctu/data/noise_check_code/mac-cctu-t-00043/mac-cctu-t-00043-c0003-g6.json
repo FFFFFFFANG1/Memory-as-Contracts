@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00043",
+    "node_id": "mac-cctu-t-00043-c0003-g6",
+    "constraint_text": "Restrict all tool usage to corporate_event_finder and produce succession timelines covering FTSE 100 chief executives, ignoring political leadership data.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00043-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "corporate_event_finder"
+            ],
+            "forbidden_tools": [
+                "election_results_analyzer",
+                "event_location_finder",
+                "game_release_date_finder",
+                "historical_event_date_finder",
+                "historical_event_locator",
+                "historical_event_retriever",
+                "incident_report_retriever"
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

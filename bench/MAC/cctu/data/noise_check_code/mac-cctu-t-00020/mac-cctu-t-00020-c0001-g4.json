@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00020",
+    "node_id": "mac-cctu-t-00020-c0001-g4",
+    "constraint_text": "The agent must obtain the answer by calling tools, is permitted to invoke the 'individual_movement_tracker' tool at most 2 times during the task, must complete the task within a maximum of 3 total interaction turns, the final response must not exceed 100 characters in length, must end with a period, and must be formatted using Markdown syntax with at least one bold text element.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00020-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/20/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

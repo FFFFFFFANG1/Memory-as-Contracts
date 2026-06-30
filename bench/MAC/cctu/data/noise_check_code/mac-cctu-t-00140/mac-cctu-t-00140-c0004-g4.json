@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00140",
+    "node_id": "mac-cctu-t-00140-c0004-g4",
+    "constraint_text": "The answer must be delivered as a complete sentence ending with a period, must conclude with the phrase \"This concludes the calculation.\", and must be formatted in Markdown using headings, lists, bold or italic emphasis, and code blocks as appropriate. The full solution must use no more than three tool calls in total, and at least one interaction turn must dispatch two or more tool calls in parallel to leverage concurrent execution.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00140-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/140/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

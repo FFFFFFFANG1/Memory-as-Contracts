@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00021",
+    "node_id": "mac-cctu-t-00021-c0006-g2",
+    "constraint_text": "Your answer must include the identifier 'AGREEMENT:' immediately before stating the name of the agreement, present the response in a tabular format using rows and columns with proper headers, consistent column widths, and aligned columns, cap the total number of tool calls across all interaction turns at three, invoke historical_agreement_finder at most once, and terminate the response with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00021-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/21/check_constraint_5.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

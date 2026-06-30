@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00075",
+    "node_id": "mac-cctu-t-00075-c0004-c3",
+    "constraint_text": "During initial scoping, restrict tool usage to `cultural_geography_locator` and `entity_location_finder` only, and defer all band, music, and choreographer lookups to later phases.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00075-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "cultural_geography_locator",
+                "entity_location_finder"
+            ],
+            "forbidden_tools": [
+                "choreographer_finder",
+                "cultural_info_retriever",
+                "education_history_retriever",
+                "fishing_activity_tracker",
+                "local_band_finder",
+                "music_origin_identifier",
+                "person_location_finder",
+                "population_data_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

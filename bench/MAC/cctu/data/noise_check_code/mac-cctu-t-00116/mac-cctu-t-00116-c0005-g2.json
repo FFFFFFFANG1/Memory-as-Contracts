@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00116",
+    "node_id": "mac-cctu-t-00116-c0005-g2",
+    "constraint_text": "The final answer must be returned as a single valid JSON object that parses without errors, contains the key \"Prüm_Explosion_Casualties\" mapped to the value retrieved for the Prüm explosion and the key \"SS_Noromic_Fire_Casualties\" mapped to the value retrieved for the SS Noronic fire separated by a comma, contains no trailing commas or semicolons or other invalid punctuation, is at least 150 characters long, is produced using no more than 5 tool calls in total, and includes at least one interaction turn that invokes at least 2 tool calls simultaneously.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00116-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/116/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

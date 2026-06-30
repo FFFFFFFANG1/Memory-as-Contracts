@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00121",
+    "node_id": "mac-cctu-t-00121-c0002-g6",
+    "constraint_text": "Restrict the working toolset to 'aviation_incident_database' and 'mountaineering_event_finder_v2', and ignore generic historical-event tools when sourcing casualty figures.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00121-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "aviation_incident_database",
+                "mountaineering_event_finder_v2"
+            ],
+            "forbidden_tools": [
+                "astronomical_data_tool",
+                "disaster_event_info_retriever",
+                "historical_event_finder",
+                "historical_event_finder_merged",
+                "historical_event_information_tool",
+                "historical_organization_info_retriever",
+                "merged_auction_price_tool",
+                "olympic_participation_estimator",
+                "university_enrollment_checker"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

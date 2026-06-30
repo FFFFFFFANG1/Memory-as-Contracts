@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00179",
+    "node_id": "mac-cctu-t-00179-c0005-c2",
+    "constraint_text": "The agent is permitted to invoke `academic_paper_finder` and `innovation_country_identifier` concurrently when both are required for the comparison, each listed tool may be invoked at most once per task, the agent must complete at least 6 interaction rounds, `biodiversity_database` must be called before `satellite_info_retriever`, and the final answer must contain the phrase \"Species Count: \" followed by the number, the phrase \"Satellite Weight (kg): \" followed by the weight, separated by a line containing \"---- Comparison ----\" before the final comparison statement, which itself must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00179-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "biodiversity_database",
+                    "satellite_info_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/179/check_constraint_4.json"
+        }
+    }
+}

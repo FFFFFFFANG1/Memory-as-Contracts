@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00096",
+    "node_id": "mac-cctu-t-00096-c0005-c1",
+    "constraint_text": "Limit the work to at most 8 interaction turns with the provided tools and keep the final answer to no more than 150 words. When the analysis begins with `urban_area_identifier`, follow the strict sequence `business_district_locator` -> `business_locator` -> `consulting_client_finder` -> `corporate_housing_locator` -> `rental_price_analyzer`. Do not invoke any single tool more than twice. Present the final answer as a table with at least two columns and two rows that clearly separates the key components (e.g., \"Step\" and \"Result\").",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00096-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/96/check_constraint_4.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

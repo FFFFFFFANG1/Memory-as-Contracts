@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00075",
+    "node_id": "mac-cctu-t-00075-c0006-c4",
+    "constraint_text": "The tool `cultural_geography_locator` must be called before `local_band_finder`, `music_origin_identifier`, `choreographer_finder`, `entity_location_finder`, and `cultural_info_retriever`. The total number of interaction turns must be between 6 and 8 inclusive. The `cultural_info_retriever` tool must be used at most 2 times. The response must end with a period and contain between 50 and 150 words. The final response must contain a valid JSON object with a key \"traditional_dance\" whose value is the answer.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00075-c0006",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/75/check_constraint_5.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

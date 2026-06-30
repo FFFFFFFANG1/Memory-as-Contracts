@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00098",
+    "node_id": "mac-cctu-t-00098-c0003-g3",
+    "constraint_text": "Solve the multi-hop supplier chain question using between 8 and 13 interaction turns inclusive and between 7 and 12 tool calls inclusive, and structure the final response so the explanation is introduced by the identifier [Chain of Relationships] and the resolved value is introduced by the identifier [Final Answer].",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00098-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_call_count",
+        "spec": {
+            "min": 7,
+            "max": 12
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/98/check_constraint_2.json"
+        }
+    }
+}

@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00054",
+    "node_id": "mac-cctu-t-00054-c0004-g1",
+    "constraint_text": "During preliminary scoping, restrict tool usage to 'historical_location_finder' and 'geological_formation_comparator' so the search space can be bounded before any specialized lookups are issued.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00054-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "geological_formation_comparator",
+                "historical_location_finder"
+            ],
+            "forbidden_tools": [
+                "architect_material_locator",
+                "architectural_work_locator",
+                "historical_event_locator",
+                "paleontological_discovery_locator",
+                "paleontologist_discovery_finder",
+                "quarry_material_identifier",
+                "quarry_material_locator",
+                "traditional_food_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

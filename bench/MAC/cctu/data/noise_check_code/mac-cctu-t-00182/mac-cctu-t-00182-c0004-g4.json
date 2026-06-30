@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00182",
+    "node_id": "mac-cctu-t-00182-c0004-g4",
+    "constraint_text": "The final answer must be formatted in Markdown syntax with headings, bold and italic emphasis, and explicit numerical comparisons, must omit all periods, and must end with the exact phrase \"**Answer:** (a) is more than (b)\" or \"**Answer:** (b) is more than (a)\" depending on the comparison; any use of the `cultural_heritage_locator` tool must be followed by a call to the `mountain_peak_identifier` tool, and at least one turn must dispatch two or more distinct tool types in parallel.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00182-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "cultural_heritage_locator",
+                    "mountain_peak_identifier"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/182/check_constraint_3.json"
+        }
+    }
+}

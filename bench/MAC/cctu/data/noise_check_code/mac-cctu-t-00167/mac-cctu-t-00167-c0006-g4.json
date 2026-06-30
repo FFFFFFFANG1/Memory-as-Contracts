@@ -1,0 +1,38 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00167",
+    "node_id": "mac-cctu-t-00167-c0006-g4",
+    "constraint_text": "Restrict literary lookups to the `literary_setting_search_v2` tool and avoid `poetry_theme_search` to keep settings-based citations consistent across the atlas entries.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00167-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "literary_setting_search_v2",
+                "poetry_theme_search"
+            ],
+            "forbidden_tools": [
+                "geographical_area_calculator",
+                "historical_residence_finder",
+                "historical_visit_locator",
+                "landmark_info_retriever",
+                "official_residence_locator",
+                "scientist_research_finder",
+                "urban_forest_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

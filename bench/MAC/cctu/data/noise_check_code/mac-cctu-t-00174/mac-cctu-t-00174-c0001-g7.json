@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00174",
+    "node_id": "mac-cctu-t-00174-c0001-g7",
+    "constraint_text": "For the GrandSlamStatisticsProject, restrict tool usage to grand_slam_winner_analyzer and arithmetic_calculator, and refuse to call any literary or architectural tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00174-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "arithmetic_calculator",
+                "grand_slam_winner_analyzer"
+            ],
+            "forbidden_tools": [
+                "architectural_design_locator",
+                "course_offering_finder",
+                "elevation_finder",
+                "historical_structure_identifier",
+                "institution_fact_finder",
+                "language_identifier",
+                "literary_setting_finder",
+                "novel_language_filter",
+                "play_budget_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

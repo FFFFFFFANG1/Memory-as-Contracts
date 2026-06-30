@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00176",
+    "node_id": "mac-cctu-t-00176-c0004-c4",
+    "constraint_text": "The agent must call restaurant_locator before any invocation of chef_dish_associator, must execute island_feature_locator and restaurant_locator in the same parallel action step, must keep total tool calls across the task at or below 15, must include at least one turn invoking two or more distinct tools, and must terminate the final response with a period followed by the phrase \"Tourist comparison completed.\"",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00176-c0004",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "parallel_call_count",
+        "spec": {
+            "min": 2,
+            "max": null,
+            "unit": "type"
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/176/check_constraint_3.json"
+        }
+    }
+}

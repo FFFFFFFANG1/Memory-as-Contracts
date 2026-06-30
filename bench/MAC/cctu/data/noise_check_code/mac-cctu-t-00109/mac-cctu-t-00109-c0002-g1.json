@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00109",
+    "node_id": "mac-cctu-t-00109-c0002-g1",
+    "constraint_text": "During the Initial Query Triage phase of the Primate Comparative Genomics project, the total number of tool calls must be in the range of 2 to 3, the response must end with a period, and the response must include the keyword \"Difference:\" immediately before stating the final numerical answer to explicitly delimit the result.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00109-c0002",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_call_count",
+        "spec": {
+            "min": 2,
+            "max": 3
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/109/check_constraint_1.json"
+        }
+    }
+}

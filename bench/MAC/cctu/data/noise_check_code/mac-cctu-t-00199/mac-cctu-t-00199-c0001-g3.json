@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00199",
+    "node_id": "mac-cctu-t-00199-c0001-g3",
+    "constraint_text": "You must complete this task using between 8 and 12 interaction turns, inclusive, and whenever multiple tools are invoked in one step, cultural_heritage_locator and nearby_reserve_locator must be called together in that same step.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00199-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "interaction_rounds",
+        "spec": {
+            "min": 8,
+            "max": 12
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/199/check_constraint_0.json"
+        }
+    }
+}

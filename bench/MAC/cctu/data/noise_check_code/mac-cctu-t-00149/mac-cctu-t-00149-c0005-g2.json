@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00149",
+    "node_id": "mac-cctu-t-00149-c0005-g2",
+    "constraint_text": "Your response must be fully formatted using Markdown syntax (including proper use of bold, italic, lists, or other elements), must conclude with the exact phrase \"Final Answer:\" followed by the comparison result in bold specifying both scores numerically and the relationship between them, must end with a period after the **Final Answer:** declaration, must ensure that no single interaction turn invokes more than one unique tool type simultaneously, and must limit the academic_score_retriever tool to no more than 2 calls in total during the solution process.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00149-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/149/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

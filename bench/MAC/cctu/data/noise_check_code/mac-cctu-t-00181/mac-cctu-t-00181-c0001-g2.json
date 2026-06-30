@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00181",
+    "node_id": "mac-cctu-t-00181-c0001-g2",
+    "constraint_text": "During the Initial Discovery Phase, the agent must restrict itself to a single tool call per interaction turn and must use city_feature_finder as the first investigative tool.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00181-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "city_feature_finder"
+            ],
+            "forbidden_tools": [
+                "architectural_style_locator",
+                "building_area_calculator",
+                "country_feature_locator",
+                "cultural_influence_finder",
+                "enhanced_arithmetic_calculator",
+                "historical_works_identifier",
+                "honor_locator",
+                "musical_composition_finder",
+                "nearby_mountain_range_locator",
+                "philosopher_work_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

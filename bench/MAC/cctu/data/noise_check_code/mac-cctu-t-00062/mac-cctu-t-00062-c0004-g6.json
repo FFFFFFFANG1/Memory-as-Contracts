@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00062",
+    "node_id": "mac-cctu-t-00062-c0004-g6",
+    "constraint_text": "Restrict tool usage to course_catalog_query and library_collection_locator and frame all outputs around school enrollment indicators.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00062-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "course_catalog_query",
+                "library_collection_locator"
+            ],
+            "forbidden_tools": [
+                "building_material_analyzer",
+                "event_location_finder",
+                "grape_variety_identifier",
+                "historical_civilization_identifier",
+                "historical_event_finder",
+                "life_expectancy_retriever",
+                "robotics_team_finder",
+                "train_service_info"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00188",
+    "node_id": "mac-cctu-t-00188-c0004-c3",
+    "constraint_text": "The answer must be concise and must not exceed 150 words. Additionally, if the agent chooses to invoke a biographical_info_retriever, then an invention_info_retriever must be invoked simultaneously in the same action instruction. At least 2 unique tool types must be invoked simultaneously in one interaction turn during the task. The answer must end with a period to ensure proper sentence closure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00188-c0004",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/188/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

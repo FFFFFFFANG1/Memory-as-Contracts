@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00058",
+    "node_id": "mac-cctu-t-00058-c0001-g6",
+    "constraint_text": "The agent must restrict all tool usage to 'landmark_locator' and 'institution_city_locator' and avoid invoking any music-related tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00058-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "institution_city_locator",
+                "landmark_locator"
+            ],
+            "forbidden_tools": [
+                "agricultural_locator",
+                "author_bibliography_search",
+                "business_locator",
+                "cultural_information_retriever",
+                "individual_region_locator",
+                "instrument_origin_locator",
+                "musician_composer_finder",
+                "national_symbol_finder",
+                "rental_price_analyzer",
+                "workshop_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

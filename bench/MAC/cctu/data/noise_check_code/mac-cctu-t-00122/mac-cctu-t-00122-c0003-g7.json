@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00122",
+    "node_id": "mac-cctu-t-00122-c0003-g7",
+    "constraint_text": "Inventory replies must be limited to under 20 characters and contain only the final numeric total.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00122-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": null,
+            "max": 20
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

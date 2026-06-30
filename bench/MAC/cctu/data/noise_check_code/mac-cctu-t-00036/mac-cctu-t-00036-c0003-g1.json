@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00036",
+    "node_id": "mac-cctu-t-00036-c0003-g1",
+    "constraint_text": "Responses must be between 30 and 50 words, must include the BMI value and classification needed to determine normality, must be formatted in Markdown using headings, bold/italic text, and lists for readability, and must invoke the 'bmi_calculator' tool no more than 2 times in total.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00036-c0003",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/36/check_constraint_2.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

@@ -1,0 +1,61 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00049",
+    "node_id": "mac-cctu-t-00049-c0002-g7",
+    "constraint_text": "Within the QuickFactSampler project's RapidTriagePhase, email_query_tool must be invoked first to check for prior analyst notes before any other tool is called.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00049-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "email_query_tool",
+                    "astronomical_discovery_finder"
+                ],
+                [
+                    "email_query_tool",
+                    "disaster_impact_analyzer"
+                ],
+                [
+                    "email_query_tool",
+                    "event_location_finder"
+                ],
+                [
+                    "email_query_tool",
+                    "event_participation_finder"
+                ],
+                [
+                    "email_query_tool",
+                    "geopolitical_event_finder"
+                ],
+                [
+                    "email_query_tool",
+                    "historical_event_retriever"
+                ],
+                [
+                    "email_query_tool",
+                    "space_mission_info_retriever"
+                ],
+                [
+                    "email_query_tool",
+                    "sports_event_winner_retriever"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

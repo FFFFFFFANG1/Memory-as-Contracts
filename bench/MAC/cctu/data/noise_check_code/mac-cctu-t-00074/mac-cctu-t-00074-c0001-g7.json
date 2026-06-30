@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00074",
+    "node_id": "mac-cctu-t-00074-c0001-g7",
+    "constraint_text": "Within the SportsHeritageAudit project, retrieve sports_statistics_retriever data for the relevant town before issuing any architectural or museum lookup.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00074-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "sports_statistics_retriever",
+                    "architect_info_finder"
+                ],
+                [
+                    "sports_statistics_retriever",
+                    "museum_locator"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

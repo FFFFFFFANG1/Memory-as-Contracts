@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00088",
+    "node_id": "mac-cctu-t-00088-c0006-c1",
+    "constraint_text": "Limit total tool calls to between 3 and 5 inclusive, keep the final response between 50 and 100 words ending with a period, call each unique tool at most once, only invoke bridge_identifier after event_locator has executed, and only invoke infrastructure_info_retriever after bridge_identifier has executed successfully.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00088-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/88/check_constraint_5.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

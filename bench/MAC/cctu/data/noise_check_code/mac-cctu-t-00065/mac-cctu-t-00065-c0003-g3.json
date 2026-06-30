@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00065",
+    "node_id": "mac-cctu-t-00065-c0003-g3",
+    "constraint_text": "You must obtain all information through tool calls, retrying with corrected parameters if errors occur, and you may use each unique tool type at most twice during the task; the final answer must be formatted in Markdown with bold key terms, a dedicated \"Final Answer\" heading, and must conclude with the exact phrase \"Final Answer: **[the identified mountain]**\".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00065-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/65/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00102",
+    "node_id": "mac-cctu-t-00102-c0003-g6",
+    "constraint_text": "The agent must invoke every tool listed in its toolbox at least once to demonstrate coverage during the audit exercise.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00102-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "anatomical_info_retriever",
+                "historical_event_finder",
+                "historical_event_info_retriever",
+                "smartphone_specification_retriever",
+                "subscription_price_checker_merged",
+                "treaty_search_tool"
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

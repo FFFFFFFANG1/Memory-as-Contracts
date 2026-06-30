@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00167",
+    "node_id": "mac-cctu-t-00167-c0001-g1",
+    "constraint_text": "During the initial_research phase, restrict yourself to invoking exactly one tool per interaction turn so that intermediate evidence can be logged individually.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00167-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "initial_research"
+            ],
+            "forbidden_tools": [
+                "geographical_area_calculator",
+                "historical_residence_finder",
+                "historical_visit_locator",
+                "landmark_info_retriever",
+                "literary_setting_search_v2",
+                "official_residence_locator",
+                "poetry_theme_search",
+                "scientist_research_finder",
+                "urban_forest_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

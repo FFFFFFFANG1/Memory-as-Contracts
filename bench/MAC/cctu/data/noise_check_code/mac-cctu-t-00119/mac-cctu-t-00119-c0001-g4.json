@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00119",
+    "node_id": "mac-cctu-t-00119-c0001-g4",
+    "constraint_text": "Forecast answers must be expanded to at least 600 characters and include a narrative paragraph describing OPEC policy, refinery throughput, and seasonal demand drivers in addition to any price figures.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00119-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": 600,
+            "max": null
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

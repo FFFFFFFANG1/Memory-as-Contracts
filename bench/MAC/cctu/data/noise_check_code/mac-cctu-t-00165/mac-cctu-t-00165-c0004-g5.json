@@ -1,0 +1,69 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00165",
+    "node_id": "mac-cctu-t-00165-c0004-g5",
+    "constraint_text": "The film_award_winner_finder tool must be invoked as the first action of every workflow, ahead of any geographic or venue lookup.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00165-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "film_award_winner_finder",
+                    "artwork_information_retriever"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "city_feature_identifier"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "cultural_landmark_finder"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "geographical_feature_identifier"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "geological_verification_finder"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "historical_landmark_identifier"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "historical_event_locator"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "museum_locator"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "personal_location_finder"
+                ],
+                [
+                    "film_award_winner_finder",
+                    "venue_information_retriever"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

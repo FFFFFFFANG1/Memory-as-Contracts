@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00011",
+    "node_id": "mac-cctu-t-00011-c0002-g4",
+    "constraint_text": "Your response must be formatted entirely using Markdown syntax, including appropriate use of bold, headings, or other elements to clearly present the answer. Ensure the response ends with a period to maintain proper sentence closure. The response must begin with the phrase \"**The answer is: **\" followed by the answer in bold formatting. You may use each tool type at most 2 times during your problem-solving process, and you must complete this task with a total of no more than 3 tool calls across all interaction turns.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00011-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/11/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

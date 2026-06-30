@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00079",
+    "node_id": "mac-cctu-t-00079-c0005-c5",
+    "constraint_text": "Restrict all outgoing tool calls to `landmark_identifier` and `valley_river_locator`, and require at least 12 interaction turns before producing the final answer.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00079-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "landmark_identifier": {
+                    "min": 12,
+                    "max": null
+                },
+                "valley_river_locator": {
+                    "min": 12,
+                    "max": null
+                }
+            }
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

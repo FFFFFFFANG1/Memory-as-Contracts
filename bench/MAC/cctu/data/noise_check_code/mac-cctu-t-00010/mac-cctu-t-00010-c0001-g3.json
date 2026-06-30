@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00010",
+    "node_id": "mac-cctu-t-00010-c0001-g3",
+    "constraint_text": "You must answer by calling the provided tools. The total number of tool calls across all interaction turns must not exceed 3, and the final answer must be a valid JSON object with a key \"location\" specifying the country where the event occurred.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00010-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/10/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

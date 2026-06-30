@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00054",
+    "node_id": "mac-cctu-t-00054-c0001-g1",
+    "constraint_text": "Invocations of 'paleontological_discovery_locator' must be preceded by a successful execution of 'paleontologist_discovery_finder', the tool 'paleontologist_discovery_finder' must be called at most once during the solution, and the final response must be formatted in Markdown with proper headings, bold/italic text, lists, and code blocks, ending with the phrase 'Final Answer: [traditional dessert name]'.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00054-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "paleontologist_discovery_finder",
+                    "paleontological_discovery_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/54/check_constraint_0.json"
+        }
+    }
+}

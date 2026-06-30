@@ -1,0 +1,31 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00080",
+    "node_id": "mac-cctu-t-00080-c0004-g5",
+    "constraint_text": "In the Culinary Heritage Mapping project's ingredient_sourcing phase, the agent must invoke `culinary_ingredient_identifier` and `product_origin_finder` once each before any geographic tool is used.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00080-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "culinary_ingredient_identifier",
+                "ingredient_sourcing",
+                "product_origin_finder"
+            ],
+            "forbidden_tools": []
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

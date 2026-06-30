@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00119",
+    "node_id": "mac-cctu-t-00119-c0004-g2",
+    "constraint_text": "Every Texas energy forecast deliverable must end with a period, contain no exclamation marks or question marks, stay within 200 characters, and be presented as a two-row table with 'Date' and 'Price' headers covering today and tomorrow; the supporting investigation must issue at least three distinct tool calls including one interaction turn that invokes two different tool types simultaneously.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00119-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/119/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

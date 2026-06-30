@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00184",
+    "node_id": "mac-cctu-t-00184-c0006-g5",
+    "constraint_text": "The agent must restrict tool usage to `literary_verse_finder` and `biographical_data_retriever` only, and must defer all geographic and demographic lookups to a later phase.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00184-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "biographical_data_retriever",
+                "literary_verse_finder"
+            ],
+            "forbidden_tools": [
+                "event_city_identifier",
+                "explorer_naming_finder",
+                "highest_point_locator",
+                "ice_sheet_thickness_calculator",
+                "lake_volume_calculator",
+                "landmark_info_retriever_v2",
+                "music_metadata_retriever",
+                "park_feature_locator",
+                "population_data_retriever",
+                "population_data_retriever_v2"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

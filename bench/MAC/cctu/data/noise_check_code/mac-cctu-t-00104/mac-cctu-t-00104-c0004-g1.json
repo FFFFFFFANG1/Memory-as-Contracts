@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00104",
+    "node_id": "mac-cctu-t-00104-c0004-g1",
+    "constraint_text": "During the IndustrialAccidentComparativeAnalysis project, the agent must perform at least one interaction turn where it invokes a unique tool type simultaneously; if the historical_event_info_retriever tool is used, it must be invoked exactly twice within a single action step; the historical_event_info_retriever tool may not be called more than twice in total during the task; the total number of tool calls across all interaction turns must not exceed three; and the final answer must be presented in a tabular format with at least three columns covering event names, casualty numbers, and the calculated difference between the two values.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00104-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "historical_event_info_retriever",
+                    "historical_event_info_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/104/check_constraint_3.json"
+        }
+    }
+}

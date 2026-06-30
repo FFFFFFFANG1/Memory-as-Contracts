@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00049",
+    "node_id": "mac-cctu-t-00049-c0001-g1",
+    "constraint_text": "You must solve this by calling the available tools and not by directly answering the question. If a tool call fails, you must analyze the error, correct the parameters, and retry until you arrive at an answer. You are allowed to make at most 5 interaction rounds to solve this. Additionally, the geopolitical_event_finder tool can be invoked at most 2 times during the task. The final answer must be presented in a tabular format, including at least the date, location, involved parties, and a description of the event. The final answer must conclude with the country name in bold. Furthermore, the final answer must be between 50 and 150 characters long, inclusive, to ensure conciseness and clarity.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00049-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/49/check_constraint_0.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

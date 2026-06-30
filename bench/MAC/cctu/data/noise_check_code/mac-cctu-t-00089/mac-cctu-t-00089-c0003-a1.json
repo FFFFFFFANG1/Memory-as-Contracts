@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00089",
+    "node_id": "mac-cctu-t-00089-c0003-a1",
+    "constraint_text": "Any invocation of 'supplier_hospital_locator' must occur before any call to 'hospital_survival_rate_analyzer'. The total number of tool calls must be between 5 and 8 inclusive. The final answer must be formatted using Markdown syntax including proper headings, lists, bold or italic text, and code blocks to enhance readability and structure, and must end with a period to ensure proper sentence closure.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00089-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/89/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

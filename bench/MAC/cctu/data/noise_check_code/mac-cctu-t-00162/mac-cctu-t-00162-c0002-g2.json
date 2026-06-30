@@ -1,0 +1,52 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00162",
+    "node_id": "mac-cctu-t-00162-c0002-g2",
+    "constraint_text": "Determine the higher value between (a) the attendance of the parade held in the capital of the land where the tribe converses in a language related to the institute researching ancient civilizations, and (b) the capacity of the famous theater in the city considered the heart of the Renaissance. The response must be concise and not exceed 500 words. For part (a), the agent must execute tribal_language_identifier, then ethnic_group_locator, then capital_city_finder in that order before invoking event_attendance_tracker, and must run event_locator and event_attendance_tracker after that sequence. For part (b), the agent must execute historical_city_identifier and then cultural_landmark_locator before invoking venue_information_retriever. The total number of tool calls must remain within 6 to 10. The final comparison of the two values must be presented as a table with rows for each value and columns for the description and numeric value, using the '||' symbol to separate columns.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00162-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "tribal_language_identifier",
+                    "ethnic_group_locator"
+                ],
+                [
+                    "ethnic_group_locator",
+                    "capital_city_finder"
+                ],
+                [
+                    "capital_city_finder",
+                    "event_locator"
+                ],
+                [
+                    "event_locator",
+                    "event_attendance_tracker"
+                ],
+                [
+                    "historical_city_identifier",
+                    "cultural_landmark_locator"
+                ],
+                [
+                    "cultural_landmark_locator",
+                    "venue_information_retriever"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/162/check_constraint_1.json"
+        }
+    }
+}

@@ -1,0 +1,21 @@
+def evaluate(trace):
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
+    ok = True
+    evidence = []
+    reasons = []
+    marks = ['**', '__', '`', '# ', '- ', '* ']
+    if not any(mark in response for mark in marks):
+        ok = False
+        reasons.append('format marker missing')
+    has_digit = any(ch.isdigit() for ch in response)
+    if not has_digit:
+        ok = False
+        reasons.append('numeric date-like value missing')
+    if not response.split():
+        ok = False
+        reasons.append('response text missing')
+    if ok:
+        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
+    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}

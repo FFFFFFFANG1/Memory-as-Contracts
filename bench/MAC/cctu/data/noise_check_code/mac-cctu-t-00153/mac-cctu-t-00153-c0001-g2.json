@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00153",
+    "node_id": "mac-cctu-t-00153-c0001-g2",
+    "constraint_text": "Your answer must be derived by calling between 6 and 10 tool calls in total across all interaction turns, the city_feature_identifier and city_reputation_identifier tools must be invoked together in a single action step, and each of city_feature_identifier, city_reputation_identifier, artist_location_finder, artwork_valuation_tool, company_locator, and financial_data_retriever may be invoked at most 2 times during the solution process.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00153-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_call_count",
+        "spec": {
+            "min": 6,
+            "max": 10
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/153/check_constraint_0.json"
+        }
+    }
+}

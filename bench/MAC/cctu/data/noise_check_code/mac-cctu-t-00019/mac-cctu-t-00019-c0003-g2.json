@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00019",
+    "node_id": "mac-cctu-t-00019-c0003-g2",
+    "constraint_text": "Your response must end with the exact phrase \"Casualties: **X**\", where X is the numerical answer, and the historical_event_data_retriever tool must be invoked no more than once to obtain this information.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00019-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/19/check_constraint_2.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

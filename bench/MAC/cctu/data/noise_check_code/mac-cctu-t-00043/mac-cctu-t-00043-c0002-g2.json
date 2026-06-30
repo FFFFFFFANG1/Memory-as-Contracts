@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00043",
+    "node_id": "mac-cctu-t-00043-c0002-g2",
+    "constraint_text": "You must derive the answer using tool calls within a maximum of 3 interaction turns, ensure that the total number of tool calls executed across all interaction turns is between 1 and 3, and begin your final response with the exact phrase \"The date is\" to standardize the answer format.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00043-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/43/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

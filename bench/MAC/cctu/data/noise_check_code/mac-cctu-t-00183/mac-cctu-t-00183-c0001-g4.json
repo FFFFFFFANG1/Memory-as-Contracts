@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00183",
+    "node_id": "mac-cctu-t-00183-c0001-g4",
+    "constraint_text": "The answer must be obtained by invoking the provided tools, and at least one interaction turn must invoke two distinct tool types simultaneously; whenever train_speed_analyzer is invoked, landmark_information_retriever must be invoked in the same turn; the full solution must be reached within a maximum of 10 interaction turns; the final response must be presented in a two-column table with the headers \"Entity\" and \"Value\" separated by a comma or tab, and must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00183-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "parallel_call_count",
+        "spec": {
+            "min": 2,
+            "max": null,
+            "unit": "type"
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/183/check_constraint_0.json"
+        }
+    }
+}

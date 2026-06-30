@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00148",
+    "node_id": "mac-cctu-t-00148-c0003-g2",
+    "constraint_text": "If the agent intends to use the `historical_event_date_tool`, it must be invoked in a single action step to retrieve the necessary dates. At least one interaction turn must involve the agent invoking at least one unique tool type simultaneously. All information must be obtained through tool calls, and the agent must analyze and correct any errors until it arrives at a final answer. The total number of interaction turns must fall within a range of 2 to 5 (inclusive). The final answer must contain a table with at least two rows and two columns to clearly show the event names, their respective dates, and the calculated number of days between them. Additionally, the response must conclude with the phrase \"Days between events: [number]\" and must be between 150 and 250 words in total length to ensure conciseness and completeness.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00148-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/148/check_constraint_2.py",
+            "repair": "verifier_token_aligned_python"
+        },
+        "notes": [
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ]
+    }
+}

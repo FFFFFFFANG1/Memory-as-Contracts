@@ -1,0 +1,43 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00173",
+    "node_id": "mac-cctu-t-00173-c0001-g7",
+    "constraint_text": "Restrict tool selection to landmark_identifier and landmark_info_retriever for every city-related sub-question.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00173-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "landmark_identifier",
+                "landmark_info_retriever"
+            ],
+            "forbidden_tools": [
+                "altitude_retriever",
+                "animal_characteristics_finder",
+                "animal_record_finder",
+                "artwork_info_retriever",
+                "artwork_viewership_analyzer",
+                "author_publication_counter",
+                "biographical_info_retriever",
+                "book_info_retriever",
+                "cathedral_locator",
+                "plant_info_retriever",
+                "population_estimator",
+                "tallest_tree_species_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

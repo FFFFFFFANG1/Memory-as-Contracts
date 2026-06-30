@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00046",
+    "node_id": "mac-cctu-t-00046-c0001-g3",
+    "constraint_text": "The answer must be presented in a tabular format with two columns, \"Company Name\" and \"Resulting Company\", with one row for each company formed from the split of Centura Health, immediately followed by a brief concluding sentence ending with a period. The information must be obtained via the provided tools, and the task must be completed in at most 2 interaction turns using at most one tool call in total.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00046-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/46/check_constraint_0.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

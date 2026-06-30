@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00167",
+    "node_id": "mac-cctu-t-00167-c0006-g5",
+    "constraint_text": "Invoke `urban_forest_locator` before `geographical_area_calculator`, issue `scientist_research_finder` and `historical_visit_locator` together in one round, include at least one interaction turn that simultaneously invokes between 2 and 4 unique tool types, and format the final answer to start with \"Answer:\", end with \"End of Answer.\", and terminate with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00167-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/167/check_constraint_5.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0003-g2",
+    "constraint_text": "Restrict all tool usage during scoping to a single call of green_belt_identifier per turn and never batch geographic tools together.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "green_belt_identifier"
+            ],
+            "forbidden_tools": [
+                "biologist_catalog_search",
+                "cultural_landmark_identifier",
+                "geographical_feature_info",
+                "historical_biological_catalog_query",
+                "historical_figure_residence_finder",
+                "historical_location_associator",
+                "landmark_city_identifier",
+                "landmark_identifier",
+                "landmark_region_identifier",
+                "natural_landmark_locator",
+                "tax_revenue_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

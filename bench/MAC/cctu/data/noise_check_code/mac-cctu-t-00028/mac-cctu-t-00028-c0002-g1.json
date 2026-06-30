@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00028",
+    "node_id": "mac-cctu-t-00028-c0002-g1",
+    "constraint_text": "The AI Agent must complete at least 2 interaction turns before providing a final answer, and the final answer must be at most 10 words in length and structured as a valid JSON object with the company name as the only key-value pair.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00028-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/28/check_constraint_1.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

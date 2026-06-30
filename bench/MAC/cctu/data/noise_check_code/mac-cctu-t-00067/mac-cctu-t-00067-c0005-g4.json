@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00067",
+    "node_id": "mac-cctu-t-00067-c0005-g4",
+    "constraint_text": "During task decomposition, produce a written dependency diagram before any tool call and restrict tool usage to geographer_identifier and river_source_locator for scoping purposes.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00067-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "geographer_identifier",
+                "river_source_locator"
+            ],
+            "forbidden_tools": [
+                "academic_founder_identifier",
+                "academic_institution_locator",
+                "biographical_info_finder",
+                "biographical_info_retriever",
+                "cultural_artifact_identifier",
+                "institution_location_finder",
+                "lake_feature_finder",
+                "river_locator"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

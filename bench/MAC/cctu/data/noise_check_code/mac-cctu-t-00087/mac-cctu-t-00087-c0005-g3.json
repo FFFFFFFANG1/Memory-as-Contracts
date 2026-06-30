@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00087",
+    "node_id": "mac-cctu-t-00087-c0005-g3",
+    "constraint_text": "Determine the answer by calling the provided tools using between 3 and 5 tool calls, deliver a final answer between 5 and 10 words formatted with Markdown headings and bold text, and invoke sports_event_winner_retriever strictly before sports_team_venue_locator and sports_team_venue_locator strictly before stadium_info_retriever, with no parallel execution among these three tools.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00087-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/87/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

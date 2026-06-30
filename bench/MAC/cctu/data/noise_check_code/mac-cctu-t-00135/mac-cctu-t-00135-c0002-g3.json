@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00135",
+    "node_id": "mac-cctu-t-00135-c0002-g3",
+    "constraint_text": "You must use the available tools to find the answer, and your solution must involve between 2 and 5 interaction turns, inclusive. Additionally, you are limited to at most 2 calls per unique tool type for this task. Your final answer must use the delimiter \"###\" to clearly separate the two results in the response.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00135-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/135/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

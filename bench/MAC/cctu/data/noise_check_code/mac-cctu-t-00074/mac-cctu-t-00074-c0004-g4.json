@@ -1,0 +1,42 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00074",
+    "node_id": "mac-cctu-t-00074-c0004-g4",
+    "constraint_text": "Restrict tool usage to artist_influence_analyzer and museum_locator while sketching the initial hop dependency map for the cultural-heritage query.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00074-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "artist_influence_analyzer",
+                "museum_locator"
+            ],
+            "forbidden_tools": [
+                "architect_info_finder",
+                "artwork_catalog",
+                "artwork_locator",
+                "event_info_retriever",
+                "financial_city_locator",
+                "historical_figure_locator",
+                "historical_relationship_finder",
+                "landmark_material_info",
+                "local_cuisine_identifier",
+                "location_identifier",
+                "sports_statistics_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

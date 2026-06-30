@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00195",
+    "node_id": "mac-cctu-t-00195-c0003-g2",
+    "constraint_text": "Produce the full comparative ranking from highest to lowest across (a) the length of the longest bridge in the city with the oldest library in Europe, (b) the duration of the longest-running festival in the country of the artist whose paintings feature a starry night, and (c) the capacity of the stadium in the city of the chef famous for inventing a popular street food, in a response of at least 200 words formatted with Markdown headings, lists, and bold/italic emphasis, completing the entire exchange in between 8 and 12 total interaction turns inclusive, and whenever bridge_information_finder is invoked for part (a), invoke historical_landmark_locator beforehand and landmark_info_provider immediately afterward.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00195-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/195/check_constraint_2.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

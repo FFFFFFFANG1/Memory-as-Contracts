@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00178",
+    "node_id": "mac-cctu-t-00178-c0004-g2",
+    "constraint_text": "The AI agent may use up to 25 total tool calls and up to 4 calls per tool across event_locator, museum_exhibit_locator, historical_artisan_finder, historical_site_finder, altitude_finder, bird_characteristic_finder, car_design_influence_finder, and car_specification_retriever, with up to 24 interaction rounds, and the final response must end with the identifier \"[Done]\".",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00178-c0004",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

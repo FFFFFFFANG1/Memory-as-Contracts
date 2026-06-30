@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00167",
+    "node_id": "mac-cctu-t-00167-c0001-g3",
+    "constraint_text": "If the agent intends to invoke the `geographical_area_calculator` tool, the `urban_forest_locator` tool must be executed beforehand. The final answer must start with the identifier \"Answer:\" and end with the identifier \"End of Answer.\" The agent must invoke `scientist_research_finder` and `historical_visit_locator` simultaneously in one round. The agent must invoke between 2 and 4 unique tool types simultaneously in at least one interaction turn during the task. The final answer must end with a period.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00167-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "urban_forest_locator",
+                    "geographical_area_calculator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/167/check_constraint_0.json"
+        }
+    }
+}

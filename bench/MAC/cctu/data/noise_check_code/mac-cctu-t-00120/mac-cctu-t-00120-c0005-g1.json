@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00120",
+    "node_id": "mac-cctu-t-00120-c0005-g1",
+    "constraint_text": "You must ensure that in every interaction turn, you invoke at most one unique tool type simultaneously. The 'social_media_metrics_tool' can be used at most twice in total across all interaction turns. All information must be obtained through tool calls, and you must correct and retry if any call fails. Your final answer must be formatted as a valid JSON object containing the keys 'ronaldo_followers', 'messi_followers', and 'difference_in_millions', each storing the corresponding numerical values retrieved through tool calls. The natural language explanation must end with a period before the JSON object. The total number of interaction turns must not exceed 3.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00120-c0005",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/120/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

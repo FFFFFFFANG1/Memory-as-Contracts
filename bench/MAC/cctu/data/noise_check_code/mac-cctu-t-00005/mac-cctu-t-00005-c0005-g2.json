@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00005",
+    "node_id": "mac-cctu-t-00005-c0005-g2",
+    "constraint_text": "Responses must be a valid JSON object whose sole key is 'president' mapped to the winning candidate's name with no trailing punctuation, the full JSON must be between 30 and 50 characters long, the agent is limited to at most 3 interaction rounds, the event_outcome_retriever tool may be invoked at most once, and the total number of tool calls across all turns must be between 1 and 3 inclusive.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00005-c0005",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/5/check_constraint_4.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

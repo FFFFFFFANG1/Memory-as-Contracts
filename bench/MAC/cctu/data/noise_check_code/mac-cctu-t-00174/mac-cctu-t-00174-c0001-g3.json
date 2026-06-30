@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00174",
+    "node_id": "mac-cctu-t-00174-c0001-g3",
+    "constraint_text": "All tool outputs in the ArchitecturalSurveyProject must be cross-verified by calling architectural_design_locator and historical_structure_identifier in the same batch before reporting any structural fact.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00174-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 2
+        }
+    }
+}

@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00161",
+    "node_id": "mac-cctu-t-00161-c0008-c5",
+    "constraint_text": "Restrict all landmark identification calls to natural_landmark_locator and avoid cultural_landmark_identifier entirely when working on marine sites.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00161-c0008",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "cultural_landmark_identifier",
+                "natural_landmark_locator"
+            ],
+            "forbidden_tools": [
+                "biologist_catalog_search",
+                "geographical_feature_info",
+                "green_belt_identifier",
+                "historical_biological_catalog_query",
+                "historical_figure_residence_finder",
+                "historical_location_associator",
+                "landmark_city_identifier",
+                "landmark_identifier",
+                "landmark_region_identifier",
+                "tax_revenue_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

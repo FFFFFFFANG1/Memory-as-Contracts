@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00020",
+    "node_id": "mac-cctu-t-00020-c0003-g3",
+    "constraint_text": "The agent must use the 'election_result_retriever' and 'election_result_analyzer' tools as the primary sources, must cite at least two independent retrievals before producing any answer, and the final response must be rendered as a numbered list without any Markdown emphasis.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00020-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

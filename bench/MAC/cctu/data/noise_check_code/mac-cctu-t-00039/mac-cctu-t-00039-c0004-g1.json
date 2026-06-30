@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00039",
+    "node_id": "mac-cctu-t-00039-c0004-g1",
+    "constraint_text": "Information-gathering interactions are restricted to the geopolitical_event_tracker tool exclusively, with all other tools deferred to later phases.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00039-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "geopolitical_event_tracker"
+            ],
+            "forbidden_tools": [
+                "chemical_release_tracker",
+                "diplomatic_event_finder",
+                "diplomatic_recognition_tracker",
+                "earthquake_event_retriever",
+                "election_result_retriever",
+                "event_participation_finder",
+                "historical_event_date_finder",
+                "political_event_analyzer",
+                "political_event_identifier"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

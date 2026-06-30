@@ -1,0 +1,39 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00157",
+    "node_id": "mac-cctu-t-00157-c0006-g4",
+    "constraint_text": "During the source_gathering phase of literary_geography_project, bibliographic_search_tool must be invoked before any call to literary_search_tool to seed the candidate author list.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00157-c0006",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "bibliographic_search_tool",
+                    "literary_search_tool"
+                ],
+                [
+                    "literary_geography_project",
+                    "literary_search_tool"
+                ],
+                [
+                    "source_gathering",
+                    "literary_search_tool"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

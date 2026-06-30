@@ -1,0 +1,35 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00022",
+    "node_id": "mac-cctu-t-00022-c0003-g2",
+    "constraint_text": "During the scoping phase, restrict all tool usage to political_term_tracker and election_result_finder, and produce a written scope memo before any other tool is invoked.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00022-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "election_result_finder",
+                "political_term_tracker"
+            ],
+            "forbidden_tools": [
+                "disaster_event_info",
+                "election_result_analyzer",
+                "financial_event_identifier",
+                "space_mission_identifier"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

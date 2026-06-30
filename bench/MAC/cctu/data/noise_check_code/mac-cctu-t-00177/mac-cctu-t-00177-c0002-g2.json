@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00177",
+    "node_id": "mac-cctu-t-00177-c0002-g2",
+    "constraint_text": "The answer must be concise and contain only the numeric result, with a length between 3 and 10 characters. If the agent intends to invoke the residence_locator tool, the historical_filmmaker_search must strictly be executed beforehand. Additionally, each of the following tools may only be used at most once: historical_filmmaker_search, residence_locator, cultural_geography_mapper, historical_monument_counter, landmark_info_retriever, and advanced_calculator.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00177-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/177/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

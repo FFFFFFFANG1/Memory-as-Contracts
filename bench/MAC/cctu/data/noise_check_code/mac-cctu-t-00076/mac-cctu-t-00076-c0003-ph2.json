@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00076",
+    "node_id": "mac-cctu-t-00076-c0003-ph2",
+    "constraint_text": "During the Initial Scoping phase of the National Book Awards Longitudinal Study, tool invocations are restricted to `award_winner_retriever` only, and outputs must be returned as a bulleted summary of candidate years.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00076-c0003",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "award_winner_retriever"
+            ],
+            "forbidden_tools": [
+                "author_book_finder",
+                "branch_employee_counter",
+                "event_location_finder",
+                "gardener_finder",
+                "industrial_production_analyzer",
+                "landmark_location_identifier",
+                "literary_author_lookup",
+                "rainfall_data_retriever",
+                "rural_area_feature_locator",
+                "team_equipment_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,40 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00040",
+    "node_id": "mac-cctu-t-00040-c0001-g6",
+    "constraint_text": "Restrict tool usage to event_locator while gathering candidate sources for the ruling.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00040-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "event_locator"
+            ],
+            "forbidden_tools": [
+                "election_result_analyzer",
+                "election_result_retriever",
+                "historical_event_analyzer",
+                "historical_event_lookup",
+                "historical_event_retriever",
+                "historical_incident_data_retriever",
+                "membership_info_retriever",
+                "object_tracking_analyzer",
+                "papal_event_retriever",
+                "sports_event_result_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

@@ -1,0 +1,38 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00199",
+    "node_id": "mac-cctu-t-00199-c0002-g5",
+    "constraint_text": "Restrict all tool invocations to literary_works_database and event_locator only, and disallow any ecological or scientific data lookups.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00199-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "event_locator",
+                "literary_works_database"
+            ],
+            "forbidden_tools": [
+                "advanced_calculator",
+                "area_calculator",
+                "cultural_heritage_locator",
+                "element_discovery_info",
+                "historical_fact_lookup",
+                "nearby_reserve_locator",
+                "zoologist_expert_finder"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

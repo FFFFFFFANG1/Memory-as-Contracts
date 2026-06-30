@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00116",
+    "node_id": "mac-cctu-t-00116-c0002-g4",
+    "constraint_text": "The final response must be a fully valid JSON object that parses without errors, containing the key \"Prüm_Explosion_Casualties\" mapped to the retrieved Prüm explosion casualty value and the key \"SS_Noromic_Fire_Casualties\" mapped to the retrieved SS Noronic fire casualty value, separated by a single comma, with no trailing commas or semicolons and no invalid punctuation. The response must be at least 150 characters long. The agent must complete the task in no more than 5 tool calls total, and at least one interaction turn must dispatch 2 or more tool calls simultaneously.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00116-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_format",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/116/check_constraint_1.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00168",
+    "node_id": "mac-cctu-t-00168-c0004-g6",
+    "constraint_text": "If the agent intends to invoke `specialty_beverage_locator`, the `nearby_plant_locator` must be executed beforehand; additionally, if the agent chooses to use both `fort_feature_locator` and `nearby_plant_locator`, they must be invoked in the same action step; the final response must include the delimiter \"##\" separating the page count of the novel from the average number of patients treated per day at the hospital, and must present the final answer as a table with the rows \"Novel Page Count\" and \"Average Patients Treated Per Day\".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00168-c0004",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "fort_feature_locator",
+                    "nearby_plant_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/168/check_constraint_3.json"
+        }
+    }
+}

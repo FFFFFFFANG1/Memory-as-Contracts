@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00061",
+    "node_id": "mac-cctu-t-00061-c0004-g4",
+    "constraint_text": "The answer must conclude with the phrase \"[End of Answer]\", be determined within at most 8 interaction turns with the tools, use the seafood_origin_locator tool at most 1 time and only after the port_locator tool has already been executed, and present the final answer using Markdown syntax with at least one bolded element highlighting the local spice.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00061-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/61/check_constraint_3.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

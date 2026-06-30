@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00117",
+    "node_id": "mac-cctu-t-00117-c0004-g2",
+    "constraint_text": "To answer this, if the agent intends to retrieve speaker data for all three languages, it must invoke both the `language_speaker_estimator` and `global_language_statistics_v2` tools in a single coordinated step. The agent may invoke the `language_speaker_estimator` tool at most 2 times and the `global_language_statistics_v2` tool at most 1 time. The final answer must be a valid JSON object containing the three languages and their speaker counts as key-value pairs, with numerical values formatted as strings to accommodate potential tool output variations.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00117-c0004",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/117/check_constraint_3.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

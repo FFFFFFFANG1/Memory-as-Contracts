@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00117",
+    "node_id": "mac-cctu-t-00117-c0002-g1",
+    "constraint_text": "For language-speaker comparison queries, the agent must invoke both the `language_speaker_estimator` and `global_language_statistics_v2` tools in a single coordinated step, calling `language_speaker_estimator` at most twice and `global_language_statistics_v2` at most once, and the final answer must be a valid JSON object mapping each of the three languages to its speaker count, with the numerical values formatted as strings to accommodate tool output variations.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00117-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Format"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "notes": [
+            "mixed local heuristic fallback",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "heuristic",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00069",
+    "node_id": "mac-cctu-t-00069-c0005-c3",
+    "constraint_text": "Restrict tool usage to island_beach_finder and oasis_feature_locator, and present the result as a two-paragraph travel brief.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00069-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Sequential Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "island_beach_finder",
+                "oasis_feature_locator"
+            ],
+            "forbidden_tools": [
+                "artist_artwork_identifier",
+                "business_magnate_identifier",
+                "company_device_inquiry",
+                "event_host_locator",
+                "historical_company_finder",
+                "historical_figure_locator",
+                "regional_cuisine_identifier",
+                "scientific_discovery_lookup",
+                "tech_phenomenon_mapper_v2",
+                "technology_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

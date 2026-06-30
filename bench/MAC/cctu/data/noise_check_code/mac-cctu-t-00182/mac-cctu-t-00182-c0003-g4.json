@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00182",
+    "node_id": "mac-cctu-t-00182-c0003-g4",
+    "constraint_text": "The final answer must be formatted in Markdown syntax using headings and bold or italic emphasis with explicit numerical comparisons, must conclude with the exact phrase **Answer:** (a) is more than (b) or **Answer:** (b) is more than (a) as appropriate, must contain no periods anywhere in the response, must call the `mountain_peak_identifier` tool after any use of `cultural_heritage_locator`, and must include at least one interaction turn that invokes at least two unique tool types in parallel.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00182-c0003",
+    "source_anchor_role": "exception",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/182/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

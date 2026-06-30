@@ -1,0 +1,41 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00198",
+    "node_id": "mac-cctu-t-00198-c0003-g5",
+    "constraint_text": "Tool selection during preliminary scoping is restricted to forest_name_search and landmark_info_retriever, and no arithmetic comparison tools may be dispatched.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00198-c0003",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Calls Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "forest_name_search",
+                "landmark_info_retriever"
+            ],
+            "forbidden_tools": [
+                "advanced_arithmetic_calculator",
+                "biographical_affiliation_finder",
+                "biologist_specialization_finder",
+                "ecosystem_researcher_finder",
+                "enhanced_infrastructure_locator",
+                "habitat_species_associator",
+                "historical_landmark_finder",
+                "nearby_forest_locator",
+                "park_area_calculator",
+                "tree_age_inquiry"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

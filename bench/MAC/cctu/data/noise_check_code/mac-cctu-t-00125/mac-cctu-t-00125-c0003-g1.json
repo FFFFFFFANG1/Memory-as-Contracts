@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00125",
+    "node_id": "mac-cctu-t-00125-c0003-g1",
+    "constraint_text": "During the entire task issue at least one interaction turn that batches two or more tool calls simultaneously, and produce a final response that ends with a period and uses a bullet point (•) to separate the magnification ratio of the Leica Noctilux-M 50mm f/0.95 from the magnification ratio of the Nikon NIKKOR Z 58mm f/0.95 S.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00125-c0003",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/125/check_constraint_2.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

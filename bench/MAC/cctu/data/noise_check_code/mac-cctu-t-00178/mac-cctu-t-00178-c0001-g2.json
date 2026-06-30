@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00178",
+    "node_id": "mac-cctu-t-00178-c0001-g2",
+    "constraint_text": "The AI agent must obtain all information by calling the provided tools, and is restricted to at most 2 calls per tool for each of event_locator, museum_exhibit_locator, historical_artisan_finder, historical_site_finder, altitude_finder, bird_characteristic_finder, car_design_influence_finder, and car_specification_retriever; the task must finish within 16 interaction rounds and 12 total tool calls, and the response must end with the identifier \"[Answer]\".",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00178-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/178/check_constraint_0.json",
+            "repair": "verifier_token_aligned_python"
+        }
+    }
+}

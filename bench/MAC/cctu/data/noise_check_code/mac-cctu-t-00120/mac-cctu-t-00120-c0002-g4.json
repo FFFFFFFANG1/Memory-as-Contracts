@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00120",
+    "node_id": "mac-cctu-t-00120-c0002-g4",
+    "constraint_text": "Restrict all data retrieval to the tourism_statistics_tool and report visitor counts rounded to the nearest thousand.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00120-c0002",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "tourism_statistics_tool"
+            ],
+            "forbidden_tools": [
+                "celestial_discovery_info",
+                "flight_price_checker",
+                "historical_event_data_info_retriever",
+                "historical_event_finder",
+                "population_data_retriever",
+                "social_media_metrics_tool",
+                "space_mission_info_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

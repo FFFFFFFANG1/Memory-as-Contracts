@@ -1,0 +1,42 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00061",
+    "node_id": "mac-cctu-t-00061-c0002-g4",
+    "constraint_text": "Restrict use of stone_origin_locator to at most 2 invocations per query and always pair it with location_identifier to verify regional provenance of stones.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00061-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "location_identifier",
+                "stone_origin_locator"
+            ],
+            "forbidden_tools": [
+                "award_winner_finder",
+                "chef_dish_finder",
+                "delta_port_locator",
+                "landmark_country_locator",
+                "local_cuisine_explorer",
+                "organization_locator",
+                "person_location_finder",
+                "port_locator",
+                "professor_identifier",
+                "seafood_origin_locator",
+                "supplier_store_linker"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

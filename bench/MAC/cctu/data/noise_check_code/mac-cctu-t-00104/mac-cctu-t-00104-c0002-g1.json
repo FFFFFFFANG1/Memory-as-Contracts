@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00104",
+    "node_id": "mac-cctu-t-00104-c0002-g1",
+    "constraint_text": "During preliminary scoping of the industrial accident comparison, the agent must restrict itself to a single historical_event_tool call per turn and may not invoke historical_event_info_retriever at all.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00104-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "historical_event_info_retriever",
+                "historical_event_tool"
+            ],
+            "forbidden_tools": [
+                "everest_summit_records",
+                "historical_event_date_finder",
+                "merged_subscriber_data_tool",
+                "olympic_medal_tracker",
+                "species_counter",
+                "volcano_activity_analyzer"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

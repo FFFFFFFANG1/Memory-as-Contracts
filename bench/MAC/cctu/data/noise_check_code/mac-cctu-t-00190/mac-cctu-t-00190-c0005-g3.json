@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00190",
+    "node_id": "mac-cctu-t-00190-c0005-g3",
+    "constraint_text": "Rank these from highest to lowest: (a) the height of the largest waterfall visited by the artist who painted the famous mural in the city park, (b) the capacity of the theater in the city where the poet who wrote the sonnet named after a celestial body resides, and (c) the number of islands in the largest lake in the world. The final answer must be a valid JSON object containing the three labeled values, their numerical results, and an explicit ranking order from highest to lowest. Each tool may be invoked at most 3 times, and the total number of tool calls across the investigation must lie between 8 and 10. The agent must execute `artist_information_retriever` before invoking either `historical_visit_locator` or `landmark_info_retriever`.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00190-c0005",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/190/check_constraint_4.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

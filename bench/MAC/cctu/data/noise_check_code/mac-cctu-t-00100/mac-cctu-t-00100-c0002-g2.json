@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00100",
+    "node_id": "mac-cctu-t-00100-c0002-g2",
+    "constraint_text": "The solution must use parallel execution: in at least one interaction turn, the agent must invoke between 1 and 2 unique tool types simultaneously (calling the same tool twice counts as one unique type, while calling two different tools counts as two), and must never exceed two unique tool types in any single turn. The solution must be completed within a total of 2 to 3 interaction turns. The final answer must conclude with the identifier \"[END OF ANSWER]\" to clearly indicate the end of the response and end with a period (.) to ensure proper sentence closure. The agent may invoke the unified_specification_retriever tool at most 2 times in total, and no other tool may be used more than once in this task.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00100-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/100/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

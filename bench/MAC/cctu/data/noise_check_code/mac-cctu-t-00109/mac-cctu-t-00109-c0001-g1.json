@@ -1,0 +1,29 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00109",
+    "node_id": "mac-cctu-t-00109-c0001-g1",
+    "constraint_text": "Limit the total number of tool calls to between 2 and 3, end the response with a period, and include the keyword \"Difference:\" immediately before the final numerical answer to explicitly delimit the result.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00109-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/109/check_constraint_0.py",
+            "repair": "verifier_token_aligned_python"
+        },
+        "notes": [
+            "rewritten by verifier repair pass",
+            "rewritten with verifier-token-aligned template"
+        ]
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00137",
+    "node_id": "mac-cctu-t-00137-c0001-g2",
+    "constraint_text": "Use at most one call to the anatomy_facts_provider tool and at most one call to the anatomical_info_provider tool, and reply with a concise answer of at most 20 words ending with a period, formatted as a valid JSON object whose key \"answer\" holds the final numerical result.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00137-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/137/check_constraint_0.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

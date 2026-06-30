@@ -1,0 +1,24 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00080",
+    "node_id": "mac-cctu-t-00080-c0004-g4",
+    "constraint_text": "During the exhibition_cross_reference phase of the VMA Venue Density Analysis project, the agent must call `exhibition_finder` before consulting `neighborhood_identifier` and may issue up to 7 tool calls total.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00080-c0004",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Specific Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 2
+        }
+    }
+}

@@ -1,0 +1,69 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00083",
+    "node_id": "mac-cctu-t-00083-c0002-g2",
+    "constraint_text": "Every investigation must begin with a call to olympic_history_retriever before any other tool is invoked, to anchor the research timeline in verified Olympic records.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00083-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Tool Call Count"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_sequence",
+        "spec": {
+            "orders": [
+                [
+                    "olympic_history_retriever",
+                    "building_info_retriever"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "cultural_symbol_identifier"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "historical_author_finder"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "historical_event_analyzer"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "historical_event_locator"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "historical_figure_locator"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "indigenous_culture_identifier"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "indigenous_territory_locator"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "landmark_locator"
+                ],
+                [
+                    "olympic_history_retriever",
+                    "museum_collection_finder"
+                ]
+            ]
+        },
+        "notes": [],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

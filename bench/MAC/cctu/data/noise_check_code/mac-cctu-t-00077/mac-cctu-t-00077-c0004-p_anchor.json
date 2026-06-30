@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00077",
+    "node_id": "mac-cctu-t-00077-c0004-p_anchor",
+    "constraint_text": "The answer must be formatted using Markdown syntax, including proper use of headings, lists, bold/italic text, links, and code blocks to enhance readability and structure, and must conclude with the exact phrase \"Answer: [dessert name]\" where [dessert name] is the specific dessert identified, followed by a period. The answer must be produced within a maximum of 10 interaction rounds, must require between 7 and 10 tool calls, and must follow the strict tool order: historical_explorer_finder before exploration_history_analyzer; exploration_history_analyzer before mineral_resource_identifier; mineral_resource_identifier before industry_material_usage_finder; industry_material_usage_finder before economic_theory_influence_finder; economic_theory_influence_finder before historical_figure_locator; historical_figure_locator before regional_cuisine_identifier. Each tool must complete successfully before the next is invoked, with no parallel execution between these tools.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00077-c0004",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Content_2"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "family": "response_content",
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/77/check_constraint_3.py",
+            "repair": "minimal_python_for_verify"
+        },
+        "notes": [
+            "rewritten by verifier repair pass"
+        ]
+    }
+}

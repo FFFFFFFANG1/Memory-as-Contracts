@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00111",
+    "node_id": "mac-cctu-t-00111-c0003-g1",
+    "constraint_text": "The agent must execute between 2 and 5 tool calls to answer the question, may invoke the earthquake_data_analyzer tool at most 2 times during the task, must invoke the earthquake_data_analyzer and historical_event_finder tools in the same action step, may invoke at most 2 unique tool types simultaneously in any single interaction turn, and must ensure its final response does not exceed 200 words.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00111-c0003",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "earthquake_data_analyzer",
+                    "historical_event_finder"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/111/check_constraint_2.json"
+        }
+    }
+}

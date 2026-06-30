@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00144",
+    "node_id": "mac-cctu-t-00144-c0002-g6",
+    "constraint_text": "The agent must combine `earthquake_data_retriever` and `ocean_depth_info` outputs in a structured table and limit responses to under 300 characters.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00144-c0002",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "response_length",
+        "spec": {
+            "unit": "characters",
+            "min": null,
+            "max": 300
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}

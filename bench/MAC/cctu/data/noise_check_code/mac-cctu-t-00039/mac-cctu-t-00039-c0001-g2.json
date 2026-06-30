@@ -1,0 +1,26 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00039",
+    "node_id": "mac-cctu-t-00039-c0001-g2",
+    "constraint_text": "The diplomatic_recognition_tracker tool must be invoked at least twice before any final answer is composed, and cross-referenced against diplomatic_event_finder output.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00039-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Resource",
+        "Interaction Rounds"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "Cannot verify semantic cross-referencing; checks counts and co-occurrence."
+        ],
+        "generation": {
+            "method": "llm",
+            "attempts": 1
+        }
+    }
+}

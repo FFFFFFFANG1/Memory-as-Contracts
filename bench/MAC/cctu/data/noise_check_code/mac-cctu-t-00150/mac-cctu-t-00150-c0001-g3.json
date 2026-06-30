@@ -1,0 +1,32 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00150",
+    "node_id": "mac-cctu-t-00150-c0001-g3",
+    "constraint_text": "The agent must invoke lake_shape_identifier and rare_flower_locator together in a single action step, must ensure at least one interaction turn invokes 2-3 unique tool types simultaneously, must invoke the enhanced_calculator tool for any arithmetic, and the final response must be between 100 and 500 characters in length.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00150-c0001",
+    "source_anchor_role": "project",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Behavior",
+        "Parallel Dependencies"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_parallel",
+        "spec": {
+            "groups": [
+                [
+                    "lake_shape_identifier",
+                    "rare_flower_locator"
+                ]
+            ]
+        },
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/150/check_constraint_0.json"
+        }
+    }
+}

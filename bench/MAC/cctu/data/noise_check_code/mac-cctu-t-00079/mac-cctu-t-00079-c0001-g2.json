@@ -1,0 +1,28 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00079",
+    "node_id": "mac-cctu-t-00079-c0001-g2",
+    "constraint_text": "The answer must be concise and not exceed 200 characters; `startup_identifier` must be called before `corporate_acquisition_finder`, which must be called before `product_information_retriever`; the solution must use between 7 and 9 interaction turns inclusive; each of `startup_identifier`, `corporate_acquisition_finder`, and `product_information_retriever` must be called at most once; and the final answer must include the delimiter \"[ANSWER]\" immediately before the landmark name.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00079-c0001",
+    "source_anchor_role": "global",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/79/check_constraint_0.json",
+            "repair": "minimal_python_for_verify"
+        }
+    }
+}

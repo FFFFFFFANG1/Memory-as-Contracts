@@ -1,0 +1,27 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00051",
+    "node_id": "mac-cctu-t-00051-c0002-g3",
+    "constraint_text": "You must ensure that each tool can be used at most once during the solution process, and the total number of interaction turns must not exceed 8. The final answer must be concise, not exceeding 50 words.",
+    "expected_should_apply": true,
+    "is_anchor": true,
+    "source_constraint_uid": "mac-cctu-t-00051-c0002",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": true,
+    "type_hint": [
+        "Response",
+        "Length"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "python",
+        "notes": [
+            "converted from structured evaluator by verifier repair pass"
+        ],
+        "generation": {
+            "method": "cctu_reference",
+            "source_artifact": "bench/CCTU/check_code/51/check_constraint_1.json",
+            "repair": "structured_to_minimal_python"
+        }
+    }
+}

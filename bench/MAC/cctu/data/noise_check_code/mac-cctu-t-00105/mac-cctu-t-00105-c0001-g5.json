@@ -1,0 +1,37 @@
+{
+    "schema_version": "MACCCTUNoiseEvaluatorArtifactV1",
+    "task_uid": "mac-cctu-t-00105",
+    "node_id": "mac-cctu-t-00105-c0001-g5",
+    "constraint_text": "The agent must restrict all tool calls to 'constitutional_info_retriever' and 'political_union_info' and must avoid any crime- or event-focused historical tools.",
+    "expected_should_apply": false,
+    "is_anchor": false,
+    "source_constraint_uid": "mac-cctu-t-00105-c0001",
+    "source_anchor_role": "task",
+    "trigger_condition_holds": false,
+    "type_hint": [
+        "Response",
+        "Content_1"
+    ],
+    "evaluator": {
+        "status": "success",
+        "evaluator_type": "structured",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "constitutional_info_retriever",
+                "political_union_info"
+            ],
+            "forbidden_tools": [
+                "astronomical_discovery_info",
+                "historical_crime_analyzer",
+                "historical_event_and_fact_retriever",
+                "historical_event_facts",
+                "historical_event_tool",
+                "unified_population_data_retriever"
+            ]
+        },
+        "generation": {
+            "method": "heuristic"
+        }
+    }
+}
