@@ -47,6 +47,17 @@ def _event_tool_calls(event: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def _tool_result_payload(event: dict[str, Any]) -> Any:
+    """Prefer the actual tool result when runtime metadata is empty."""
+    runtime = event.get("runtime")
+    result = event.get("result")
+    if runtime is None:
+        return result
+    if isinstance(runtime, dict) and not runtime:
+        return result
+    return runtime
+
+
 def build_raw_history(row: dict[str, Any]) -> dict[str, Any]:
     """Build the compact evaluator-facing trajectory from a MAC task result row."""
     final_response = row.get("final_answer")
@@ -95,7 +106,7 @@ def build_raw_history(row: dict[str, Any]) -> dict[str, Any]:
         target = calls_by_id.get(call_id) if isinstance(call_id, str) else None
         if target is None:
             continue
-        source = event.get("runtime", event.get("result"))
+        source = _tool_result_payload(event)
         target["result"] = _compact_tool_output(source)
 
     return {

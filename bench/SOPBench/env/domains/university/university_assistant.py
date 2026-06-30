@@ -478,6 +478,8 @@ constraint_processes = {
         ("single", "internal_get_interaction_time", None)
     ]),
 
+    "internal_check_username_exists": ("single", "internal_check_username_exists", {"username": "username"}),
+    "internal_check_course_exists": ("single", "internal_check_course_exists", {"course_code": "course_code"}),
     "internal_check_major_exists": ("single", "internal_check_major_exists", {"major": "major"}),
     "internal_check_minor_exists": ("single", "internal_check_minor_exists", {"minor": "minor"}),
     "has_min_credits_for_major_change": ("single", "internal_get_student_info", {"username": "username"}),

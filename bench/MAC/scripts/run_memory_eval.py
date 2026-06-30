@@ -6,7 +6,12 @@ import argparse
 import asyncio
 import json
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC
+except ImportError:  # Python < 3.11
+    UTC = timezone.utc
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +23,16 @@ from bench.MAC.cctu.bridge import (
     list_cctu_task_uids,
     load_cctu_eval_tasks,
 )
+from bench.MAC.sopbench.bridge import (
+    MAC_SOPBENCH_DATA_DIR,
+    build_sopbench_eval_task,
+    build_sopbench_system_config,
+    list_sopbench_task_uids,
+    load_sopbench_eval_tasks,
+)
 from bench.MAC.agent.llm import LLMConfig, model_client_from_config
 from bench.MAC.agent.loop.cctu_tools import CCTUToolExecutor
+from bench.MAC.agent.loop.sopbench_tools import SOPBenchToolExecutor
 from bench.MAC.agent.loop.llm_tools import (
     DryRunToolReturnModelClient,
     LLMToolExecutor,
@@ -97,6 +110,12 @@ def parse_args() -> argparse.Namespace:
         help="Benchmark to run.",
     )
     parser.add_argument("--cctu-data-dir", type=Path, default=MAC_CCTU_DATA_DIR, help="MAC CCTU runtime data dir.")
+    parser.add_argument(
+        "--sopbench-data-dir",
+        type=Path,
+        default=MAC_SOPBENCH_DATA_DIR,
+        help="MAC SOPBench runtime data dir.",
+    )
     parser.add_argument(
         "--memoryarena-data",
         type=Path,
@@ -244,7 +263,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--tool-executor",
-        choices=["heuristic", "hybrid", "llm", "cctu", "memoryarena"],
+        choices=["heuristic", "hybrid", "llm", "cctu", "sopbench", "memoryarena"],
         default="heuristic",
         help="Tool-return executor mode. `heuristic` preserves the original stub behavior.",
     )
@@ -376,10 +395,10 @@ def default_output_path(args: argparse.Namespace) -> Path:
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    if args.bench == "sopbench":
-        raise NotImplementedError(f"--bench {args.bench} is not wired into run_memory_eval yet")
     if args.bench == "cctu" and args.tool_executor not in {"cctu", "heuristic"}:
         raise ValueError("--bench cctu requires --tool-executor cctu (or heuristic for dry runs)")
+    if args.bench == "sopbench" and args.tool_executor not in {"sopbench", "heuristic"}:
+        raise ValueError("--bench sopbench requires --tool-executor sopbench (or heuristic for dry runs)")
     if args.bench == "memoryarena" and args.tool_executor != "memoryarena" and not args.dry_run:
         raise ValueError("--bench memoryarena requires --tool-executor memoryarena unless --dry-run is set")
     if args.merge_into and not args.retry_errors and not args.only_indices:
@@ -430,21 +449,27 @@ def load_merge_run_context(
     *,
     retry_indices: list[int],
 ) -> tuple[list[tuple[int, dict[str, Any]]], dict[str, Any], dict[str, Any], int]:
-    if args.bench != "cctu":
-        raise NotImplementedError("--merge-into is only supported for --bench cctu")
+    if args.bench not in {"cctu", "sopbench"}:
+        raise NotImplementedError("--merge-into is only supported for --bench cctu or sopbench")
     if not retry_indices:
         raise ValueError("No task indices selected for retry")
 
-    all_uids = list_cctu_task_uids(data_dir=args.cctu_data_dir)
+    if args.bench == "cctu":
+        all_uids = list_cctu_task_uids(data_dir=args.cctu_data_dir)
+        build_task = lambda uid: build_cctu_eval_task(uid, data_dir=args.cctu_data_dir)
+        _, task_set_summary = load_cctu_eval_tasks(data_dir=args.cctu_data_dir)
+        system_config = build_cctu_system_config(data_dir=args.cctu_data_dir)
+    else:
+        all_uids = list_sopbench_task_uids(data_dir=args.sopbench_data_dir)
+        build_task = lambda uid: build_sopbench_eval_task(uid, data_dir=args.sopbench_data_dir)
+        _, task_set_summary = load_sopbench_eval_tasks(data_dir=args.sopbench_data_dir)
+        system_config = build_sopbench_system_config(data_dir=args.sopbench_data_dir)
+
     selected: list[tuple[int, dict[str, Any]]] = []
     for index in retry_indices:
         if index < 0 or index >= len(all_uids):
             raise IndexError(f"Task index out of range for merge retry: {index}")
-        task = build_cctu_eval_task(all_uids[index], data_dir=args.cctu_data_dir)
-        selected.append((index, task))
-
-    _, task_set_summary = load_cctu_eval_tasks(data_dir=args.cctu_data_dir)
-    system_config = build_cctu_system_config(data_dir=args.cctu_data_dir)
+        selected.append((index, build_task(all_uids[index])))
     return selected, task_set_summary, system_config, len(all_uids)
 
 
@@ -474,6 +499,11 @@ def load_run_context(
         uids = task_slice(list_cctu_task_uids(data_dir=args.cctu_data_dir), offset=offset, limit=limit)
         tasks, task_set_summary = load_cctu_eval_tasks(data_dir=args.cctu_data_dir, uids=uids)
         system_config = build_cctu_system_config(data_dir=args.cctu_data_dir)
+        return tasks, task_set_summary, system_config
+    if args.bench == "sopbench":
+        uids = task_slice(list_sopbench_task_uids(data_dir=args.sopbench_data_dir), offset=offset, limit=limit)
+        tasks, task_set_summary = load_sopbench_eval_tasks(data_dir=args.sopbench_data_dir, uids=uids)
+        system_config = build_sopbench_system_config(data_dir=args.sopbench_data_dir)
         return tasks, task_set_summary, system_config
     if args.bench == "memoryarena":
         category = None if args.memoryarena_category == "all" else args.memoryarena_category
@@ -587,6 +617,8 @@ async def run_one_task(
         executor = None
         if args.tool_executor == "cctu":
             executor = CCTUToolExecutor(task=task)
+        elif args.tool_executor == "sopbench":
+            executor = SOPBenchToolExecutor(task=task)
         elif args.tool_executor == "memoryarena":
             executor = MemoryArenaWebShopToolExecutor(
                 task=task,
@@ -732,7 +764,7 @@ async def run(args: argparse.Namespace) -> None:
         args.mac_store_dir = Path(args.mac_store_dir) / run_id
     memory_provider = memory_provider_from_args(args)
     model_client = model_client_from_config(agent_llm, dry_run=args.dry_run)
-    if args.tool_executor in {"heuristic", "cctu"}:
+    if args.tool_executor in {"heuristic", "cctu", "sopbench"}:
         tool_return_model_client = None
     elif args.dry_run:
         tool_return_model_client = DryRunToolReturnModelClient()

@@ -1,6 +1,6 @@
 {
     "schema_version": "MACSOPBenchSystemPromptV1",
-    "generated_at": "2026-06-27T10:47:04.572926+00:00",
+    "generated_at": "2026-06-28T03:38:45.979036+00:00",
     "source": "SOPBench create_assistant(..., assistant_dependency_instructions=None)",
     "constraint_descr_format": "structured",
     "tool_list": "full",

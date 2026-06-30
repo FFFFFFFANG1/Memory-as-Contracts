@@ -48,3 +48,30 @@ for every task, get task-level SOP:
         for each anchor & temporal mod:
             populate user turns
             # tone: designing / revising the sop
+
+
+## steps
+filter_sop.py          ✅ done
+select_anchors.py      ← anchors = G + K=8
+temporal_noise.py      ← 0–3 mods / anchor
+merge + validate       ← graph resolver
+task_hist_gen.py       ← user turns
+export_sop_data.py     ← 最终 data/
+bridge + grade         ← 跑 benchmark
+
+evaluation代码修改(for temporal_noise.py)
+分析 / 质检（process→null 比例、semantics-only、假差异）
+    ↓
+batch：为 process=null 的 noisy 生成 eval 侧参数/配置（或改 bridge，不一定动 domain 源码）
+
+## note: university graph-builder fix (2026-06-29)
+
+`temporal_noise.py` action-level rulebase compiles full action dependency trees via SOPBench
+`dfsgather_invfunccalldirgraph`. University `default_dep_full` expands `constraint_dependencies`
+into `chain` nodes that expose bare `internal_check_*` singles; those must appear in
+`constraint_processes` or compilation raises `KeyError`.
+
+**Fix:** in `bench/SOPBench/env/domains/university/university_assistant.py`, register
+`internal_check_username_exists` and `internal_check_course_exists` in `constraint_processes`
+(same pattern as existing `internal_check_major_exists` / `internal_check_minor_exists`).
+Without this, all university action units in step3 were skipped (`noise_generated=0`).

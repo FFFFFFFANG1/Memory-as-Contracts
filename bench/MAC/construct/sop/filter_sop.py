@@ -309,9 +309,13 @@ def main() -> int:
         neat_prompt = domain_runtimes[domain].neat_system_prompt
         step1_tasks.append(adapt_task(task, domain_runtimes[domain], neat_prompt))
 
+    step1_output_path = resolve_path(args.step1_output)
     step1_meta = {
         "schema_version": "MACConstructStep1SOPV2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "tasks_output": str(step1_output_path.relative_to(REPO_ROOT))
+        if step1_output_path.is_relative_to(REPO_ROOT)
+        else str(step1_output_path),
         "source_input": str(input_path.relative_to(REPO_ROOT)) if input_path.is_relative_to(REPO_ROOT) else str(input_path),
         "system_prompts": str(resolve_path(args.system_prompts_output).relative_to(REPO_ROOT))
         if resolve_path(args.system_prompts_output).is_relative_to(REPO_ROOT)
@@ -340,7 +344,6 @@ def main() -> int:
                 if constraint.get("metadata", {}).get("eval_scope") == "user_goal"
             ),
         },
-        "tasks": step1_tasks,
     }
     write_json(args.step1_output, step1_tasks)
     write_json(args.step1_output.with_suffix(args.step1_output.suffix + ".meta.json"), step1_meta)
