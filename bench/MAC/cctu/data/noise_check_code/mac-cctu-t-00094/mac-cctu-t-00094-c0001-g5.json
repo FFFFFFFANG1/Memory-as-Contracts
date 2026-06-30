@@ -15,14 +15,20 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "forbidden_tools": [
+                "architect_info_finder"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "minimal_python_for_verify"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:59.232345+00:00"
         }
     }
 }

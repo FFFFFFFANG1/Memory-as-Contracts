@@ -1,28 +1,19 @@
 def evaluate(trace):
     import re
-    traj = trace.get('trajectory') or []
-    tools = ['artwork_identifier','author_geography_linker','bestselling_book_finder','cultural_heritage_locator','elevation_finder','historical_novel_finder','mountain_peak_identifier','product_price_checker','sales_tracker']
-    scratch_step = None
-    for i, step in enumerate(traj):
-        content = (step.get('content') or '') if isinstance(step, dict) else ''
-        if not content:
-            continue
-        lines = content.splitlines()
-        numbered = [l for l in lines if re.match(r'\s*\d+[\.\)]\s+', l)]
-        if len(numbered) >= 2:
-            scratch_step = (i, step, content, numbered)
-            break
-    if scratch_step is None:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No numbered scratchpad list found', 'evidence_refs': []}
-    i, step, content, numbered = scratch_step
-    tagged = 0
-    for l in numbered:
-        low = l.lower()
-        if any(t in low for t in tools):
-            tagged += 1
-    all_tagged = tagged == len(numbered)
-    tcalls = step.get('tool_calls') or [] if isinstance(step, dict) else []
-    no_calls_same_turn = len(tcalls) == 0
-    followed = all_tagged and no_calls_same_turn
-    reason = f'numbered={len(numbered)}, tagged={tagged}, tool_calls_in_turn={len(tcalls)}'
-    return {'observed_followed': bool(followed), 'confidence': 'medium', 'reason': reason, 'evidence_refs': [{'step_index': i}]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

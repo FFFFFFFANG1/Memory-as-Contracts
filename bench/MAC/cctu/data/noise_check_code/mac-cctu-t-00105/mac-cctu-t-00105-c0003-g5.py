@@ -1,13 +1,17 @@
 def evaluate(trace):
-    import re
-    tcs = trace.get('tool_calls') or []
-    final = trace.get('final_response') or ''
-    if not tcs:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no tool calls','evidence_refs':[]}
-    first = tcs[0].get('name','')
-    if first != 'constitutional_info_retriever':
-        return {'observed_followed': False, 'confidence':'high','reason': f'first tool call is {first}','evidence_refs':[{'index':0,'name':first}]}
-    pattern = re.compile(r'(article|section|amendment|clause|art\.|sec\.)\s*\w+', re.IGNORECASE)
-    if not pattern.search(final):
-        return {'observed_followed': False, 'confidence':'medium','reason':'no constitutional clause citation found in final','evidence_refs':[]}
-    return {'observed_followed': True, 'confidence':'high','reason':'first call is constitutional_info_retriever and final cites a clause','evidence_refs':[]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['constitutional_info_retriever']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

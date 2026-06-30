@@ -1,24 +1,25 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['advanced_calculator', 'historical_event_retriever', 'historical_infrastructure_info', 'historical_residence_finder', 'literary_author_identifier']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    has_number = any(ch.isdigit() for ch in response)
-    if not has_number:
-        ok = False
-        reasons.append('numeric value missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    _count_advanced_calculator = sum(1 for name in tool_names if name == 'advanced_calculator')
+    if _count_advanced_calculator > 2:
+        reasons.append('advanced_calculator' + ' call count ' + str(_count_advanced_calculator) + ' above 2')
+    _count_historical_infrastructure_info = sum(1 for name in tool_names if name == 'historical_infrastructure_info')
+    if _count_historical_infrastructure_info > 2:
+        reasons.append('historical_infrastructure_info' + ' call count ' + str(_count_historical_infrastructure_info) + ' above 2')
+    _count_historical_residence_finder = sum(1 for name in tool_names if name == 'historical_residence_finder')
+    if _count_historical_residence_finder > 2:
+        reasons.append('historical_residence_finder' + ' call count ' + str(_count_historical_residence_finder) + ' above 2')
+    round_count = len(trajectory)
+    if response.strip() and not response.rstrip().endswith('.'):
+        reasons.append('response does not end with period')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

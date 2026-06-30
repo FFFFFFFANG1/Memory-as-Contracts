@@ -1,24 +1,47 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get(''.join(['tool', '_calls'])) or []
-    if not response.strip() and not calls:
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+    tool_names = [str(c.get('name') or '') for c in tool_calls]
+    called = set(n for n in tool_names if n)
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['space_mission_info_retriever']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    has_number = any(ch.isdigit() for ch in response)
-    if not has_number:
-        ok = False
-        reasons.append('numeric value missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if 'space_mission_info_retriever' not in called:
+        reasons.append('space_mission_info_retriever not used as primary source')
+    # Other tools that could compete as primary source for launch-site/mission-date
+    competing = {'event_location_finder', 'historical_event_finder', 'corporate_event_retriever'}
+    used_competing = sorted(called & competing)
+    if used_competing:
+        reasons.append('non-primary tools used for launch info: ' + ', '.join(used_competing))
+    # Check for launch identifier in response or tool results
+    # Common patterns: mission names with codes, e.g. STS-, Apollo X, Artemis, Falcon, SpaceX CRS-, COSPAR like YYYY-NNNA
+    id_patterns = [
+        r'\b(?:STS|CRS|SLS|GSLV|PSLV|CZ|H-?II|Ariane)[- ]?\d+[A-Za-z]?\b',
+        r'\b(?:Apollo|Artemis|Soyuz|Shenzhou|Gemini|Mercury|Vostok|Voskhod)\s*\d+\b',
+        r'\b\d{4}-\d{3}[A-Z]\b',  # COSPAR ID
+        r'\bNORAD\s*(?:ID|#)?\s*\d+\b',
+        r'\b(?:Falcon|Atlas|Delta|Saturn|Titan)\s*[IVX0-9]+\b',
+    ]
+    combined_text = response
+    for c in tool_calls:
+        res = c.get('result')
+        if res is not None:
+            combined_text += '\n' + str(res)
+    has_id = any(re.search(p, combined_text, re.IGNORECASE) for p in id_patterns)
+    if not has_id:
+        reasons.append('no confirmed launch identifier present')
+    # Check for mission date in final response (date coverage)
+    date_patterns = [
+        r'\b\d{4}-\d{2}-\d{2}\b',
+        r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b',
+        r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b',
+        r'\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b',
+        r'\b\d{4}\b',
+    ]
+    has_date = any(re.search(p, response, re.IGNORECASE) for p in date_patterns)
+    if not has_date:
+        reasons.append('no mission date present in final response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'space_mission_info_retriever used as sole primary source with launch identifier and date', 'evidence_refs': []}

@@ -1,19 +1,12 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
     calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
-    reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['location_identifier']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
-    else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if not calls:
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no tool calls; multi-hop precondition not observed', 'evidence_refs': []}
+    names = [str((c.get('name') or c.get('tool_name') or '')).strip() for c in calls]
+    names = [n for n in names if n]
+    if len(names) < 2:
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'single tool call; not a multi-hop lookup', 'evidence_refs': []}
+    first = names[0]
+    if first == 'location_identifier':
+        return {'observed_followed': True, 'confidence': 'high', 'reason': 'multi-hop sequence begins with location_identifier', 'evidence_refs': [{'first_tool': first, 'sequence': names}]}
+    return {'observed_followed': False, 'confidence': 'high', 'reason': f'multi-hop sequence begins with {first!r}, not location_identifier', 'evidence_refs': [{'first_tool': first, 'sequence': names}]}

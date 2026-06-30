@@ -18,12 +18,16 @@
         "notes": [
             "rewritten by verifier repair pass",
             "rewritten with verifier-token-aligned template",
-            "removed tool call access for verifier final pass"
+            "removed tool call access for verifier final pass",
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass"
         ],
         "generation": {
             "method": "llm",
             "attempts": 1,
-            "repair": "response_only_final_review_fix"
+            "repair": "rule_based_p2_repair",
+            "repaired_at": "2026-06-30T04:30:39.344562+00:00"
         }
     }
 }

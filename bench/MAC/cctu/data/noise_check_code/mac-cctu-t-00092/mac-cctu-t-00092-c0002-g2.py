@@ -1,24 +1,16 @@
 def evaluate(trace):
-    import re
-    traj = trace.get('trajectory') or []
+    response = str(trace.get('final_response') or '')
     tool_calls = trace.get('tool_calls') or []
-    if not tool_calls:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no tool calls to log','evidence_refs':[]}
-    texts = []
-    for step in traj:
-        c = step.get('content')
-        if isinstance(c, str):
-            texts.append(c)
-    blob = '\n'.join(texts)
-    if not blob.strip():
-        return {'observed_followed': False,'confidence':'medium','reason':'no logged YAML content in assistant steps','evidence_refs':[]}
-    # Count YAML-like records with required fields
-    tool_hits = len(re.findall(r'(?mi)^\s*-?\s*tool\s*:', blob))
-    query_hits = len(re.findall(r'(?mi)^\s*query\s*:', blob))
-    vs_hits = len(re.findall(r'(?mi)^\s*verification_status\s*:', blob))
-    n = len(tool_calls)
-    if tool_hits >= n and query_hits >= n and vs_hits >= n:
-        return {'observed_followed': True,'confidence':'high','reason': f'found >={n} YAML records with tool/query/verification_status','evidence_refs':[]}
-    if tool_hits == 0 and query_hits == 0 and vs_hits == 0:
-        return {'observed_followed': False,'confidence':'high','reason':'no YAML log fields present','evidence_refs':[]}
-    return {'observed_followed': False,'confidence':'medium','reason': f'incomplete YAML logging: tool={tool_hits} query={query_hits} verification_status={vs_hits} for {n} calls','evidence_refs':[]}
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    required_tools = ['verification_status']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

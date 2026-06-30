@@ -1,16 +1,11 @@
 def evaluate(trace):
-    calls = [c for c in trace.get('tool_calls',[]) if c.get('name')=='organization_establishment_tracker_analyzer_v2']
-    if len(calls) < 2:
-        return {'observed_followed': False, 'confidence':'high','reason':f'Tool called {len(calls)} times; need >=2','evidence_refs':[]}
-    phrasings = []
-    for c in calls:
-        args = c.get('arguments') or {}
-        if isinstance(args, dict):
-            q = ' '.join(str(v) for v in args.values() if isinstance(v,(str,int,float)))
-        else:
-            q = str(args)
-        phrasings.append(q.strip().lower())
-    distinct = set(phrasings)
-    if len(distinct) < 2:
-        return {'observed_followed': False,'confidence':'high','reason':'Calls used identical query phrasings','evidence_refs': phrasings}
-    return {'observed_followed': True,'confidence':'medium','reason':f'{len(calls)} calls with {len(distinct)} distinct phrasings','evidence_refs': list(distinct)}
+    import re
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

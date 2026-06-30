@@ -14,17 +14,23 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_usage",
         "spec": {
             "required_tools": [
-                "historical_event_date_finder",
-                "historical_event_tool"
+                "historical_event_tool",
+                "historical_event_date_finder"
             ],
             "forbidden_tools": []
         },
+        "notes": [
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:02.726407+00:00"
         }
     }
 }

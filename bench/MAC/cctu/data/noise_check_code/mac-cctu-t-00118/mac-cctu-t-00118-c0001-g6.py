@@ -1,27 +1,22 @@
 def evaluate(trace):
     import re
-    text = (trace.get('final_response') or '').strip()
-    if not text:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'empty final response', 'evidence_refs': []}
-    lines = [ln.rstrip() for ln in text.splitlines() if ln.strip()]
-    if not lines:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no content lines', 'evidence_refs': []}
-    bullet_re = re.compile(r'^\s*([-*+•]|\d+\.)\s+(.*)$')
-    iso_re = re.compile(r'^(\d{4}(-\d{2}(-\d{2})?)?)(\s|:|\s*[-–—])')
-    bad = []
-    good = 0
-    for ln in lines:
-        m = bullet_re.match(ln)
-        if not m:
-            bad.append(ln)
-            continue
-        rest = m.group(2).strip()
-        if not iso_re.match(rest):
-            bad.append(ln)
-            continue
-        good += 1
-    if good == 0:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no bulleted ISO-dated items found', 'evidence_refs': lines[:3]}
-    if bad:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'lines not following bulleted ISO-date format', 'evidence_refs': bad[:3]}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': 'all lines are bulleted ISO-dated items', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

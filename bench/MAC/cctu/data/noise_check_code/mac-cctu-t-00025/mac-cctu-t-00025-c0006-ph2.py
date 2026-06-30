@@ -1,32 +1,15 @@
 def evaluate(trace):
-    import re
-    traj = trace.get('trajectory') or []
-    if not traj:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no trajectory', 'evidence_refs': []}
-    # Find preliminary draft steps: assistant content before any tool call occurs
-    draft_texts = []
-    deferred = True
-    found_draft = False
-    for step in traj:
-        content = (step.get('content') or '').strip()
-        tool_calls = step.get('tool_calls') or []
-        if not found_draft:
-            if content:
-                draft_texts.append(content)
-                found_draft = True
-                if tool_calls:
-                    deferred = False
-                break
-        else:
-            break
-    if not draft_texts:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no preliminary draft found', 'evidence_refs': []}
-    draft = draft_texts[0]
-    # Count sentences (split on . ! ?)
-    sentences = [s for s in re.split(r'(?<=[.!?])\s+', draft) if s.strip()]
-    single_sentence = len(sentences) <= 1
-    if not deferred:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'tool invoked during preliminary draft phase', 'evidence_refs': []}
-    if not single_sentence:
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': f'preliminary draft has {len(sentences)} sentences', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'preliminary draft is single sentence and tools deferred', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

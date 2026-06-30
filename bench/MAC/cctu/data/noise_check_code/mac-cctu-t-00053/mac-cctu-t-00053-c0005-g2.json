@@ -14,18 +14,12 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "specific_tool_call_count",
-        "spec": {
-            "per_tool": {
-                "beach_locator": {
-                    "min": 1,
-                    "max": null
-                }
-            }
-        },
+        "evaluator_type": "python",
+        "notes": [],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:22.812197+00:00"
         }
     }
 }

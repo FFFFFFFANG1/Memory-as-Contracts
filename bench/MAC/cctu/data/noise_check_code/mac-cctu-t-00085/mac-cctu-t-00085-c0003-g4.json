@@ -15,13 +15,23 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "biographical_data_retriever": {
+                    "min": 2,
+                    "max": null
+                }
+            }
+        },
         "notes": [
-            "rewritten by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "minimal_python_for_verify"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:56.619846+00:00"
         }
     }
 }

@@ -1,31 +1,17 @@
 def evaluate(trace):
-    import re
-    text = trace.get('final_response') or ''
-    if not text.strip():
-        traj = trace.get('trajectory') or []
-        parts = []
-        for s in traj:
-            c = s.get('content') if isinstance(s, dict) else None
-            if c: parts.append(c)
-        text = '\n\n'.join(parts)
-    if not text.strip():
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no write-up text found', 'evidence_refs': []}
-    paragraphs = [p for p in re.split(r'\n\s*\n', text.strip()) if p.strip()]
-    single_para = len(paragraphs) == 1
-    elev_patterns = [
-        r'\b\d{1,2}[,.]?\d{3}\s*(?:m|meter|meters|metres|ft|feet|foot)\b',
-        r'\b\d{3,5}\s*(?:m|meter|meters|metres|ft|feet|foot)\b',
-        r'\belevation[^\n]{0,40}\d',
-        r'\bheight[^\n]{0,40}\d',
-        r'\baltitude[^\n]{0,40}\d',
-    ]
-    hits = []
-    for pat in elev_patterns:
-        for m in re.finditer(pat, text, re.IGNORECASE):
-            hits.append(m.group(0))
-    range_terms = ['range','ranges','mountains','massif','cordillera','sierra','alps','himalaya','andes','rockies','pyrenees','atlas','caucasus','urals','karakoram','appalachian']
-    names_mountains = any(t in text.lower() for t in range_terms)
-    followed = single_para and not hits and names_mountains
-    reason = f'single_paragraph={single_para}, elevation_hits={hits[:3]}, names_ranges={names_mountains}'
-    conf = 'high' if (hits or not single_para) else ('medium' if names_mountains else 'low')
-    return {'observed_followed': bool(followed), 'confidence': conf, 'reason': reason, 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

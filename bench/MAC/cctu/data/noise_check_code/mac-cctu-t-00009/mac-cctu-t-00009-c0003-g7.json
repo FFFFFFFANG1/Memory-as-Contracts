@@ -17,12 +17,16 @@
         "evaluator_type": "python",
         "notes": [
             "rewritten by verifier repair pass",
-            "rewritten with verifier-token-aligned template"
+            "rewritten with verifier-token-aligned template",
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass"
         ],
         "generation": {
             "method": "llm",
             "attempts": 1,
-            "repair": "verifier_token_aligned_python"
+            "repair": "rule_based_p2_repair",
+            "repaired_at": "2026-06-30T04:30:24.565879+00:00"
         }
     }
 }

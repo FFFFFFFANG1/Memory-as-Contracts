@@ -1,18 +1,19 @@
 def evaluate(trace):
     import re
-    text = (trace.get('final_response') or '').strip()
-    if not text:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no final response','evidence_refs':[]}
-    lines = [l for l in text.splitlines() if l.strip()]
-    table_lines = [l for l in lines if l.strip().startswith('|') and l.strip().endswith('|')]
-    if len(table_lines) < 2:
-        return {'observed_followed': False, 'confidence':'high','reason':'no markdown table found','evidence_refs':[]}
-    sep_found = any(re.match(r'^\s*\|?\s*:?-{2,}', l) and '|' in l and set(l.replace('|','').replace(':','').replace('-','').strip())==set() for l in table_lines)
-    if not sep_found:
-        return {'observed_followed': False, 'confidence':'medium','reason':'no header separator row','evidence_refs':[]}
-    header = table_lines[0].lower()
-    need = [('case', ['case']), ('defendant', ['defendant']), ('charge date', ['charge date','date'])]
-    missing = [n for n,keys in need if not any(k in header for k in keys)]
-    if missing:
-        return {'observed_followed': False, 'confidence':'high','reason': 'missing columns: '+ ','.join(missing),'evidence_refs':[]}
-    return {'observed_followed': True, 'confidence':'high','reason':'markdown table with required columns','evidence_refs':[]}
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

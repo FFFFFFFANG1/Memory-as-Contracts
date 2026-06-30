@@ -15,12 +15,20 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_call_count",
+        "spec": {
+            "min": null,
+            "max": 5
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:41:30.103803+00:00"
         }
     }
 }

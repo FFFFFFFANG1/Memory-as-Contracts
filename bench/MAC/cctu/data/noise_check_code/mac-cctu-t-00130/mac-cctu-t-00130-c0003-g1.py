@@ -1,20 +1,16 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
-    calls = trace.get(''.join(['tool', '_calls'])) or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+    tool_calls = trace.get('tool_calls') or []
+    if not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no tool calls; constraint requires at least 4 distinct retrieval calls', 'evidence_refs': []}
+    names = [str(c.get('name') or '') for c in tool_calls if c.get('name')]
+    distinct = set(n for n in names if n)
+    target = 'product_and_appliance_specification_retriever'
+    target_count = sum(1 for n in names if n == target)
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['product_and_appliance_specification_retriever']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if len(distinct) < 4:
+        reasons.append('only ' + str(len(distinct)) + ' distinct tool(s) called; need at least 4')
+    if target_count > 5:
+        reasons.append(target + ' called ' + str(target_count) + ' times, exceeds max of 5')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'at least 4 distinct tools called and product_and_appliance_specification_retriever within 5-call cap', 'evidence_refs': []}

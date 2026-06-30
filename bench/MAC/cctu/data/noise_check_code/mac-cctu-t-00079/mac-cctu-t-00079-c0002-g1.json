@@ -14,20 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "tool_sequence",
-        "spec": {
-            "orders": [
-                [
-                    "startup_identifier",
-                    "corporate_acquisition_finder",
-                    "product_information_retriever"
-                ]
-            ]
-        },
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/79/check_constraint_1.json"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:55.810525+00:00"
         }
     }
 }

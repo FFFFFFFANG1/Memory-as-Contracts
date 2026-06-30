@@ -14,19 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "specific_tool_call_count",
-        "spec": {
-            "per_tool": {
-                "water_body_capacity_calculator_v2": {
-                    "min": 2
-                }
-            }
-        },
-        "notes": [],
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:19.550530+00:00"
         }
     }
 }

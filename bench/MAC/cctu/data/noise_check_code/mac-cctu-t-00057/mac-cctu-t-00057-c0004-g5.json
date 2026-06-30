@@ -15,12 +15,32 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [],
+            "forbidden_tools": [
+                "academic_relationship_finder",
+                "architectural_designer_finder",
+                "biographical_info_retriever",
+                "book_information_retriever",
+                "cultural_culinary_info",
+                "institutional_lab_finder",
+                "library_manuscript_locator",
+                "literary_connection_finder"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:50:18.521514+00:00"
         }
     }
 }

@@ -13,9 +13,7 @@
         "Interaction Rounds"
     ],
     "evaluator": {
-        "status": "success",
-        "evaluator_type": "structured",
-        "family": "specific_tool_call_count",
+        "mode": "specific_tool_call_count",
         "spec": {
             "per_tool": {
                 "event_reopening_search": {
@@ -24,10 +22,15 @@
                 }
             }
         },
-        "notes": [],
+        "status": "unsupported",
+        "evaluator_type": "unsupported",
+        "notes": [
+            "unknown evaluator_type"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:22.114797+00:00"
         }
     }
 }

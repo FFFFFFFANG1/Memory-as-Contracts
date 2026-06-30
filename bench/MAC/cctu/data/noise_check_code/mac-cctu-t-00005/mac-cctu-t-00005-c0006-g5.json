@@ -15,13 +15,31 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "outbreak_case_tracker"
+            ],
+            "forbidden_tools": [
+                "election_results_analyzer",
+                "event_outcome_retriever",
+                "historical_event_data_retriever",
+                "historical_event_finder",
+                "incident_info_retriever",
+                "international_organization_event_tracker",
+                "public_domain_calculator",
+                "space_mission_identifier",
+                "sports_event_winner_finder"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "structured_to_minimal_python"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:36.821981+00:00"
         }
     }
 }

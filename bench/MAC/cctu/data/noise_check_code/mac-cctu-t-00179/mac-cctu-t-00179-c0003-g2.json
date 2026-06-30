@@ -14,15 +14,12 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "interaction_rounds",
-        "spec": {
-            "min": 6,
-            "max": null
-        },
+        "evaluator_type": "python",
+        "notes": [],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/179/check_constraint_2.json"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:35.433201+00:00"
         }
     }
 }

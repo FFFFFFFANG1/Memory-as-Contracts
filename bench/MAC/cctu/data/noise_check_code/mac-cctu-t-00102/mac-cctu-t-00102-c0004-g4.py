@@ -1,22 +1,22 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+    tool_calls = trace.get('tool_calls') or []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['historical_event_info_retriever']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
-    else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
-    if not response.split():
-        ok = False
-        reasons.append('response text missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    tool_names = [str(c.get('name') or '') for c in tool_calls]
+    hcount = sum(1 for n in tool_names if n == 'historical_event_info_retriever')
+    if hcount > 2:
+        reasons.append('historical_event_info_retriever called ' + str(hcount) + ' times (max 2)')
+    text = response.strip()
+    length = len(text)
+    if length < 50 or length > 150:
+        reasons.append('final response length ' + str(length) + ' not in [50,150]')
+    pattern = re.compile(r'Pr[üu]m:\s*([0-9][0-9,\.]*)\s*;\s*Kemi:\s*([0-9][0-9,\.]*)\s*;\s*Total:\s*([0-9][0-9,\.]*)', re.IGNORECASE)
+    m = pattern.search(text)
+    if not m:
+        reasons.append('final response does not contain required format "Prüm: X; Kemi: Y; Total: Z"')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'format, length, and tool-call cap satisfied', 'evidence_refs': []}

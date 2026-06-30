@@ -1,19 +1,34 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+    tool_calls = trace.get('tool_calls') or []
+    if not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no tool calls; constraint requires musician_locator before event_location_finder', 'evidence_refs': []}
+    names = []
+    for c in tool_calls:
+        n = c.get('name')
+        if n:
+            names.append(str(n))
+    ml_count = sum(1 for n in names if n == 'musician_locator')
+    el_count = sum(1 for n in names if n == 'event_location_finder')
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['event_location_finder', 'musician_locator']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
-    else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if ml_count > 2:
+        reasons.append('musician_locator called ' + str(ml_count) + ' times (>2)')
+    if el_count > 2:
+        reasons.append('event_location_finder called ' + str(el_count) + ' times (>2)')
+    first_ml = None
+    first_el = None
+    for i, n in enumerate(names):
+        if n == 'musician_locator' and first_ml is None:
+            first_ml = i
+        if n == 'event_location_finder' and first_el is None:
+            first_el = i
+    if first_el is not None:
+        if first_ml is None:
+            reasons.append('event_location_finder invoked without prior musician_locator')
+        elif first_ml >= first_el:
+            reasons.append('musician_locator did not precede event_location_finder')
+    relevant = (ml_count + el_count) > 0
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    if not relevant:
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'neither tool used; constraint not exercised', 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'musician_locator precedes event_location_finder and per-tool caps respected', 'evidence_refs': []}

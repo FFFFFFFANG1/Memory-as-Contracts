@@ -15,12 +15,18 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_call_count",
+        "spec": {
+            "min": 1,
+            "max": 5
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured LLM package"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:22.244891+00:00"
         }
     }
 }

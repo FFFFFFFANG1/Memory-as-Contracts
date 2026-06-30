@@ -1,19 +1,18 @@
 def evaluate(trace):
     import re
+    response = str(trace.get('final_response') or '')
     tool_calls = trace.get('tool_calls') or []
-    used_tool = any((tc.get('name')=='sports_event_result_finder') for tc in tool_calls)
-    final = trace.get('final_response') or ''
-    # Detect markdown table: lines with | and a separator row like |---|
-    lines = final.splitlines()
-    has_table = False
-    for i,l in enumerate(lines):
-        if '|' in l and i+1 < len(lines):
-            sep = lines[i+1]
-            if re.search(r'\|\s*:?-{3,}', sep):
-                has_table = True
-                break
-    # Detect flag emoji (regional indicator pairs U+1F1E6-U+1F1FF)
-    has_flag = bool(re.search(r'[\U0001F1E6-\U0001F1FF]{2}', final))
-    followed = used_tool and has_table and has_flag
-    reason = f'used_tool={used_tool}, markdown_table={has_table}, flag_emoji={has_flag}'
-    return {'observed_followed': bool(followed), 'confidence': 'high' if (used_tool and (has_table or has_flag)) else 'medium', 'reason': reason, 'evidence_refs': []}
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

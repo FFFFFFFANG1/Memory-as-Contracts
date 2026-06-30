@@ -14,18 +14,30 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_usage",
         "spec": {
             "required_tools": [
                 "elevation_retriever",
                 "mountain_peak_altitude_finder"
-            ]
+            ],
+            "forbidden_tools": []
         },
-        "notes": [],
+        "notes": [
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T07:16:19.977189+00:00"
         }
     }
 }

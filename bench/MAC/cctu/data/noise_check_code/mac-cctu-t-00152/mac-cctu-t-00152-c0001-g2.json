@@ -18,7 +18,12 @@
         "family": "response_content",
         "generation": {
             "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/152/check_constraint_0.py"
-        }
+            "source_artifact": "bench/CCTU/check_code/152/check_constraint_0.py",
+            "repair": "rule_based_p0_repair",
+            "repaired_at": "2026-06-30T04:18:54.654646+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass"
+        ]
     }
 }

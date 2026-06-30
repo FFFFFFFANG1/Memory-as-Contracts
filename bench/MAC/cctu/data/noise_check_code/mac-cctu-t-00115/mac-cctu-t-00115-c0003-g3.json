@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "response_length",
         "spec": {
             "unit": "words",
@@ -23,7 +23,12 @@
         },
         "generation": {
             "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/115/check_constraint_2.json"
-        }
+            "source_artifact": "bench/CCTU/check_code/115/check_constraint_2.json",
+            "repair": "rule_based_p0_repair",
+            "repaired_at": "2026-06-30T04:18:46.685235+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass"
+        ]
     }
 }

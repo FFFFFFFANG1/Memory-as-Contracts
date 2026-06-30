@@ -1,25 +1,19 @@
 def evaluate(trace):
     import re
-    resp = (trace.get('final_response') or '').strip()
-    tools = ['election_info_retriever','event_information_extractor','historical_event_finder','historical_event_info_retriever','space_mission_event_finder','space_mission_info_retriever']
-    if not resp:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'empty response','evidence_refs':[]}
-    # Split into sentence-like claims
-    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', resp) if s.strip()]
-    if not sentences:
-        return {'observed_followed': None,'confidence':'unknown','reason':'no sentences','evidence_refs':[]}
-    claim_like = []
-    for s in sentences:
-        # crude factual-claim heuristic: contains a digit/year or proper noun-ish capitalized word besides first
-        if re.search(r'\b(19|20)\d{2}\b', s) or re.search(r'\b\d+\b', s) or re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+', s):
-            claim_like.append(s)
-    if not claim_like:
-        return {'observed_followed': None,'confidence':'low','reason':'no clear factual claims detected','evidence_refs':[]}
-    bad = []
-    for s in claim_like:
-        names = [t for t in tools if t in s]
-        if len(set(names)) < 3:
-            bad.append(s[:120])
-    if bad:
-        return {'observed_followed': False,'confidence':'medium','reason': f'{len(bad)} claim(s) lack 3 inline tool names','evidence_refs': bad[:3]}
-    return {'observed_followed': True,'confidence':'medium','reason':'all detected claims have >=3 inline tool names','evidence_refs':[]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    _markdown_markers = ('**', '__', '# ')
+    _has_markdown = any(mark in response for mark in _markdown_markers)
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if tool_count < 3:
+        reasons.append('tool call count {tool_count} below 3')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

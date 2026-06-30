@@ -1,45 +1,134 @@
+import json
+import re
+
+SPEC = {'length': {'unit': 'words', 'min': None, 'max': None}, 'response_checks': [{'name': 'contains_terms', 'terms': ['yaml']}]}
+
+
+def _word_count(text):
+    return len(re.findall(r"\S+", text or ""))
+
+
+def _contains_json_object(text):
+    text = (text or "").strip()
+    candidates = [text]
+    candidates.extend(re.findall(r"\{.*?\}", text, flags=re.DOTALL))
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def evaluate(trace):
-    import re
-    final = trace.get('final_response','') or ''
-    traj = trace.get('trajectory',[]) or []
-    tool_calls = trace.get('tool_calls',[]) or []
-    if len(tool_calls) < 2:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'No comparative tool outputs to stage.','evidence_refs':[]}
-    # Collect assistant text in order
-    texts = []
-    for step in traj:
-        c = step.get('content','') or ''
-        if c:
-            texts.append(c)
-    if final and (not texts or texts[-1] != final):
-        texts.append(final)
-    combined = '\n'.join(texts)
-    if not combined.strip():
-        return {'observed_followed': None,'confidence':'unknown','reason':'No assistant text to inspect.','evidence_refs':[]}
-    # Detect YAML manifest: fenced ```yaml block or clear YAML key: value structure with multiple keys
-    yaml_fence = re.search(r'```ya?ml\b', combined, re.IGNORECASE)
-    yaml_like = None
-    if not yaml_fence:
-        # Heuristic: at least 3 lines matching 'key: value' pattern
-        lines = combined.splitlines()
-        kv = [l for l in lines if re.match(r'^[A-Za-z_][\w\- ]*:\s*(\S.*)?$', l.strip())]
-        if len(kv) >= 3:
-            yaml_like = True
-    if not yaml_fence and not yaml_like:
-        return {'observed_followed': False,'confidence':'medium','reason':'No YAML manifest detected before narrative.','evidence_refs':[]}
-    # Find position of YAML block
-    if yaml_fence:
-        yaml_start = yaml_fence.start()
-        yaml_end_match = re.search(r'```', combined[yaml_fence.end():])
-        yaml_end = yaml_fence.end() + (yaml_end_match.start() if yaml_end_match else 0)
-    else:
-        # find first kv line index
-        m = re.search(r'(?m)^[A-Za-z_][\w\- ]*:\s*\S', combined)
-        yaml_start = m.start() if m else 0
-        yaml_end = yaml_start + 200
-    # Narrative = substantial prose (sentences with multiple words ending in period) BEFORE yaml_start
-    before = combined[:yaml_start]
-    sentences = re.findall(r'[A-Z][^.!?\n]{30,}[.!?]', before)
-    if len(sentences) >= 2:
-        return {'observed_followed': False,'confidence':'medium','reason':'Narrative composed before YAML manifest staging.','evidence_refs':[]}
-    return {'observed_followed': True,'confidence':'medium','reason':'YAML manifest appears before narrative composition.','evidence_refs':[]}
+    trace = trace or {}
+    final = str(trace.get("final_response") or "")
+    trajectory = trace.get("trajectory") or []
+    tool_calls = trace.get("tool_calls") or []
+    failures = []
+    evidence = []
+
+    length = SPEC.get("length") or {}
+    if length:
+        unit = length.get("unit") or "words"
+        count = len(final) if unit == "characters" else _word_count(final)
+        min_value = length.get("min")
+        max_value = length.get("max")
+        if isinstance(min_value, int) and count < min_value:
+            failures.append(f"{unit} length {count} below minimum {min_value}")
+        if isinstance(max_value, int) and count > max_value:
+            failures.append(f"{unit} length {count} above maximum {max_value}")
+        evidence.append({"field": "final_response", "unit": unit, "count": count})
+
+    if SPEC.get("json_object"):
+        parsed = _contains_json_object(final)
+        if parsed is None:
+            failures.append("expected a valid JSON object")
+        else:
+            keys = set(str(key) for key in parsed.keys())
+            required_any = set(str(key) for key in SPEC.get("json_keys_any") or [])
+            if required_any and not required_any.intersection(keys):
+                failures.append(f"JSON object missing expected key candidates {sorted(required_any)}")
+            only_keys = set(str(key) for key in SPEC.get("json_only_keys") or [])
+            if only_keys and keys != only_keys:
+                failures.append(f"JSON object keys {sorted(keys)} do not match required keys {sorted(only_keys)}")
+            evidence.append({"field": "final_response", "json_keys": sorted(keys)})
+
+    for term in SPEC.get("contains_terms") or []:
+        if str(term).lower() not in final.lower():
+            failures.append(f"missing term {term!r}")
+
+    if SPEC.get("requires_bold") and not re.search(r"\*\*[^*]+\*\*|__[^_]+__", final):
+        failures.append("expected bold markdown text")
+
+    for check in SPEC.get("response_checks") or []:
+        name = check.get("name")
+        if name == "ends_with":
+            value = str(check.get("value") or "")
+            if value and not final.rstrip().endswith(value):
+                failures.append(f"response does not end with {value!r}")
+        elif name == "starts_with":
+            value = str(check.get("value") or "")
+            if value and not final.startswith(value):
+                failures.append(f"response does not start with {value!r}")
+        elif name == "contains_terms":
+            for term in check.get("terms") or []:
+                if str(term).lower() not in final.lower():
+                    failures.append(f"missing term {term!r}")
+        elif name == "excludes_terms":
+            for term in check.get("terms") or []:
+                if str(term) in final:
+                    failures.append(f"forbidden term present {term!r}")
+
+    rounds = SPEC.get("interaction_rounds") or {}
+    if rounds:
+        count = len(trajectory)
+        min_value = rounds.get("min")
+        max_value = rounds.get("max")
+        if isinstance(min_value, int) and count < min_value:
+            failures.append(f"interaction rounds {count} below minimum {min_value}")
+        if isinstance(max_value, int) and count > max_value:
+            failures.append(f"interaction rounds {count} above maximum {max_value}")
+
+    tool_count = SPEC.get("tool_call_count") or {}
+    if tool_count:
+        count = len(tool_calls)
+        min_value = tool_count.get("min")
+        max_value = tool_count.get("max")
+        if isinstance(min_value, int) and count < min_value:
+            failures.append(f"tool calls {count} below minimum {min_value}")
+        if isinstance(max_value, int) and count > max_value:
+            failures.append(f"tool calls {count} above maximum {max_value}")
+
+    per_tool = SPEC.get("specific_tool_call_count") or {}
+    if per_tool:
+        counts = {}
+        for call in tool_calls:
+            name = str(call.get("name") or "")
+            counts[name] = counts.get(name, 0) + 1
+        for tool, bounds in per_tool.items():
+            count = counts.get(str(tool), 0)
+            min_value = bounds.get("min") if isinstance(bounds, dict) else None
+            max_value = bounds.get("max") if isinstance(bounds, dict) else None
+            if isinstance(min_value, int) and count < min_value:
+                failures.append(f"{tool} calls {count} below minimum {min_value}")
+            if isinstance(max_value, int) and count > max_value:
+                failures.append(f"{tool} calls {count} above maximum {max_value}")
+
+    groups = SPEC.get("tool_parallel") or []
+    if groups:
+        step_sets = []
+        for step in trajectory:
+            step_sets.append({str(call.get("name") or "") for call in step.get("tool_calls") or [] if isinstance(call, dict)})
+        for group in groups:
+            expected = {str(item) for item in group if item}
+            if expected and not any(expected <= names for names in step_sets):
+                failures.append(f"tool group not called in same step: {sorted(expected)}")
+
+    if not final and any(key in SPEC for key in ("length", "json_object", "response_checks", "contains_terms", "requires_bold")):
+        return {"observed_followed": None, "confidence": "unknown", "reason": "missing final response", "evidence_refs": evidence}
+    if failures:
+        return {"observed_followed": False, "confidence": "medium", "reason": "; ".join(failures[:8]), "evidence_refs": evidence}
+    return {"observed_followed": True, "confidence": "medium", "reason": "mixed heuristic checks passed", "evidence_refs": evidence}

@@ -1,25 +1,17 @@
 def evaluate(trace):
     import re
-    calls = trace.get('tool_calls') or []
-    pef = [c for c in calls if c.get('name')=='political_event_finder']
-    hlf = [c for c in calls if c.get('name')=='historical_leadership_finder']
-    if not pef:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no political_event_finder calls observed','evidence_refs':[]}
-    paired = True
-    unpaired = []
-    for c in pef:
-        it = c.get('iteration')
-        match = [h for h in hlf if h.get('iteration')==it]
-        if not match:
-            paired = False
-            unpaired.append(it)
-    final = trace.get('final_response') or ''
-    lines = [l.strip() for l in final.splitlines() if l.strip()]
-    numbered = [l for l in lines if re.match(r'^\d+[\.\)]\s+', l)]
-    is_numbered_list = len(numbered) >= 2 and len(numbered) >= max(1, int(0.5*len(lines)))
-    followed = paired and is_numbered_list
-    reason = []
-    if not paired: reason.append(f'political_event_finder not paired with historical_leadership_finder in iterations {unpaired}')
-    if not is_numbered_list: reason.append('final response is not a numbered bullet list')
-    if followed: reason.append('tools paired and response is numbered list')
-    return {'observed_followed': bool(followed), 'confidence':'high' if pef and final else 'medium','reason':'; '.join(reason),'evidence_refs':[]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

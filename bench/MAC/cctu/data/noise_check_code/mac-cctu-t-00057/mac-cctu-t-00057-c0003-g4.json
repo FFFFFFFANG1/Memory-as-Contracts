@@ -13,14 +13,22 @@
         "Sequential Dependencies"
     ],
     "evaluator": {
+        "mode": "tool_call_count",
+        "spec": {
+            "min": 1,
+            "max": 1
+        },
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "unknown evaluator_type",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:41:17.675058+00:00"
         }
     }
 }

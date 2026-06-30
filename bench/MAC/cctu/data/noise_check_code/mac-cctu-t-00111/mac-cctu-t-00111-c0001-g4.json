@@ -16,11 +16,12 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "Checks only this constraint: final answer must include a >=400-word tool-call provenance log."
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:28.483238+00:00"
         }
     }
 }

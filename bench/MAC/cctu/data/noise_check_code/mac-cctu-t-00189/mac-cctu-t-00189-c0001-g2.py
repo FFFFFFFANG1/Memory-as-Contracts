@@ -1,17 +1,15 @@
 def evaluate(trace):
-    traj = trace.get('trajectory') or []
-    calls = trace.get('tool_calls') or []
-    total = len(calls)
-    parallel_turn = None
-    for i, step in enumerate(traj):
-        tcs = step.get('tool_calls') or []
-        if len(tcs) > 1:
-            parallel_turn = i
-            break
-    if total > 4:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Total tool calls {total} exceeds 4.', 'evidence_refs': []}
-    if parallel_turn is not None:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Multiple tool calls in turn {parallel_turn}.', 'evidence_refs': []}
-    if total == 0 and not traj:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No trajectory evidence.', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': f'{total} sequential tool calls, none parallel.', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

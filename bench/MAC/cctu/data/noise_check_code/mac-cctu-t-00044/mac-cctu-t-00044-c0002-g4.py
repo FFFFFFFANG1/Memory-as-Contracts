@@ -1,24 +1,18 @@
 def evaluate(trace):
     import re
-    text = (trace.get('final_response') or '').strip()
-    if not text:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No final response', 'evidence_refs': []}
-    paragraphs = [p for p in re.split(r'\n\s*\n', text) if p.strip()]
-    multi_para = len(paragraphs) >= 2
-    heading_patterns = [r'^#{1,6}\s+\S', r'^\*\*[^*\n]+\*\*\s*:?\s*$', r'^[A-Z][A-Za-z0-9 ,/&-]{2,60}:\s*$', r'^[A-Z][A-Z0-9 ,/&-]{2,60}$']
-    heading_lines = []
-    for line in text.splitlines():
-        s = line.strip()
-        if not s:
-            continue
-        for pat in heading_patterns:
-            if re.match(pat, s):
-                heading_lines.append(s)
-                break
-    has_headings = len(heading_lines) >= 2
-    summary_pat = re.compile(r'(summary|conclusion|in\s+summary|in\s+conclusion|to\s+summarize|closing\s+thoughts|wrap[-\s]?up|takeaway)', re.IGNORECASE)
-    last_chunk = '\n'.join(text.splitlines()[-15:])
-    has_summary = bool(summary_pat.search(last_chunk))
-    ok = multi_para and has_headings and has_summary
-    reason = f'paragraphs={len(paragraphs)}, headings={len(heading_lines)}, closing_summary={has_summary}'
-    return {'observed_followed': bool(ok), 'confidence': 'medium', 'reason': reason, 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

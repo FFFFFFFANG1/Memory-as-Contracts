@@ -1,19 +1,19 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
     calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
-    reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['gardener_finder', 'venue_locator']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
-    else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if not calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no tool calls made', 'evidence_refs': []}
+    names = []
+    for c in calls:
+        n = c.get('name') if isinstance(c, dict) else None
+        if n:
+            names.append(n)
+    if not names:
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'tool calls present but names missing', 'evidence_refs': []}
+    if 'gardener_finder' not in names:
+        return {'observed_followed': None, 'confidence': 'low', 'reason': 'no gardener provenance lookup detected', 'evidence_refs': []}
+    if names[0] != 'gardener_finder':
+        return {'observed_followed': False, 'confidence': 'high', 'reason': f'first tool was {names[0]}, not gardener_finder', 'evidence_refs': [{'index': 0, 'name': names[0]}]}
+    if len(names) < 2 or names[1] != 'venue_locator':
+        second = names[1] if len(names) > 1 else None
+        return {'observed_followed': False, 'confidence': 'high', 'reason': f'second tool was {second}, not venue_locator', 'evidence_refs': [{'index': 1, 'name': second}]}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'gardener_finder first, venue_locator second before any other enrichment', 'evidence_refs': [{'index': 0, 'name': names[0]}, {'index': 1, 'name': names[1]}]}

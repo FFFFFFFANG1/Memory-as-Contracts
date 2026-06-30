@@ -1,24 +1,25 @@
+import re
 def evaluate(trace):
     response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['historical_event_info_retriever']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
+    text = response.strip()
+    n = len(text)
+    if n < 50 or n > 150:
+        reasons.append('length ' + str(n) + ' not in [50,150]')
+    m = re.search(r'Pr[uü]m:\s*(\d+)\s*;\s*Kemi:\s*(\d+)\s*;\s*Total:\s*(\d+)', text)
+    if not m:
+        reasons.append("missing required format 'Prüm: X; Kemi: Y; Total: Z'")
     else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    pieces = response.split()
-    if not pieces:
-        ok = False
-        reasons.append('response text missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+        x, y, z = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if x + y != z:
+            reasons.append('total ' + str(z) + ' != ' + str(x) + '+' + str(y))
+    names = [str(c.get('name') or '') for c in tool_calls]
+    cnt = sum(1 for nm in names if nm == 'historical_event_info_retriever')
+    if cnt > 2:
+        reasons.append('historical_event_info_retriever called ' + str(cnt) + ' > 2')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'length, format, and tool-cap satisfied', 'evidence_refs': []}

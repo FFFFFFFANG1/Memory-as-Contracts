@@ -1,24 +1,13 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
-    reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['election_result_finder', 'political_term_tracker']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    has_number = any(ch.isdigit() for ch in response)
-    if not has_number:
-        ok = False
-        reasons.append('numeric value missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    tool_calls = trace.get('tool_calls') or []
+    if not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no tool calls observed for exploratory scoping', 'evidence_refs': []}
+    scoping_tools = {'political_term_tracker', 'election_result_finder'}
+    scoping_calls = [c for c in tool_calls if str(c.get('name') or '') in scoping_tools]
+    total = len(tool_calls)
+    scoping_count = len(scoping_calls)
+    if scoping_count == 0:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no calls to political_term_tracker or election_result_finder during scoping', 'evidence_refs': []}
+    if scoping_count > 5:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': f'{scoping_count} scoping calls exceed cap of 5', 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': f'{scoping_count} scoping call(s) to allowed tools within cap of 5', 'evidence_refs': []}

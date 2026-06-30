@@ -14,16 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "parallel_call_count",
-        "spec": {
-            "min": 1,
-            "max": 2,
-            "unit": "type"
-        },
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/126/check_constraint_0.json"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:10.344796+00:00"
         }
     }
 }

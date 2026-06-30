@@ -19,11 +19,13 @@
         "generation": {
             "method": "cctu_reference",
             "source_artifact": "bench/CCTU/check_code/142/check_constraint_3.py",
-            "repair": "verifier_token_aligned_python"
+            "repair": "rule_based_p0_repair",
+            "repaired_at": "2026-06-30T04:18:52.614499+00:00"
         },
         "notes": [
             "rewritten by verifier repair pass",
-            "rewritten with verifier-token-aligned template"
+            "rewritten with verifier-token-aligned template",
+            "rewritten by rule-based P0 repair pass"
         ]
     }
 }

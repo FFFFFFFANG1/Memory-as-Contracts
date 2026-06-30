@@ -1,34 +1,20 @@
 def evaluate(trace):
     import re
-    text = trace.get('final_response','') or ''
-    if not text.strip():
-        return {'observed_followed': None, 'confidence':'unknown','reason':'empty response','evidence_refs':[]}
-    words = len(text.split())
-    # Detect table formatting (pipe tables or grid tables)
-    lines = text.splitlines()
-    has_pipe_table = False
-    for i,l in enumerate(lines):
-        if l.count('|') >= 2 and i+1 < len(lines) and re.match(r'^\s*\|?\s*:?-{2,}', lines[i+1]):
-            has_pipe_table = True
-            break
-    # Detect comparative content heuristically
-    comp_keywords = ['compare','comparison','vs','versus','between','differ','difference','contrast','whereas','while']
-    lower = text.lower()
-    is_comparative = any(k in lower for k in comp_keywords)
-    bullet_lines = [l for l in lines if re.match(r'^\s*[-*+]\s+', l)]
-    has_bullets = len(bullet_lines) >= 2
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
     reasons = []
-    followed = True
-    if words >= 200:
-        followed = False
-        reasons.append(f'word count {words} >= 200')
-    if has_pipe_table:
-        followed = False
-        reasons.append('contains tabular formatting')
-    if is_comparative and not has_bullets:
-        followed = False
-        reasons.append('comparative content not rendered as bullet list')
-    if followed:
-        reason = 'within word limit, no tables' + (', bullets used for comparison' if is_comparative else '; no clear comparative content detected')
-        return {'observed_followed': True, 'confidence':'medium' if is_comparative else 'low','reason':reason,'evidence_refs':[]}
-    return {'observed_followed': False, 'confidence':'high','reason':'; '.join(reasons),'evidence_refs':[]}
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

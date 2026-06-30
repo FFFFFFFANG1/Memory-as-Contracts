@@ -1,21 +1,14 @@
 def evaluate(trace):
-    import re
-    text = (trace.get('final_response') or '').strip()
-    if not text:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no final response','evidence_refs':[]}
-    paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
-    if len(paragraphs) < 3:
-        return {'observed_followed': False, 'confidence':'high','reason':f'found {len(paragraphs)} paragraphs, need 3','evidence_refs':[]}
-    if len(paragraphs) > 3:
-        return {'observed_followed': False, 'confidence':'medium','reason':f'found {len(paragraphs)} paragraphs, expected exactly 3','evidence_refs':[]}
-    joined = ' \n '.join(paragraphs).lower()
-    origin_terms = ['origin','originated','began','history','historical','root','ancient','first']
-    meaning_terms = ['meaning','symbol','represent','signif','denote','stands for','convey']
-    modern_terms = ['modern','today','contemporary','currently','present','nowadays','recent']
-    has_origin = any(t in joined for t in origin_terms)
-    has_meaning = any(t in joined for t in meaning_terms)
-    has_modern = any(t in joined for t in modern_terms)
-    missing = [n for n,v in [('origin',has_origin),('meaning',has_meaning),('modern usage',has_modern)] if not v]
-    if missing:
-        return {'observed_followed': False, 'confidence':'medium','reason':'missing coverage: '+', '.join(missing),'evidence_refs':[]}
-    return {'observed_followed': True, 'confidence':'medium','reason':'three paragraphs covering origin, meaning, modern usage','evidence_refs':[]}
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

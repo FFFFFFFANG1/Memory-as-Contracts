@@ -14,18 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "specific_tool_call_count",
-        "spec": {
-            "per_tool": {
-                "leadership_change_announcement_finder": {
-                    "min": 2,
-                    "max": null
-                }
-            }
-        },
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:46.846564+00:00"
         }
     }
 }

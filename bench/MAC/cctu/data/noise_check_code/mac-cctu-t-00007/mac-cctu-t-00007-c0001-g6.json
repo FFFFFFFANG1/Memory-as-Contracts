@@ -16,12 +16,13 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "Checks final response for JSON, YAML, and table structures only.",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "structured_to_minimal_python"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:37.528951+00:00"
         }
     }
 }

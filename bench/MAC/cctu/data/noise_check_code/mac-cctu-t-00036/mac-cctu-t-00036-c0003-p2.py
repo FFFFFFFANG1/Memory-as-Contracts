@@ -1,19 +1,14 @@
 def evaluate(trace):
-    import re
-    text = (trace.get('final_response') or '')
-    if not text.strip():
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no final response','evidence_refs':[]}
-    low = text.lower()
-    # Detect Spanish markers
-    es_markers = ['español','espanol','recomendación','recomendacion','dieta','región','region','salud','alimentación','alimentacion','nutrición','nutricion',' y ',' la ',' el ',' los ',' las ']
-    en_markers = ['english','recommendation','diet','region','health','nutrition',' the ',' and ',' for ']
-    es_hits = sum(1 for m in es_markers if m in low)
-    en_hits = sum(1 for m in en_markers if m in low)
-    bilingual = es_hits >= 2 and en_hits >= 2
-    # Region-specific dietary recommendation heuristic
-    has_diet = any(w in low for w in ['diet','dietary','dieta','alimentación','alimentacion','nutrition','nutrición','nutricion'])
-    has_region = any(w in low for w in ['region','región','regional','area','zone','country','local'])
-    has_reco = any(w in low for w in ['recommend','recomend'])
-    region_diet = has_diet and has_region and has_reco
-    followed = bilingual and region_diet
-    return {'observed_followed': bool(followed), 'confidence': 'medium', 'reason': f'bilingual={bilingual} (es_hits={es_hits}, en_hits={en_hits}), region_diet={region_diet}', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

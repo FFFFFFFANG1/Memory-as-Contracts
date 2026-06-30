@@ -15,13 +15,24 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "academic_score_retriever": {
+                    "min": null,
+                    "max": 10
+                }
+            }
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "minimal_python_for_verify"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:41:25.183920+00:00"
         }
     }
 }

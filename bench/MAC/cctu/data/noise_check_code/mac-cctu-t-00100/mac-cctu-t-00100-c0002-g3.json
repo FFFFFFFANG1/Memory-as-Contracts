@@ -18,7 +18,8 @@
         "notes": [],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:27.421721+00:00"
         }
     }
 }

@@ -14,17 +14,15 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "response_format",
-        "spec": {
-            "checks": [
-                {
-                    "name": "no_markdown"
-                }
-            ]
-        },
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:41:17.665214+00:00"
         }
     }
 }

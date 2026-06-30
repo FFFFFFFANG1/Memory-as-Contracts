@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "response_format",
         "spec": {
             "checks": [
@@ -28,10 +28,15 @@
                 }
             ]
         },
-        "notes": [],
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "attempts": 1,
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:28:13.638634+00:00"
         }
     }
 }

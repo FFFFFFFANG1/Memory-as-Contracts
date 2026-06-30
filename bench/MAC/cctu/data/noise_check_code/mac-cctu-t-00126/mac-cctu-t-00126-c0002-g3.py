@@ -1,17 +1,16 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls', []) or []
-    final = (trace.get('final_response') or '').strip()
-    if not calls and not final:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No trajectory data', 'evidence_refs': []}
-    n = len(calls)
-    distinct = {c.get('name') for c in calls if c.get('name')}
-    ends_ok = final.rstrip().rstrip('"\'').endswith('Verified across multiple sources.')
+    import re
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
     reasons = []
-    ok = True
-    if n < 4:
-        ok = False; reasons.append(f'only {n} tool calls (<4)')
-    if len(distinct) < 3:
-        ok = False; reasons.append(f'only {len(distinct)} distinct tools (<3)')
-    if not ends_ok:
-        ok = False; reasons.append('final response does not end with required phrase')
-    return {'observed_followed': ok, 'confidence': 'high' if ok else 'medium', 'reason': 'ok' if ok else '; '.join(reasons), 'evidence_refs': []}
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if tool_count < 4:
+        reasons.append('tool call count {tool_count} below 4')
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

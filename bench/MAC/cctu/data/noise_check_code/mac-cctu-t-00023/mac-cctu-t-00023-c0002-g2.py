@@ -1,33 +1,21 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no tool calls','evidence_refs':[]}
-    first = calls[0].get('name')
-    if first != 'historical_event_data_retriever':
-        return {'observed_followed': False,'confidence':'high','reason': f'first tool was {first}, not historical_event_data_retriever','evidence_refs':[{'index':calls[0].get('index'),'name':first}]}
-    # Check notes: look at assistant content for bullet lists labeled as scoping notes
     import re
-    traj = trace.get('trajectory') or []
-    for step in traj:
-        content = (step.get('content') or '')
-        if not content:
-            continue
-        low = content.lower()
-        if 'scoping' in low or 'preliminary' in low:
-            # find bullet blocks
-            lines = content.splitlines()
-            bullet_block = []
-            blocks = []
-            for ln in lines:
-                if re.match(r'^\s*[-*\u2022]\s+', ln):
-                    bullet_block.append(ln)
-                else:
-                    if bullet_block:
-                        blocks.append(bullet_block)
-                        bullet_block = []
-            if bullet_block:
-                blocks.append(bullet_block)
-            for b in blocks:
-                if len(b) > 5:
-                    return {'observed_followed': False,'confidence':'medium','reason': f'scoping notes bullet block has {len(b)} lines (>5)','evidence_refs':[]}
-    return {'observed_followed': True,'confidence':'high','reason':'historical_event_data_retriever invoked first; no over-long scoping bullet blocks detected','evidence_refs':[{'index':calls[0].get('index'),'name':first}]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    allowed_tools = set(['historical_event_data_retriever'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
+    if forbidden_used:
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

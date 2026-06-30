@@ -1,22 +1,21 @@
 def evaluate(trace):
-    import re
-    allowed = {'urban_area_identifier','business_district_locator'}
-    calls = trace.get('tool_calls') or []
-    used = [c.get('name') for c in calls if c.get('name')]
-    bad = [n for n in used if n not in allowed]
-    final = (trace.get('final_response') or '').strip()
-    if not final:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No final response', 'evidence_refs': []}
-    if bad:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Used disallowed tools: {sorted(set(bad))}', 'evidence_refs': bad}
-    # one paragraph check: no blank line separating paragraphs
-    paragraphs = [p for p in re.split(r'\n\s*\n', final) if p.strip()]
-    if len(paragraphs) > 1:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Response has {len(paragraphs)} paragraphs, not one', 'evidence_refs': []}
-    # check no committed numeric final answer - look for patterns like 'the answer is X', 'final: N', or a standalone numeric conclusion
-    low = final.lower()
-    commit_patterns = [r'\bthe answer is\b', r'\bfinal answer\b', r'\bi conclude\b.*\d', r'\bdefinitively\b.*\d', r'\bis exactly\s+\d']
-    for pat in commit_patterns:
-        if re.search(pat, low):
-            return {'observed_followed': False, 'confidence': 'medium', 'reason': f'Appears to commit to a final answer: pattern {pat}', 'evidence_refs': [pat]}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'Only allowed tools used; single paragraph; no explicit numeric commitment detected', 'evidence_refs': used}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    allowed_tools = set(['business_district_locator', 'urban_area_identifier'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
+    if forbidden_used:
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

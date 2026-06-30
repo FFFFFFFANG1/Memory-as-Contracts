@@ -16,12 +16,12 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "rewritten by verifier repair pass"
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "minimal_python_for_verify"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:57.432500+00:00"
         }
     }
 }

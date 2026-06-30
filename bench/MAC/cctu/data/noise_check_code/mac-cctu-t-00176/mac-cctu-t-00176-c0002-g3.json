@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_usage",
         "spec": {
             "required_tools": [
@@ -24,10 +24,16 @@
                 "chef_dish_associator"
             ]
         },
-        "notes": [],
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "attempts": 1,
+            "repair": "rule_based_p2_repair",
+            "repaired_at": "2026-06-30T04:30:54.842181+00:00"
         }
     }
 }

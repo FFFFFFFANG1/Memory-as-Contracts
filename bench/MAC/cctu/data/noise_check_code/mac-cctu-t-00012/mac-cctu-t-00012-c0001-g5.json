@@ -14,25 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "response_format",
-        "spec": {
-            "checks": [
-                {
-                    "name": "contains_terms",
-                    "terms": [
-                        "acquirer",
-                        "target",
-                        "announced",
-                        "deal value"
-                    ]
-                }
-            ]
-        },
-        "notes": [],
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:39.882383+00:00"
         }
     }
 }

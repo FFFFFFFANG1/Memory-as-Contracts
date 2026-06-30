@@ -14,16 +14,12 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "tool_usage",
-        "spec": {
-            "required_tools": [
-                "award_information_and_record_retriever"
-            ],
-            "forbidden_tools": []
-        },
+        "evaluator_type": "python",
+        "notes": [],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:28.768914+00:00"
         }
     }
 }

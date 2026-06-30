@@ -19,12 +19,14 @@
         "generation": {
             "method": "cctu_reference",
             "source_artifact": "bench/CCTU/check_code/101/check_constraint_1.py",
-            "repair": "response_only_final_review_fix"
+            "repair": "rule_based_p0_repair",
+            "repaired_at": "2026-06-30T04:18:43.404072+00:00"
         },
         "notes": [
             "rewritten by verifier repair pass",
             "rewritten with verifier-token-aligned template",
-            "removed tool call access for verifier final pass"
+            "removed tool call access for verifier final pass",
+            "rewritten by rule-based P0 repair pass"
         ]
     }
 }

@@ -1,24 +1,19 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get(''.join(['tool', '_calls'])) or []
-    if not response.strip() and not calls:
+    trajectory = trace.get('trajectory') or []
+    if not response.strip():
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['biographical_data_retriever']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    pieces = response.split()
-    if not pieces:
-        ok = False
-        reasons.append('response text missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    _markdown_markers = ('**', '__', '# ')
+    _has_markdown = any(mark in response for mark in _markdown_markers)
+    word_count = len(response.split())
+    if word_count > 150:
+        reasons.append('word count {word_count} above 150')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

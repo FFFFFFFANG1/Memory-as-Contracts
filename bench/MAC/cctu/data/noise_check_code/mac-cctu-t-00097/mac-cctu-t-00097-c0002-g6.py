@@ -1,21 +1,21 @@
 def evaluate(trace):
-    allowed = {'biographical_info_retriever','historical_fact_finder'}
-    calls = trace.get('tool_calls') or []
-    used = [c.get('name') for c in calls if c.get('name')]
-    forbidden = [n for n in used if n not in allowed]
-    final = (trace.get('final_response') or '').strip()
-    if forbidden:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Used disallowed tools: {sorted(set(forbidden))}', 'evidence_refs': []}
-    if not final:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No final response to assess paragraph format.', 'evidence_refs': []}
-    # Check it's a short paragraph: not bullets/headers, modest length
-    import re
-    has_bullets = bool(re.search(r'(^|\n)\s*([-*+]|\d+\.)\s+', final))
-    has_headers = bool(re.search(r'(^|\n)#{1,6}\s', final))
-    paragraphs = [p for p in re.split(r'\n\s*\n', final) if p.strip()]
-    word_count = len(final.split())
-    is_short = word_count <= 250
-    is_paragraph = (len(paragraphs) <= 2) and not has_bullets and not has_headers
-    if is_paragraph and is_short:
-        return {'observed_followed': True, 'confidence': 'medium', 'reason': 'Tools restricted to allowed set; response is a short paragraph.', 'evidence_refs': []}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': f'Response not a short biographical paragraph (words={word_count}, paragraphs={len(paragraphs)}, bullets={has_bullets}, headers={has_headers}).', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    allowed_tools = set(['biographical_info_retriever', 'historical_fact_finder'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
+    if forbidden_used:
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

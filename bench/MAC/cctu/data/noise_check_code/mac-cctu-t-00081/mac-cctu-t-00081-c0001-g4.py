@@ -1,24 +1,22 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'empty final response', 'evidence_refs': []}
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['algorithm_insight_extractor', 'biographical_info_finder', 'corporate_partnership_finder', 'cuisine_explorer', 'culinary_ingredient_identifier']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    marks = ['**', '__', '`', '# ', '- ', '* ']
-    if not any(mark in response for mark in marks):
-        ok = False
-        reasons.append('format marker missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    lines = response.splitlines()
+    has_heading = any(re.match(r'^\s{0,3}#{1,6}\s+\S', ln) for ln in lines)
+    if not has_heading:
+        reasons.append('no markdown heading')
+    has_bullet = any(re.match(r'^\s*[-*+]\s+\S', ln) for ln in lines)
+    if not has_bullet:
+        reasons.append('no bullet points')
+    has_emphasis = bool(re.search(r'\*\*[^*\n]+\*\*', response)) or bool(re.search(r'__[^_\n]+__', response)) or bool(re.search(r'(?<!\*)\*[^*\n]+\*(?!\*)', response)) or bool(re.search(r'(?<!_)_[^_\n]+_(?!_)', response))
+    if not has_emphasis:
+        reasons.append('no emphasized terms')
+    stripped = response.rstrip()
+    if not stripped.endswith('.'):
+        reasons.append('does not end with a period')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'markdown headings, bullets, emphasis present and ends with period', 'evidence_refs': []}

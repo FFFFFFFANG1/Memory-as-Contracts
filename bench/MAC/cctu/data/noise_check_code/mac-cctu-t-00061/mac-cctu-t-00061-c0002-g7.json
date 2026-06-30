@@ -15,13 +15,11 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "notes": [
-            "rewritten by verifier repair pass"
-        ],
+        "notes": [],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "minimal_python_for_verify"
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:23.535510+00:00"
         }
     }
 }

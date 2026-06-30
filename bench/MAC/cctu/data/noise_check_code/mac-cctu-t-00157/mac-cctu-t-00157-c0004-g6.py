@@ -1,19 +1,22 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool calls found', 'evidence_refs': []}
-    quantitative = {'historical_road_length_calculator', 'waterfall_volume_calculator', 'population_data_retriever'}
-    scoping_violations = []
-    quant_seen = False
-    for i, c in enumerate(calls):
-        name = c.get('name') or c.get('tool_name') or ''
-        if name in quantitative:
-            quant_seen = True
-            break
-        if name != 'historical_figure_identifier':
-            scoping_violations.append((i, name))
-    if not quant_seen and not scoping_violations:
-        return {'observed_followed': None, 'confidence': 'low', 'reason': 'No quantitative tool invoked; scoping phase boundary unclear but no non-identifier tool ran first', 'evidence_refs': [c.get('name','') for c in calls]}
-    if scoping_violations:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Non-identifier tool(s) used during scoping before quantitative tools: {scoping_violations}', 'evidence_refs': [str(v) for v in scoping_violations]}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': 'Only historical_figure_identifier used during scoping before quantitative tools', 'evidence_refs': [c.get('name','') for c in calls]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['historical_figure_identifier']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    allowed_tools = set(['historical_figure_identifier'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
+    if forbidden_used:
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

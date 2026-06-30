@@ -1,28 +1,21 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get(''.join(['tool', '_calls'])) or []
-    if not response.strip() and not calls:
+    trajectory = trace.get('trajectory') or []
+    if not response.strip():
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['conservation_award_winner_finder', 'festival_finder', 'individual_location_finder', 'nature_reserve_association_finder', 'species_locator']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    marks = ['**', '__', '`', '# ', '- ', '* ']
+    marks = ['**', '__', '# ', '- ', '* ', '`']
     if not any(mark in response for mark in marks):
-        ok = False
-        reasons.append('format marker missing')
-    pieces = response.split()
-    if not pieces:
-        ok = False
+        reasons.append('markdown marker missing')
+    if '**' not in response and '__' not in response:
+        reasons.append('bold markdown missing')
+    word_count = len(response.split())
+    if word_count == 0:
         reasons.append('response text missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    round_count = len(trajectory)
+    if response.strip() and not response.rstrip().endswith('.'):
+        reasons.append('response does not end with period')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

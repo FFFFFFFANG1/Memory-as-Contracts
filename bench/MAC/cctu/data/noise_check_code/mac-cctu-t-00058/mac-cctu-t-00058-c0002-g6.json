@@ -14,16 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "tool_call_count",
-        "spec": {
-            "min": 3,
-            "max": 5
-        },
-        "notes": [],
+        "evaluator_type": "python",
+        "notes": [
+            "counts trajectory entries as interaction turns"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:23.151774+00:00"
         }
     }
 }

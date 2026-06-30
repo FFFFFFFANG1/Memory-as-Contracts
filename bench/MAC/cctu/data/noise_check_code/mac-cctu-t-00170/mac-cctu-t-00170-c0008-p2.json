@@ -14,17 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "tool_usage",
-        "spec": {
-            "required_tools": [
-                "flight_distance_calculator",
-                "train_route_distance_calculator"
-            ],
-            "forbidden_tools": []
-        },
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:23.613105+00:00"
         }
     }
 }

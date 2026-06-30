@@ -1,14 +1,15 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
     if not response.strip():
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
     reasons = []
-    has_digit = any(ch.isdigit() for ch in response)
-    if not has_digit:
-        ok = False
-        reasons.append('numeric date-like value missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if not re.search(r'\b\d{4}-\d{2}-\d{2}\b', response):
+        reasons.append('expected date in requested format')
+    if 'currency_conversion_rate' not in response.lower():
+        reasons.append('currency_conversion_rate' + ' not mentioned in response')
+    if 'observed_at' not in response.lower():
+        reasons.append('observed_at' + ' not mentioned in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

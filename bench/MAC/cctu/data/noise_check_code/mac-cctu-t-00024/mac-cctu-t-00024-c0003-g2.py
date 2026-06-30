@@ -1,32 +1,55 @@
 import json
+import re
+
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
+    trace = trace or {}
+    final = str(trace.get('final_response') or '')
+    trajectory = trace.get('trajectory') or []
+    tool_calls = trace.get('tool_calls') or []
+    failures = []
     evidence = []
-    reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['release_date']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
-    else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
+    if not final:
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'missing final response', 'evidence_refs': []}
+    prefix = 'The nurses were released on'
+    if not final.lstrip().startswith(prefix):
+        failures.append(f'response does not start with {prefix!r}')
+    parsed = None
+    stripped = final.strip()
     try:
-        parsed = json.loads(response.strip())
-        if not isinstance(parsed, dict):
-            ok = False
-            reasons.append('response is not a JSON object')
+        parsed = json.loads(stripped)
     except Exception:
-        ok = False
-        reasons.append('response is not valid JSON')
-    has_digit = any(ch.isdigit() for ch in response)
-    if not has_digit:
-        ok = False
-        reasons.append('numeric date-like value missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+        for m in re.findall(r'\{.*?\}', stripped, flags=re.DOTALL):
+            try:
+                cand = json.loads(m)
+                if isinstance(cand, dict):
+                    parsed = cand
+                    break
+            except Exception:
+                continue
+    if not isinstance(parsed, dict):
+        failures.append('final response is not a valid JSON object')
+    else:
+        evidence.append({'json_keys': sorted(parsed.keys())})
+        if 'release_date' not in parsed:
+            failures.append("JSON object missing key 'release_date'")
+        else:
+            value = parsed.get('release_date')
+            if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
+                failures.append(f'release_date value {value!r} is not YYYY-MM-DD format')
+            else:
+                try:
+                    import datetime as _dt
+                    _dt.date.fromisoformat(value)
+                except Exception:
+                    failures.append(f'release_date value {value!r} is not a valid date')
+    turns = len(trajectory)
+    evidence.append({'interaction_turns': turns})
+    if turns < 1 or turns > 3:
+        failures.append(f'interaction turns {turns} not in 1..3')
+    tc = len(tool_calls)
+    evidence.append({'tool_calls': tc})
+    if tc > 2:
+        failures.append(f'tool calls {tc} exceed maximum 2')
+    if failures:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(failures[:8]), 'evidence_refs': evidence}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'all checks passed', 'evidence_refs': evidence}

@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "parallel_call_count",
         "spec": {
             "min": 2,
@@ -23,7 +23,16 @@
         },
         "generation": {
             "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/175/check_constraint_0.json"
-        }
+            "source_artifact": "bench/CCTU/check_code/175/check_constraint_0.json",
+            "repair": "rule_based_p3_repair",
+            "repaired_at": "2026-06-30T04:37:19.139728+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass",
+            "rewritten by rule-based P2 repair pass",
+            "rewritten by rule-based P3 repair pass"
+        ]
     }
 }

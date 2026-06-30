@@ -1,14 +1,16 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
     if not response.strip():
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
     reasons = []
-    has_digit = any(ch.isdigit() for ch in response)
-    if not has_digit:
-        ok = False
-        reasons.append('numeric date-like value missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    _markdown_markers = ('**', '__', '# ')
+    _has_markdown = any(mark in response for mark in _markdown_markers)
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

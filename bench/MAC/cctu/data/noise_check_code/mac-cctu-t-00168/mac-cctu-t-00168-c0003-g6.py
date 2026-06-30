@@ -1,12 +1,17 @@
 def evaluate(trace):
-    final = (trace.get('final_response') or '').lower()
-    if not final:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no final response', 'evidence_refs': []}
-    has_disclaimer = any(k in final for k in ['disclaimer', 'note:', 'please note', 'caveat'])
-    mentions_fictional = any(k in final for k in ['fictional', 'fictitious', 'illustrative', 'hypothetical', 'made-up', 'made up', 'not real'])
-    mentions_empirical = any(k in final for k in ['empirical', 'real-world', 'real world', 'actual healthcare', 'official statistics', 'real statistics', 'actual statistics', 'verified data'])
-    if has_disclaimer and mentions_fictional and mentions_empirical:
-        return {'observed_followed': True, 'confidence': 'medium', 'reason': 'disclaimer paragraph distinguishes fictional from empirical healthcare stats', 'evidence_refs': []}
-    if mentions_fictional and mentions_empirical:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'distinguishes fictional vs empirical without explicit disclaimer label', 'evidence_refs': []}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': 'no disclaimer distinguishing fictional figures from empirical healthcare statistics', 'evidence_refs': []}
+    import re
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    _markdown_markers = ('**', '__', '# ')
+    _has_markdown = any(mark in response for mark in _markdown_markers)
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

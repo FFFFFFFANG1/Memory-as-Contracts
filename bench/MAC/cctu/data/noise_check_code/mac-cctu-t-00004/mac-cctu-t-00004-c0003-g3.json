@@ -16,12 +16,14 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by rule-based P0 repair pass"
         ],
         "generation": {
             "method": "cctu_reference",
             "source_artifact": "bench/CCTU/check_code/4/check_constraint_2.json",
-            "repair": "structured_to_minimal_python"
+            "repair": "rule_based_p0_repair",
+            "repaired_at": "2026-06-30T04:18:23.421585+00:00"
         }
     }
 }

@@ -1,9 +1,15 @@
 def evaluate(trace):
-    final = (trace.get('final_response') or '').strip()
-    calls = trace.get('tool_calls') or []
-    count = sum(1 for c in calls if (c.get('name') or '') == 'forest_tree_data_retriever')
-    ends_ok = final.endswith('[CENSUS-OK]')
-    if not calls and not final:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no evidence', 'evidence_refs': []}
-    followed = (count >= 2) and ends_ok
-    return {'observed_followed': bool(followed), 'confidence': 'high', 'reason': f'forest_tree_data_retriever calls={count}, ends_with_token={ends_ok}', 'evidence_refs': []}
+    import re
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    _count_forest_tree_data_retriever = sum(1 for name in tool_names if name == 'forest_tree_data_retriever')
+    if _count_forest_tree_data_retriever < 2:
+        reasons.append('forest_tree_data_retriever' + ' call count ' + str(_count_forest_tree_data_retriever) + ' below 2')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

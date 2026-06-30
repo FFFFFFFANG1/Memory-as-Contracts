@@ -15,13 +15,23 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "industrial_facility_locator",
+                "landmark_location_finder"
+            ],
+            "forbidden_tools": [
+                "architect_info_finder"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
+            "converted from structured LLM package"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "minimal_python_for_verify"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:26.328175+00:00"
         }
     }
 }

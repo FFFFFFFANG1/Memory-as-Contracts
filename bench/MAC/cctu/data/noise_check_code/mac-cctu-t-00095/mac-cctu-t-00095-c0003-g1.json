@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "response_format",
         "spec": {
             "checks": [
@@ -24,7 +24,12 @@
             ]
         },
         "generation": {
-            "method": "heuristic"
-        }
+            "method": "heuristic",
+            "repair": "rule_based_p0_repair",
+            "repaired_at": "2026-06-30T04:18:42.303447+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass"
+        ]
     }
 }

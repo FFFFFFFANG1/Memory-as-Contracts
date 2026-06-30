@@ -14,17 +14,12 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "response_format",
-        "spec": {
-            "checks": [
-                {
-                    "name": "json_object"
-                }
-            ]
-        },
+        "evaluator_type": "python",
+        "notes": [],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:21.905932+00:00"
         }
     }
 }

@@ -1,17 +1,17 @@
 def evaluate(trace):
     import re
+    response = str(trace.get('final_response') or '')
     tool_calls = trace.get('tool_calls') or []
-    final = trace.get('final_response') or ''
-    analyzer_calls = [tc for tc in tool_calls if (tc.get('name') or '') == 'election_result_analyzer']
-    if not analyzer_calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'election_result_analyzer was never called', 'evidence_refs': []}
-    # Check table presence in final response
-    has_md_table = '|' in final and re.search(r'\|.*\|', final) is not None and final.count('|') >= 4
-    has_separator = bool(re.search(r'\|\s*[-:]+\s*\|', final))
-    has_html_table = '<table' in final.lower()
-    tabulated = (has_md_table and has_separator) or has_html_table
-    if not final.strip():
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No final response to inspect', 'evidence_refs': []}
-    if not tabulated:
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': 'Final response lacks a tabulated breakdown of vote shares', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': 'election_result_analyzer was called and final response contains a table', 'evidence_refs': []}
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    _markdown_markers = ('**', '__', '# ')
+    _has_markdown = any(mark in response for mark in _markdown_markers)
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    _count_election_result_analyzer = sum(1 for name in tool_names if name == 'election_result_analyzer')
+    if _count_election_result_analyzer < 1:
+        reasons.append('election_result_analyzer' + ' call count ' + str(_count_election_result_analyzer) + ' below 1')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

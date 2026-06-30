@@ -15,10 +15,25 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "notes": [],
+        "family": "response_format",
+        "spec": {
+            "checks": [
+                {
+                    "name": "no_markdown"
+                },
+                {
+                    "name": "plain_text"
+                }
+            ]
+        },
+        "notes": [
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:04.796400+00:00"
         }
     }
 }

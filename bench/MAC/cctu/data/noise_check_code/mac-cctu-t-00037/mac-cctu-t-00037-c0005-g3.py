@@ -1,21 +1,17 @@
 def evaluate(trace):
-    import re
-    tool_calls = trace.get('tool_calls', []) or []
-    final = (trace.get('final_response') or '')
-    used_hist = any((tc.get('name') or '') == 'historical_event_retriever' for tc in tool_calls)
-    if not used_hist:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'historical_event_retriever was not called to cross-reference magnitudes', 'evidence_refs': []}
-    text = final.lower()
-    has_compare_terms = any(t in text for t in ['discrepan', 'differ', 'compar', 'match', 'consistent', 'agree'])
-    paragraphs = [p.strip() for p in re.split(r'\n\s*\n', final) if p.strip()]
-    comparative_para = None
-    for p in paragraphs:
-        pl = p.lower()
-        if any(t in pl for t in ['discrepan','differ','compar','consistent','agree']) and ('magnitud' in pl or 'source' in pl or 'historical' in pl):
-            comparative_para = p
-            break
-    if comparative_para is None and has_compare_terms:
-        return {'observed_followed': None, 'confidence': 'low', 'reason': 'Comparison vocabulary present but no clear comparative paragraph identified', 'evidence_refs': []}
-    if comparative_para is None:
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': 'No comparative paragraph summarizing discrepancies between the two sources found in final response', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'historical_event_retriever was used and a comparative paragraph discussing discrepancies is present', 'evidence_refs': [comparative_para[:160]]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

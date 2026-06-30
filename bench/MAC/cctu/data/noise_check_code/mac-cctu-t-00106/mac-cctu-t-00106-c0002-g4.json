@@ -15,13 +15,19 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "disaster_and_earthquake_impact_analyzer"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
+            "converted from structured LLM package"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "minimal_python_for_verify"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:27.983723+00:00"
         }
     }
 }

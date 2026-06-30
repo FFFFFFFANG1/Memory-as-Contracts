@@ -1,12 +1,14 @@
 def evaluate(trace):
-    resp = (trace.get('final_response') or '').strip()
-    if not resp:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'empty response', 'evidence_refs': []}
-    # Strip trailing closing quotes/brackets to find true terminal punctuation
-    tail = resp.rstrip('"\'\u201d\u2019)]}')
-    if not tail:
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': 'no terminal punctuation found', 'evidence_refs': [resp[-10:]]}
-    last = tail[-1]
-    if last in '.!?':
-        return {'observed_followed': True, 'confidence': 'high', 'reason': f'ends with {last!r}', 'evidence_refs': [resp[-15:]]}
-    return {'observed_followed': False, 'confidence': 'high', 'reason': f'ends with {last!r}, not closing punctuation', 'evidence_refs': [resp[-15:]]}
+    import re
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    if response.strip() and not response.rstrip().endswith('.'):
+        reasons.append('response does not end with period')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

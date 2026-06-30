@@ -1,24 +1,28 @@
 def evaluate(trace):
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    if not names:
-        ok = False
-        reasons.append('operation not observed')
-    marks = ['**', '__', '`', '# ', '- ', '* ']
+    marks = ['**', '__', '# ', '- ', '* ', '`']
     if not any(mark in response for mark in marks):
-        ok = False
-        reasons.append('format marker missing')
-    pieces = response.split()
-    if not pieces:
-        ok = False
-        reasons.append('response text missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+        reasons.append('markdown marker missing')
+    if '**' not in response and '__' not in response:
+        reasons.append('bold markdown missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    word_count = len(response.split())
+    if word_count < 300:
+        reasons.append('word count {word_count} below 300')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    round_count = len(trajectory)
+    if round_count > 10:
+        reasons.append('interaction rounds {round_count} above 10')
+    if response.strip() and not response.rstrip().endswith('.'):
+        reasons.append('response does not end with period')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

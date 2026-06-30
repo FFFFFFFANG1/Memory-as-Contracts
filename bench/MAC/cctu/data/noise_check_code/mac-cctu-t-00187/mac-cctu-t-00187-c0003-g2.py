@@ -1,16 +1,21 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool calls in trace.', 'evidence_refs': []}
-    names = [c.get('name') for c in calls]
-    refs = [{'index': c.get('index'), 'name': c.get('name')} for c in calls]
-    first = names[0]
-    if first != 'historical_infrastructure_locator':
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'First tool was {first!r}, expected historical_infrastructure_locator.', 'evidence_refs': refs[:1]}
-    hist_indices = [i for i, n in enumerate(names) if n == 'historical_infrastructure_locator']
-    pop_indices = [i for i, n in enumerate(names) if n == 'population_data_retriever']
-    for pi in pop_indices:
-        prior_hist = [hi for hi in hist_indices if hi < pi]
-        if not prior_hist:
-            return {'observed_followed': False, 'confidence': 'high', 'reason': 'population_data_retriever called without a prior historical_infrastructure_locator call to verify.', 'evidence_refs': [refs[pi]]}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': 'historical_infrastructure_locator invoked first; population_data_retriever only used after it.', 'evidence_refs': refs}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['historical_infrastructure_locator', 'population_data_retriever']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    allowed_tools = set(['historical_infrastructure_locator', 'population_data_retriever'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
+    if forbidden_used:
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

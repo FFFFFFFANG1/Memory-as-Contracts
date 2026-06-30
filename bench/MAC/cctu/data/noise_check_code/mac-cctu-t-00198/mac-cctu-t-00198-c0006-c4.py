@@ -1,19 +1,10 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
-    reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['biologist_specialization_finder', 'habitat_species_associator']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
-    else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    tool_calls = trace.get('tool_calls') or []
+    if not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no tool calls observed; cannot verify constrained tool usage', 'evidence_refs': []}
+    names = [str(c.get('name') or '') for c in tool_calls]
+    bsf_indices = [i for i, n in enumerate(names) if n == 'biologist_specialization_finder']
+    bsf_count = len(bsf_indices)
+    if bsf_count > 3:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'biologist_specialization_finder invoked ' + str(bsf_count) + ' times, exceeds limit of 3', 'evidence_refs': [str(i) for i in bsf_indices]}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'biologist_specialization_finder invoked ' + str(bsf_count) + ' times (<=3); habitat_species_associator placement unrestricted', 'evidence_refs': [str(i) for i in bsf_indices]}

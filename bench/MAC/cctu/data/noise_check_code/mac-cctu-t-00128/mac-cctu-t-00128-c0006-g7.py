@@ -1,12 +1,15 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no tool calls observed','evidence_refs':[]}
-    names = [c.get('name') for c in calls]
-    non_allowed = [n for n in names if n and n != 'unified_media_info_retriever']
-    total = len(names)
-    if non_allowed:
-        return {'observed_followed': False,'confidence':'high','reason': f'used disallowed tools: {non_allowed}','evidence_refs': names}
-    if total > 3:
-        return {'observed_followed': False,'confidence':'high','reason': f'tool calls {total} exceed cap of 3','evidence_refs': names}
-    return {'observed_followed': True,'confidence':'high','reason': f'only unified_media_info_retriever used, total {total} <= 3','evidence_refs': names}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

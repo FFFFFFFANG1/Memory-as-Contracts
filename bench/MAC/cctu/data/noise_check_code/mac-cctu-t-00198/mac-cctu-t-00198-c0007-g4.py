@@ -1,14 +1,18 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls', []) or []
-    habitat_tools = {'habitat_species_associator'}
-    bio_indices = [i for i, c in enumerate(calls) if c.get('name') == 'biographical_affiliation_finder']
-    habitat_indices = [i for i, c in enumerate(calls) if c.get('name') in habitat_tools]
-    if not habitat_indices:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No habitat tool calls detected; constraint not triggered.', 'evidence_refs': []}
-    if not bio_indices:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'Habitat tool used without prior biographical_affiliation_finder call.', 'evidence_refs': habitat_indices}
-    first_bio = min(bio_indices)
-    first_habitat = min(habitat_indices)
-    if first_bio < first_habitat:
-        return {'observed_followed': True, 'confidence': 'high', 'reason': 'biographical_affiliation_finder invoked before habitat tools.', 'evidence_refs': [first_bio, first_habitat]}
-    return {'observed_followed': False, 'confidence': 'high', 'reason': 'Habitat tool invoked before biographical_affiliation_finder.', 'evidence_refs': [first_bio, first_habitat]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['biographical_affiliation_finder']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

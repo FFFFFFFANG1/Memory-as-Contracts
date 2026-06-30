@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_parallel",
         "spec": {
             "groups": [
@@ -26,7 +26,13 @@
         },
         "generation": {
             "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/104/check_constraint_3.json"
-        }
+            "source_artifact": "bench/CCTU/check_code/104/check_constraint_3.json",
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:27:57.944916+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
+        ]
     }
 }

@@ -1,16 +1,14 @@
 def evaluate(trace):
     response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+    tool_calls = trace.get('tool_calls') or []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    if not names:
-        ok = False
-        reasons.append('no tool usage observed')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'empty final response', 'evidence_refs': []}
+    if not response.lstrip().startswith('Scoping Notes:'):
+        reasons.append('final response does not begin with literal prefix "Scoping Notes:"')
+    if len(tool_calls) > 0:
+        names = [str((tc or {}).get('name','')) for tc in tool_calls]
+        reasons.append('tool calls were issued: ' + ', '.join(names))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'response begins with "Scoping Notes:" and no tool calls were issued', 'evidence_refs': []}

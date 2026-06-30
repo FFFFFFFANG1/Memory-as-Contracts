@@ -1,23 +1,19 @@
-import json
 def evaluate(trace):
+    import json
+    import re
     response = str(trace.get('final_response') or '')
     if not response.strip():
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
     reasons = []
-    try:
-        parsed = json.loads(response.strip())
-        if not isinstance(parsed, dict):
-            ok = False
-            reasons.append('response is not a JSON object')
-    except Exception:
-        ok = False
-        reasons.append('response is not valid JSON')
-    marks = ['**', '__', '`', '# ', '- ', '* ']
+    marks = ['**', '__', '# ', '- ', '* ', '`']
     if any(mark in response for mark in marks):
-        ok = False
-        reasons.append('format marker observed')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+        reasons.append('markdown or special formatting present')
+    try:
+        _parsed = json.loads(response.strip())
+    except Exception:
+        _parsed = None
+    if not isinstance(_parsed, dict):
+        reasons.append('valid json object missing')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

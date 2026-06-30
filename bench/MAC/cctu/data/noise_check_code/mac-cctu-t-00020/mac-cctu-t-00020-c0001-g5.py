@@ -1,22 +1,23 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
+    response = trace.get('final_response')
+    tool_calls = trace.get('tool_calls') or []
+    if response is None and not tool_calls:
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no observable behavior', 'evidence_refs': []}
+    response = str(response or '')
+    names = [str(c.get('name') or '') for c in tool_calls]
+    phf_count = sum(1 for n in names if n == 'political_history_finder')
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['political_history_finder']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
+    if phf_count != 1:
+        reasons.append('political_history_finder called ' + str(phf_count) + ' times (expected exactly 1)')
+    stripped = response.rstrip()
+    if len(response) >= 50:
+        reasons.append('response length ' + str(len(response)) + ' >= 50 chars')
+    if not stripped:
+        reasons.append('response is empty')
     else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
-    if not response.split():
-        ok = False
-        reasons.append('response text missing')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+        last = stripped[-1]
+        if last in '.!?,;:。！？，；：':
+            reasons.append('response ends with terminating punctuation: ' + repr(last))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'exactly one political_history_finder call; response under 50 chars without terminating punctuation', 'evidence_refs': []}

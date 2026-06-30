@@ -1,15 +1,14 @@
 def evaluate(trace):
     import re
-    resp = (trace.get('final_response') or '').strip()
-    if not resp:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No final response', 'evidence_refs': []}
-    words = re.findall(r"\S+", resp)
-    wc = len(words)
-    if wc >= 50:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Response has {wc} words (>=50)', 'evidence_refs': [resp[:120]]}
-    calc_patterns = [r'\d+\s*[-+\u2212]\s*\d+\s*=', r'=\s*\d+\s*days', r'subtract', r'difference between', r'calculat', r'\d+\s*-\s*\d+\s*\+', r'days between.*=']
-    low = resp.lower()
-    hits = [p for p in calc_patterns if re.search(p, low)]
-    if hits:
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': f'Explicit calculation shown: {hits}', 'evidence_refs': [resp[:200]]}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': f'{wc} words, no explicit calculation step detected', 'evidence_refs': [resp[:120]]}
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

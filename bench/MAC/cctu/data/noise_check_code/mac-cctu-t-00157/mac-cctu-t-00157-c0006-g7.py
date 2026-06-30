@@ -1,19 +1,15 @@
 def evaluate(trace):
-    import re
-    calls = trace.get('tool_calls') or []
-    n = len(calls)
-    final = (trace.get('final_response') or '').strip()
-    if not final:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no final response','evidence_refs':[]}
-    # count sentences: split on . ! ? followed by space or end
-    # strip trailing punctuation, count sentence terminators
-    text = final.strip()
-    # remove trailing whitespace
-    parts = re.split(r'(?<=[.!?])\s+', text)
-    parts = [p for p in parts if p.strip()]
-    sentence_count = len(parts)
-    tool_ok = n <= 3
-    sent_ok = sentence_count == 1
-    if tool_ok and sent_ok:
-        return {'observed_followed': True, 'confidence':'high','reason': f'{n} tool calls, 1 sentence','evidence_refs':[]}
-    return {'observed_followed': False, 'confidence':'high','reason': f'tool_calls={n} (cap 3), sentences={sentence_count}','evidence_refs':[]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

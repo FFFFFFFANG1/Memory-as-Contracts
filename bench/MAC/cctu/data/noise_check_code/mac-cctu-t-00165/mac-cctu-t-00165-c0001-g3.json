@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_sequence",
         "spec": {
             "orders": [
@@ -25,7 +25,13 @@
             ]
         },
         "generation": {
-            "method": "heuristic"
-        }
+            "method": "heuristic",
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:28:11.661008+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
+        ]
     }
 }

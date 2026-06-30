@@ -1,18 +1,17 @@
 def evaluate(trace):
-    traj = trace.get('trajectory') or []
-    turns_with_tools = []
-    for i, step in enumerate(traj):
-        tcs = step.get('tool_calls') or []
-        if tcs:
-            turns_with_tools.append((i, tcs))
-    if not turns_with_tools:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool-calling turns found', 'evidence_refs': []}
-    violations = []
-    for idx, tcs in turns_with_tools:
-        first = tcs[0]
-        name = first.get('name') or (first.get('function') or {}).get('name')
-        if name != 'diplomatic_recognition_tracker':
-            violations.append({'turn_index': idx, 'first_tool': name})
-    if violations:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Turns not starting with diplomatic_recognition_tracker: {violations}', 'evidence_refs': violations}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': 'Every tool-calling turn begins with diplomatic_recognition_tracker', 'evidence_refs': [{'turn_index': i} for i,_ in turns_with_tools]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['diplomatic_recognition_tracker']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

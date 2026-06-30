@@ -15,12 +15,26 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [],
+            "forbidden_tools": [
+                "historical_disaster_data_retriever",
+                "historical_event_info_retriever",
+                "historical_event_tool",
+                "ocean_depth_info",
+                "unified_specification_retriever"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:41:22.921063+00:00"
         }
     }
 }

@@ -16,11 +16,17 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "'initial discovery phase' is heuristically the first half (min 2) of tool-using turns"
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:52:22.419515+00:00"
         }
     }
 }

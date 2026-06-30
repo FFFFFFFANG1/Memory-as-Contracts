@@ -16,12 +16,13 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "Checks both tool-call cap (<=3) and final JSON object containing 'location' key.",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/10/check_constraint_0.json",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:39.451167+00:00"
         }
     }
 }

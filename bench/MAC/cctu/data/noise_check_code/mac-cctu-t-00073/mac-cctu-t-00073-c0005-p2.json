@@ -17,11 +17,14 @@
         "evaluator_type": "python",
         "notes": [
             "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
+            "rewritten by verifier repair pass",
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
         ],
         "generation": {
             "method": "heuristic",
-            "repair": "minimal_python_for_verify"
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:27:50.729071+00:00"
         }
     }
 }

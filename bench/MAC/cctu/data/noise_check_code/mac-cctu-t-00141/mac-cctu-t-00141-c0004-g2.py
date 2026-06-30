@@ -1,16 +1,20 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
-    reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    if not names:
-        ok = False
-        reasons.append('no tool usage observed')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    tcs = trace.get('tool_calls') or []
+    if not tcs:
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no tool calls observed', 'evidence_refs': []}
+    iters = set()
+    for c in tcs:
+        it = c.get('iteration')
+        if it is None:
+            it = c.get('turn')
+        iters.add(it)
+    traj = trace.get('trajectory') or []
+    turns_with_calls = 0
+    for step in traj:
+        if isinstance(step, dict):
+            calls = step.get('tool_calls') or []
+            if calls:
+                turns_with_calls += 1
+    if len(iters) > 1 or turns_with_calls > 1:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': f'tool calls span multiple turns/iterations ({iters}, turns_with_calls={turns_with_calls}); serial follow-ups present', 'evidence_refs': [str(i) for i in iters]}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': f'all {len(tcs)} tool calls issued in a single parallel batch within one turn', 'evidence_refs': []}

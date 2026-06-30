@@ -16,12 +16,18 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured evaluator by verifier repair pass",
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "cctu_reference",
             "source_artifact": "bench/CCTU/check_code/135/check_constraint_1.json",
-            "repair": "structured_to_minimal_python"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:52:21.442812+00:00"
         }
     }
 }

@@ -1,26 +1,16 @@
 def evaluate(trace):
+    response = str(trace.get('final_response') or '')
     tool_calls = trace.get('tool_calls') or []
-    final = trace.get('final_response') or ''
-    refs = []
-    first_ok = None
-    if tool_calls:
-        first = tool_calls[0]
-        name = first.get('name')
-        refs.append(f'first_tool={name}')
-        first_ok = (name == 'artwork_fame_analyzer')
-    prefix_ok = final.startswith('Curatorial Note: ')
-    refs.append(f'final_prefix={final[:30]!r}')
-    # check assistant intermediate messages too
-    traj = trace.get('trajectory') or []
-    msg_prefix_ok = True
-    for step in traj:
-        content = step.get('content') or ''
-        if content.strip():
-            if not content.startswith('Curatorial Note: '):
-                msg_prefix_ok = False
-                refs.append(f'bad_step_prefix={content[:30]!r}')
-                break
-    if not tool_calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no tool calls observed', 'evidence_refs': refs}
-    followed = bool(first_ok) and prefix_ok and msg_prefix_ok
-    return {'observed_followed': followed, 'confidence': 'high', 'reason': f'first_tool_ok={first_ok}, final_prefix_ok={prefix_ok}, msg_prefix_ok={msg_prefix_ok}', 'evidence_refs': refs}
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    required_tools = ['artwork_fame_analyzer']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

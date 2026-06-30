@@ -1,27 +1,39 @@
+import re
+
 def evaluate(trace):
-    import re
-    text = trace.get('final_response') or ''
-    if not text.strip():
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No final response', 'evidence_refs': []}
-    lines = text.splitlines()
-    # Find markdown table: at least two consecutive lines with | and a separator line with --- 
-    table_end_idx = None
-    table_start_idx = None
-    for i in range(len(lines)-1):
-        l1 = lines[i].strip()
-        l2 = lines[i+1].strip()
-        if '|' in l1 and '|' in l2 and re.search(r'\|?\s*:?-{3,}', l2):
-            table_start_idx = i
-            j = i+2
-            while j < len(lines) and '|' in lines[j]:
+    trace = trace or {}
+    final = str((trace or {}).get('final_response') or '')
+    if not final.strip():
+        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'missing final response', 'evidence_refs': []}
+    lines = final.splitlines()
+    # Detect markdown table: header row with | and separator row of dashes
+    table_end_idx = -1
+    table_found = False
+    for i in range(len(lines) - 1):
+        header = lines[i]
+        sep = lines[i+1]
+        if '|' in header and re.match(r'^\s*\|?\s*:?-{2,}.*\|', sep) and '-' in sep:
+            # find end of table
+            j = i + 2
+            while j < len(lines) and '|' in lines[j] and lines[j].strip():
                 j += 1
             table_end_idx = j
+            table_found = True
             break
-    if table_start_idx is None:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'No Markdown comparison table detected', 'evidence_refs': []}
-    after = '\n'.join(lines[table_end_idx:]).strip()
-    words = re.findall(r"\b[\w'-]+\b", after)
-    wc = len(words)
-    if wc < 150:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Narrative after table has {wc} words (<150)', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': f'Table present and narrative has {wc} words', 'evidence_refs': []}
+    failures = []
+    if not table_found:
+        failures.append('no markdown comparison table detected')
+    # Narrative after table
+    narrative = '\n'.join(lines[table_end_idx:]) if table_found else ''
+    narrative_words = len(re.findall(r'\S+', narrative))
+    if table_found and narrative_words < 150:
+        failures.append('narrative after table has %d words, below 150' % narrative_words)
+    # If no table, also check overall word count signal
+    if not table_found:
+        total_words = len(re.findall(r'\S+', final))
+        if total_words < 150:
+            failures.append('total response has %d words, below 150' % total_words)
+    evidence = [{'table_found': table_found, 'narrative_words': narrative_words}]
+    if failures:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(failures), 'evidence_refs': evidence}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'markdown table present and narrative >=150 words', 'evidence_refs': evidence}

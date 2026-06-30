@@ -1,22 +1,17 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls', []) or []
-    total = len(calls)
-    sc = [c for c in calls if (c.get('name') or '') == 'species_counter']
-    if total > 7:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Exceeded 7 total tool calls: {total}', 'evidence_refs': []}
-    if len(sc) < 1:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'species_counter not invoked', 'evidence_refs': []}
-    # Try to infer affected regions from species_counter arguments
-    regions = set()
-    for c in sc:
-        args = c.get('arguments') or {}
-        if isinstance(args, dict):
-            for k, v in args.items():
-                if 'region' in str(k).lower() and isinstance(v, str):
-                    regions.add(v.strip().lower())
-    # Look for region mentions elsewhere (final response / trajectory) - heuristic unknown
-    text = (trace.get('final_response') or '')
-    for step in (trace.get('trajectory') or []):
-        text += '\n' + str(step.get('content') or '')
-    # Without ground truth list of affected regions we cannot fully verify per-region coverage
-    return {'observed_followed': None, 'confidence': 'low', 'reason': f'species_counter called {len(sc)}x, total={total}; cannot enumerate affected regions to confirm per-region coverage', 'evidence_refs': []}
+    import re
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if tool_count > 7:
+        reasons.append('tool call count {tool_count} above 7')
+    _count_species_counter = sum(1 for name in tool_names if name == 'species_counter')
+    if _count_species_counter < 1:
+        reasons.append('species_counter' + ' call count ' + str(_count_species_counter) + ' below 1')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

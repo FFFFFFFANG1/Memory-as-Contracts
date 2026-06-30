@@ -14,19 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "tool_parallel",
-        "spec": {
-            "groups": [
-                [
-                    "altitude_tool",
-                    "altitude_tool"
-                ]
-            ]
-        },
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/114/check_constraint_2.json"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:06.498537+00:00"
         }
     }
 }

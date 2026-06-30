@@ -15,12 +15,26 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "response_format",
+        "spec": {
+            "checks": [
+                {
+                    "name": "starts_with",
+                    "value": "[DWGA-2023]"
+                },
+                {
+                    "name": "ends_with",
+                    "value": "\nAudit Trail Recorded"
+                }
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:17.318401+00:00"
         }
     }
 }

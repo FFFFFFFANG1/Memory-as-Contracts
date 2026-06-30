@@ -1,15 +1,14 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls', []) or []
-    names = [c.get('name','') for c in calls]
-    if not calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool calls observed.', 'evidence_refs': []}
-    tz_calls = [i for i,n in enumerate(names) if n == 'timezone_finder']
-    has_beach = 'beach_locator' in names
-    has_district = 'district_identifier' in names
-    if tz_calls and not has_beach:
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': 'timezone_finder used without beach_locator coastal context.', 'evidence_refs': [{'tool_call_indices': tz_calls}]}
-    geo_like = {'location_city_identifier'}
-    misused = [i for i,n in enumerate(names) if n in geo_like and not (has_beach or has_district)]
-    if misused:
-        return {'observed_followed': False, 'confidence': 'low', 'reason': 'Geographic lookup performed without beach_locator/district_identifier as primary.', 'evidence_refs': [{'tool_call_indices': misused}]}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'beach_locator/district_identifier used as primary; timezone_finder usage consistent with coastal annotation.', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

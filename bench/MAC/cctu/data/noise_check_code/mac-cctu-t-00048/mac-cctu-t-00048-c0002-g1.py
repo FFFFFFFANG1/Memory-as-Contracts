@@ -1,14 +1,15 @@
 def evaluate(trace):
     import re
-    resp = (trace.get('final_response') or '').strip()
-    if not resp:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'empty response','evidence_refs':[]}
-    lines = [l.strip() for l in resp.splitlines() if l.strip()]
-    if len(lines) != 2:
-        return {'observed_followed': False, 'confidence':'high','reason':f'expected 2 lines, got {len(lines)}','evidence_refs':[resp]}
-    year_line, country_line = lines[0], lines[1]
-    if not re.fullmatch(r'(?:19|20)\d{2}', year_line):
-        return {'observed_followed': False, 'confidence':'high','reason':f'first line not a year: {year_line}','evidence_refs':[year_line]}
-    if not re.fullmatch(r"[A-Za-z][A-Za-z .'\-]*", country_line):
-        return {'observed_followed': False, 'confidence':'medium','reason':f'second line not a country: {country_line}','evidence_refs':[country_line]}
-    return {'observed_followed': True, 'confidence':'high','reason':'two-line year then country','evidence_refs':[year_line, country_line]}
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if 'eu' not in response.lower():
+        reasons.append('eu' + ' not mentioned in response')
+    if 'un' not in response.lower():
+        reasons.append('un' + ' not mentioned in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

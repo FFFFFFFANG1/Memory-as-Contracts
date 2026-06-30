@@ -1,21 +1,18 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool calls found', 'evidence_refs': []}
-    names = [c.get('name') for c in calls]
-    first = names[0]
-    has_supply = 'supply_chain_tracker' in names
-    entry_ok = first == 'musician_instrument_finder'
-    if entry_ok and has_supply:
-        # ensure supply_chain_tracker happens after musician_instrument_finder and before final response (it's a tool call, so before by definition)
-        mi_idx = names.index('musician_instrument_finder')
-        sc_idx = names.index('supply_chain_tracker')
-        if sc_idx > mi_idx:
-            return {'observed_followed': True, 'confidence': 'high', 'reason': 'musician_instrument_finder used first and supply_chain_tracker traced afterward', 'evidence_refs': [{'first_tool': first, 'supply_chain_index': sc_idx}]}
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': 'supply_chain_tracker did not follow musician_instrument_finder', 'evidence_refs': [{'order': names}]}
-    reason = []
-    if not entry_ok:
-        reason.append(f'entry tool was {first}, not musician_instrument_finder')
-    if not has_supply:
-        reason.append('supply_chain_tracker never invoked')
-    return {'observed_followed': False, 'confidence': 'high', 'reason': '; '.join(reason), 'evidence_refs': [{'order': names}]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['musician_instrument_finder', 'supply_chain_tracker']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

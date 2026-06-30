@@ -14,22 +14,28 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "specific_tool_call_count",
         "spec": {
             "per_tool": {
                 "artwork_valuation_tool": {
-                    "min": 2
+                    "min": 2,
+                    "max": null
                 },
                 "building_info_retriever": {
-                    "min": 1
+                    "min": 1,
+                    "max": null
                 }
             }
         },
-        "notes": [],
+        "notes": [
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:18.482354+00:00"
         }
     }
 }

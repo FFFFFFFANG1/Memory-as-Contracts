@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "interaction_rounds",
         "spec": {
             "min": 8,
@@ -22,7 +22,15 @@
         },
         "generation": {
             "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/199/check_constraint_0.json"
-        }
+            "source_artifact": "bench/CCTU/check_code/199/check_constraint_0.json",
+            "repair": "rule_based_p3_repair",
+            "repaired_at": "2026-06-30T04:33:55.655120+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass",
+            "rewritten by rule-based P2 repair pass"
+        ]
     }
 }

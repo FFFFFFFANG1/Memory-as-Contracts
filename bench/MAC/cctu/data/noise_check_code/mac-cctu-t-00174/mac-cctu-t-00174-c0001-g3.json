@@ -15,10 +15,15 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "notes": [],
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 2
+            "attempts": 2,
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:28:13.824996+00:00"
         }
     }
 }

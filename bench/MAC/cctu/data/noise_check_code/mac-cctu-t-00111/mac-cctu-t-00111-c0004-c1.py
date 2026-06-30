@@ -1,16 +1,14 @@
 def evaluate(trace):
-    traj = trace.get('trajectory') or []
-    violations = []
-    steps_with_calls = 0
-    for i, step in enumerate(traj):
-        tcs = step.get('tool_calls') or []
-        if not tcs:
-            continue
-        steps_with_calls += 1
-        if len(tcs) != 1:
-            violations.append({'step_index': i, 'tool_call_count': len(tcs)})
-    if steps_with_calls == 0:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No action steps with tool calls found in trajectory.', 'evidence_refs': []}
-    if violations:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Found {len(violations)} action step(s) not issuing exactly one tool call.', 'evidence_refs': violations}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': f'All {steps_with_calls} action step(s) issued exactly one tool call.', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

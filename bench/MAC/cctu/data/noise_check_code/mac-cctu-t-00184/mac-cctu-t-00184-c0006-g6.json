@@ -15,14 +15,20 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_call_count",
+        "spec": {
+            "min": 0,
+            "max": 0
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass",
-            "rewritten with verifier-token-aligned template"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "verifier_token_aligned_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T07:03:04.630925+00:00"
         }
     }
 }

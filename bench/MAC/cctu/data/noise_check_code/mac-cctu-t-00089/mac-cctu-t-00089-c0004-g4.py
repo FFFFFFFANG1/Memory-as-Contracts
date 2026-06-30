@@ -1,17 +1,17 @@
 def evaluate(trace):
-    preferred = {'attraction_locator','historical_landmark_locator','cultural_geography_locator'}
-    forbidden = {'hospital_survival_rate_analyzer','medical_research_center_locator','nearby_supplier_locator','supplier_hospital_locator'}
-    calls = trace.get('tool_calls') or []
-    names = [c.get('name') for c in calls]
-    used_forbidden = [n for n in names if n in forbidden]
-    used_preferred = [n for n in names if n in preferred]
-    resp = (trace.get('final_response') or '').strip()
-    if not resp and not calls:
-        return {'observed_followed': None,'confidence':'unknown','reason':'no evidence','evidence_refs':[]}
-    # single paragraph check: no blank line separators
-    paragraphs = [p for p in resp.split('\n\n') if p.strip()]
-    single_para = len(paragraphs) <= 1 and resp != ''
-    tool_ok = (len(used_forbidden) == 0) and (len(calls) == 0 or len(used_preferred) > 0)
-    followed = tool_ok and single_para
-    reason = f'forbidden_used={used_forbidden}, preferred_used={used_preferred}, paragraphs={len(paragraphs)}'
-    return {'observed_followed': bool(followed),'confidence':'high' if resp else 'medium','reason': reason,'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

@@ -1,19 +1,13 @@
 def evaluate(trace):
-    response = str(trace.get('final_response') or '')
     calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable agent behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
-    reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['geographic_feature_locator', 'quarry_mineral_locator']
-    if not any(name in names or name in text_l for name in required):
-        ok = False
-        reasons.append('required named operation not observed')
-    else:
-        evidence.append({'type': 'tool_names', 'names': [name for name in required if name in names or name in text_l]})
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched the generated check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    if not calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no tool calls but constraint requires specific tool ordering', 'evidence_refs': []}
+    names = [str(c.get('name') or '') for c in calls]
+    if names[0] != 'quarry_mineral_locator':
+        return {'observed_followed': False, 'confidence': 'high', 'reason': f'first tool is {names[0]!r}, expected quarry_mineral_locator', 'evidence_refs': [{'index': 0, 'name': names[0]}]}
+    if names[-1] != 'geographic_feature_locator':
+        return {'observed_followed': False, 'confidence': 'high', 'reason': f'last tool is {names[-1]!r}, expected geographic_feature_locator', 'evidence_refs': [{'index': len(names)-1, 'name': names[-1]}]}
+    middle = names[1:-1]
+    if middle != sorted(middle):
+        return {'observed_followed': False, 'confidence': 'high', 'reason': f'intermediate tools not alphabetically ordered: {middle}', 'evidence_refs': [{'middle': middle, 'expected': sorted(middle)}]}
+    return {'observed_followed': True, 'confidence': 'high', 'reason': 'first=quarry_mineral_locator, last=geographic_feature_locator, middle alphabetical', 'evidence_refs': [{'sequence': names}]}

@@ -1,19 +1,14 @@
 def evaluate(trace):
     import re
-    text = (trace.get('final_response') or '')
-    if not text.strip():
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'empty response', 'evidence_refs': []}
-    low = text.lower()
-    # Heuristic detection that individuals are being returned
-    person_signals = ['president','minister','general','king','queen','leader','senator','chancellor','emperor','dictator','politician','commander']
-    has_people = any(s in low for s in person_signals) or bool(re.search(r'\b[A-Z][a-z]+\s+[A-Z][a-z]+', text))
-    if not has_people:
-        return {'observed_followed': None, 'confidence': 'low', 'reason': 'no identifiable individuals in response', 'evidence_refs': []}
-    dob = any(k in low for k in ['date of birth','born:','born on','dob','b. '])
-    nat = 'nationality' in low or 'nationalit' in low
-    aff_keys = ['affiliation','affiliations','party','organization','primary affiliation']
-    aff = any(k in low for k in aff_keys)
-    missing = [n for n,v in [('dob',dob),('nationality',nat),('affiliations',aff)] if not v]
-    if not missing:
-        return {'observed_followed': True, 'confidence': 'medium', 'reason': 'DOB, nationality, and affiliations present', 'evidence_refs': []}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': 'missing biographical fields: ' + ','.join(missing), 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

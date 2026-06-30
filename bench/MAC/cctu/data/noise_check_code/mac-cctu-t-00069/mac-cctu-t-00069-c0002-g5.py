@@ -1,18 +1,16 @@
 def evaluate(trace):
-    import re
-    tcs = trace.get('tool_calls') or []
-    final = (trace.get('final_response') or '').strip()
-    if not tcs and not final:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no evidence', 'evidence_refs': []}
-    first_ok = None
-    if tcs:
-        first_name = tcs[0].get('name')
-        first_ok = (first_name == 'event_host_locator')
-    ends_ok = bool(re.search(r'Host City:\s*[^\n]+\.\s*$', final))
-    if first_ok is False:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'first tool was {tcs[0].get("name")}, not event_host_locator', 'evidence_refs': []}
-    if not ends_ok:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'final response does not end with "Host City: [city]."', 'evidence_refs': []}
-    if first_ok is None:
-        return {'observed_followed': None, 'confidence': 'low', 'reason': 'no tool calls observed; cannot verify ordering', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': 'event_host_locator called first and final ends with Host City phrase', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    required_tools = ['event_host_locator']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

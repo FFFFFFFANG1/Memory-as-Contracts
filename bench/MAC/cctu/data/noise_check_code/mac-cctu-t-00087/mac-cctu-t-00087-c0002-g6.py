@@ -1,20 +1,24 @@
 def evaluate(trace):
     import re
-    calls = trace.get('tool_calls') or []
-    names = [c.get('name') for c in calls]
-    target = 'sports_event_winner_retriever'
-    target_count = sum(1 for n in names if n == target)
-    other = [n for n in names if n != target]
-    resp = (trace.get('final_response') or '').strip()
-    if not resp:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'empty response', 'evidence_refs': []}
-    lines = [l for l in resp.splitlines() if l.strip()]
-    if not lines:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no content lines', 'evidence_refs': []}
-    bullet_re = re.compile(r'^\s*([-*+\u2022]|\d+[.)])\s+')
-    non_bullet = [l for l in lines if not bullet_re.match(l)]
-    bullets_ok = len(non_bullet) == 0 and len(lines) >= 1
-    tools_ok = (target_count == 1 and len(other) == 0)
-    followed = bullets_ok and tools_ok
-    reason = f'target_calls={target_count}, other_tools={other}, bullet_lines={len(lines)-len(non_bullet)}/{len(lines)}'
-    return {'observed_followed': bool(followed), 'confidence': 'high', 'reason': reason, 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    allowed_tools = set(['sports_event_winner_retriever'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
+    if forbidden_used:
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

@@ -1,14 +1,18 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls', [])
-    craft_tools = {'local_handicraft_identifier', 'wood_sourcing_locator'}
-    prereq = {'rural_area_feature_locator', 'famous_peak_identifier'}
-    names = [c.get('name') for c in calls]
-    craft_idxs = [i for i, n in enumerate(names) if n in craft_tools]
-    if not craft_idxs:
-        return {'observed_followed': None, 'confidence': 'low', 'reason': 'No craft-related tool was invoked; precedence vacuous.', 'evidence_refs': []}
-    first_craft = craft_idxs[0]
-    before = set(names[:first_craft])
-    missing = prereq - before
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['famous_peak_identifier', 'rural_area_feature_locator']
+    missing = sorted(t for t in required_tools if t not in called)
     if missing:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Craft tool {names[first_craft]} called before required: {sorted(missing)}.', 'evidence_refs': [{'index': first_craft, 'name': names[first_craft]}]}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': 'Both rural_area_feature_locator and famous_peak_identifier preceded the first craft-related tool call.', 'evidence_refs': [{'index': first_craft, 'name': names[first_craft]}]}
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

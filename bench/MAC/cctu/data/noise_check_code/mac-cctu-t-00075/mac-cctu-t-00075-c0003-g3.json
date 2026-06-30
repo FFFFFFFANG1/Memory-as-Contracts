@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_parallel",
         "spec": {
             "groups": [
@@ -25,7 +25,16 @@
             ]
         },
         "generation": {
-            "method": "heuristic"
-        }
+            "method": "heuristic",
+            "repair": "rule_based_p3_repair",
+            "repaired_at": "2026-06-30T04:37:12.501237+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass",
+            "rewritten by rule-based P2 repair pass",
+            "rewritten by rule-based P3 repair pass"
+        ]
     }
 }

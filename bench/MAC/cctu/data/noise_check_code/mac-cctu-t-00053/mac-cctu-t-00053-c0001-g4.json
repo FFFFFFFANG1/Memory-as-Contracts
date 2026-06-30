@@ -14,20 +14,32 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "response_format",
         "spec": {
             "checks": [
                 {
-                    "name": "contains_terms",
+                    "name": "no_markdown"
+                },
+                {
+                    "name": "excludes_terms",
                     "terms": [
-                        "###"
+                        "###",
+                        "```",
+                        "{",
+                        "}"
                     ]
                 }
             ]
         },
+        "notes": [
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:49.947089+00:00"
         }
     }
 }

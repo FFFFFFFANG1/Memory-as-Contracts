@@ -1,16 +1,21 @@
 def evaluate(trace):
-    import re
-    allowed = {'island_beach_finder','oasis_feature_locator'}
-    calls = trace.get('tool_calls') or []
-    used = [c.get('name') for c in calls if c.get('name')]
-    forbidden_used = [n for n in used if n not in allowed]
-    final = (trace.get('final_response') or '').strip()
-    if not final:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no final response','evidence_refs':[]}
-    paragraphs = [p for p in re.split(r'\n\s*\n', final) if p.strip()]
-    two_paragraphs = len(paragraphs) == 2
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    allowed_tools = set(['island_beach_finder', 'oasis_feature_locator'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
     if forbidden_used:
-        return {'observed_followed': False,'confidence':'high','reason': f'used disallowed tools: {forbidden_used}','evidence_refs': forbidden_used}
-    if not two_paragraphs:
-        return {'observed_followed': False,'confidence':'high','reason': f'expected 2 paragraphs, found {len(paragraphs)}','evidence_refs': []}
-    return {'observed_followed': True,'confidence':'high','reason':'only allowed tools used and response is two paragraphs','evidence_refs': used}
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

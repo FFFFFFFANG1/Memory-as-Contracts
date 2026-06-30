@@ -15,15 +15,13 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "family": "response_content",
-        "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/26/check_constraint_2.py",
-            "repair": "verifier_token_aligned_python"
-        },
         "notes": [
-            "rewritten by verifier repair pass",
-            "rewritten with verifier-token-aligned template"
-        ]
+            "rewritten by rule-based P4 spec repair pass"
+        ],
+        "generation": {
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:35:44.144670+00:00"
+        }
     }
 }

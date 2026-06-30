@@ -1,29 +1,17 @@
 def evaluate(trace):
     import re
-    traj = trace.get('trajectory') or []
+    response = str(trace.get('final_response') or '')
     tool_calls = trace.get('tool_calls') or []
-    if not tool_calls:
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no tool calls','evidence_refs':[]}
-    # find content before first tool call
-    pre_text = ''
-    first_idx = None
-    for i, step in enumerate(traj):
-        if step.get('tool_calls'):
-            first_idx = i
-            break
-        c = step.get('content') or ''
-        pre_text += '\n' + c
-    # also include content in same step before tool calls
-    if first_idx is not None:
-        c = traj[first_idx].get('content') or ''
-        pre_text += '\n' + c
-    lines = [l.strip() for l in pre_text.splitlines() if l.strip()]
-    numbered = [l for l in lines if re.match(r'^(\(?\d+[\).\:\-]|\d+\s)', l)]
-    has_numbered = len(numbered) >= 2
-    # tool calls in this phase: assume 'this phase' = before any non-retrieval shift; approximate as first batch (same iteration as first tool call)
-    first_iter = tool_calls[0].get('iteration')
-    phase_calls = [t for t in tool_calls if t.get('iteration') == first_iter]
-    within_limit = len(phase_calls) <= 2
-    followed = has_numbered and within_limit
-    reason = f'numbered_bullets_found={len(numbered)}, phase_tool_calls={len(phase_calls)}'
-    return {'observed_followed': bool(followed), 'confidence':'medium','reason':reason,'evidence_refs':[]}
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

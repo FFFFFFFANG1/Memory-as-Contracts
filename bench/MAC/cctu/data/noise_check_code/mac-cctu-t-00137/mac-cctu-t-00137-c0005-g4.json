@@ -14,18 +14,14 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "specific_tool_call_count",
-        "spec": {
-            "per_tool": {
-                "merged_plant_info_tool": {
-                    "min": 3,
-                    "max": null
-                }
-            }
-        },
+        "evaluator_type": "python",
+        "notes": [
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:13.084569+00:00"
         }
     }
 }

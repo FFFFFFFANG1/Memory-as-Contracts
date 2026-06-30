@@ -15,10 +15,33 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "notes": [],
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [],
+            "forbidden_tools": [
+                "academic_paper_finder",
+                "architectural_designer_finder",
+                "biodiversity_database",
+                "biographical_info_retriever",
+                "capital_city_lookup",
+                "city_area_calculator",
+                "innovation_country_identifier",
+                "organization_locator",
+                "research_location_identifier",
+                "satellite_info_retriever",
+                "sports_venue_info"
+            ]
+        },
+        "notes": [
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:45:54.277078+00:00"
         }
     }
 }

@@ -18,12 +18,17 @@
         "notes": [
             "converted from structured evaluator by verifier repair pass",
             "rewritten by verifier repair pass",
-            "rewritten with verifier-token-aligned template"
+            "rewritten with verifier-token-aligned template",
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass",
+            "rewritten by rule-based P2 repair pass"
         ],
         "generation": {
             "method": "cctu_reference",
             "source_artifact": "bench/CCTU/check_code/142/check_constraint_5.json",
-            "repair": "verifier_token_aligned_python"
+            "repair": "rule_based_p3_repair",
+            "repaired_at": "2026-06-30T04:33:52.090824+00:00"
         }
     }
 }

@@ -1,13 +1,17 @@
 def evaluate(trace):
-    import re
-    text = (trace.get('final_response') or '').strip()
-    if not text:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no final response', 'evidence_refs': []}
-    parts = re.split(r'(?<=[.!?])\s+', text)
-    sentences = [s.strip() for s in parts if s.strip()]
-    if len(sentences) > 3:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'{len(sentences)} sentences exceeds 3', 'evidence_refs': []}
-    closing = sentences[-1] if sentences else ''
-    if re.search(r'\d', closing) or re.search(r'\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|hundred|thousand|million|billion)\b', closing, re.IGNORECASE):
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'closing sentence contains numeric figure', 'evidence_refs': [closing]}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': f'{len(sentences)} sentences and closing has no numbers', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

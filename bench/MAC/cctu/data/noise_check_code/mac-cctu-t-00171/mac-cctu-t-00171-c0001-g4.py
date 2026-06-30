@@ -1,29 +1,29 @@
-import json
 def evaluate(trace):
+    import json
+    import re
     response = str(trace.get('final_response') or '')
-    calls = trace.get('tool_calls') or []
-    if not response.strip() and not calls:
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['city_population', 'comparison_result', 'museum_capacity', 'population_data_retriever']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
+    _markdown_markers = ('**', '__', '# ')
+    _has_markdown = any(mark in response for mark in _markdown_markers)
+    parsed_json = None
     try:
-        parsed = json.loads(response.strip())
-        if not isinstance(parsed, dict):
-            ok = False
-            reasons.append('not a JSON object')
+        parsed_json = json.loads(response.strip())
     except Exception:
-        ok = False
-        reasons.append('invalid JSON')
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+        parsed_json = None
+    if not isinstance(parsed_json, dict):
+        reasons.append('valid json object missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    _count_population_data_retriever = sum(1 for name in tool_names if name == 'population_data_retriever')
+    if _count_population_data_retriever > 3:
+        reasons.append('population_data_retriever' + ' call count ' + str(_count_population_data_retriever) + ' above 3')
+    round_count = len(trajectory)
+    if round_count > 10:
+        reasons.append('interaction rounds {round_count} above 10')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

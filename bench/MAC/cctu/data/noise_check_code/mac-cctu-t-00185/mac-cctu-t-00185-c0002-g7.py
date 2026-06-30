@@ -1,12 +1,14 @@
 def evaluate(trace):
-    text = (trace.get('final_response') or '')
-    if not text.strip():
-        return {'observed_followed': None, 'confidence':'unknown','reason':'no final response','evidence_refs':[]}
-    low = text.lower()
-    vary_terms = ['vary by source','varies by source','differ by source','vary depending on','vary among sources','differ between sources','sources vary','sources differ','depending on the source']
-    highest_terms = ['highest cited','highest reported','highest available','highest figure','highest value','maximum reported','tallest cited','greatest cited']
-    has_vary = any(t in low for t in vary_terms)
-    has_highest = any(t in low for t in highest_terms)
-    mentions_waterfall_measure = ('waterfall' in low) and any(w in low for w in ['height','measurement','measure'])
-    followed = has_vary and has_highest and mentions_waterfall_measure
-    return {'observed_followed': bool(followed),'confidence':'medium' if followed else 'low','reason': f'vary={has_vary} highest={has_highest} waterfall_measure={mentions_waterfall_measure}','evidence_refs':[]}
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

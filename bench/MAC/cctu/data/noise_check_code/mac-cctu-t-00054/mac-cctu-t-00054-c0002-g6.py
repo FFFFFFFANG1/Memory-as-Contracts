@@ -1,20 +1,15 @@
 def evaluate(trace):
     response = str(trace.get('final_response') or '')
-    calls = trace.get(''.join(['tool', '_calls'])) or []
-    if not response.strip() and not calls:
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
         return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
-    ok = True
-    evidence = []
     reasons = []
-    names = [str(c.get('name') or '') for c in calls if isinstance(c, dict)]
-    text_l = response.lower()
-    required = ['paleontologist_discovery_finder']
-    matched = [name for name in required if name in names or name in text_l]
-    if not matched:
-        ok = False
-        reasons.append('named operation not observed')
-    else:
-        evidence.append({'type': 'operation_names', 'names': matched})
-    if ok:
-        return {'observed_followed': True, 'confidence': 'low', 'reason': 'observable behavior matched minimal check', 'evidence_refs': evidence}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons) or 'required behavior not observed', 'evidence_refs': evidence}
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    _count_paleontologist_discovery_finder = sum(1 for name in tool_names if name == 'paleontologist_discovery_finder')
+    if _count_paleontologist_discovery_finder < 1:
+        reasons.append('paleontologist_discovery_finder' + ' call count below 1')
+    if _count_paleontologist_discovery_finder > 5:
+        reasons.append('paleontologist_discovery_finder' + ' call count above 5')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

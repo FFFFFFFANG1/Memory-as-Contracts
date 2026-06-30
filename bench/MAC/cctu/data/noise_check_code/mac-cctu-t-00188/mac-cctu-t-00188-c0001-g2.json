@@ -13,14 +13,23 @@
         "Length"
     ],
     "evaluator": {
+        "mode": "response_length",
+        "family": "response_length",
+        "spec": {
+            "unit": "words",
+            "min": null,
+            "max": 500
+        },
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "unknown evaluator_type",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:28.178498+00:00"
         }
     }
 }

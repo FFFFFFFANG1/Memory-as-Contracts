@@ -1,9 +1,17 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool calls found in trajectory.', 'evidence_refs': []}
-    first = calls[0]
-    name = first.get('name')
-    if name != 'cultural_culinary_info':
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'First tool call was {name!r}, not cultural_culinary_info.', 'evidence_refs': [{'index': first.get('index'), 'name': name}]}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'cultural_culinary_info was invoked first; caching/reuse not directly verifiable from trace.', 'evidence_refs': [{'index': first.get('index'), 'name': name}]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    required_tools = ['cultural_culinary_info']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

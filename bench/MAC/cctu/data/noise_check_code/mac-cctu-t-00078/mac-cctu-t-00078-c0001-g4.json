@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_usage",
         "spec": {
             "required_tools": [
@@ -23,7 +23,14 @@
             "forbidden_tools": []
         },
         "generation": {
-            "method": "heuristic"
-        }
+            "method": "heuristic",
+            "repair": "rule_based_p2_repair",
+            "repaired_at": "2026-06-30T04:30:35.504993+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass",
+            "rewritten by rule-based P2 repair pass"
+        ]
     }
 }

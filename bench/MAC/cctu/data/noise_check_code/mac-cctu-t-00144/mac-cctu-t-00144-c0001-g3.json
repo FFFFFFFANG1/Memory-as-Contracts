@@ -15,14 +15,11 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "notes": [
-            "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
-        ],
+        "notes": [],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/144/check_constraint_0.json",
-            "repair": "minimal_python_for_verify"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:31.951407+00:00"
         }
     }
 }

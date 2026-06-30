@@ -15,13 +15,32 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "forbidden_tools": [
+                "election_result_analyzer",
+                "election_result_retriever",
+                "event_locator",
+                "historical_event_analyzer",
+                "historical_event_lookup",
+                "historical_event_retriever",
+                "historical_incident_data_retriever",
+                "membership_info_retriever",
+                "object_tracking_analyzer",
+                "papal_event_retriever",
+                "sports_event_result_finder"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "structured_to_minimal_python"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:45:48.770012+00:00"
         }
     }
 }

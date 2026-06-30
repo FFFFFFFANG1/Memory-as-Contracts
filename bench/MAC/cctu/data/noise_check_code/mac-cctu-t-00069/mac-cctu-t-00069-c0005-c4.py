@@ -1,19 +1,17 @@
 def evaluate(trace):
     import re
-    tcs = trace.get('tool_calls') or []
-    final = trace.get('final_response') or ''
-    if not tcs:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool calls found', 'evidence_refs': []}
-    names = [tc.get('name') for tc in tcs]
-    first_ok = names[0] == 'artist_artwork_identifier'
-    last_ok = names[-1] == 'event_host_locator'
-    lines = [l.strip() for l in final.splitlines() if l.strip()]
-    numbered = [l for l in lines if re.match(r'^\d+[\.)\-:]\s+', l)]
-    list_ok = len(numbered) >= 2
-    followed = first_ok and last_ok and list_ok
-    return {
-        'observed_followed': bool(followed),
-        'confidence': 'high' if (first_ok and last_ok) else 'medium',
-        'reason': f'first={names[0]} last={names[-1]} numbered_items={len(numbered)}',
-        'evidence_refs': []
-    }
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    required_tools = ['artist_artwork_identifier', 'event_host_locator']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

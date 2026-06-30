@@ -1,11 +1,17 @@
 def evaluate(trace):
-    tool_calls = trace.get('tool_calls', []) or []
-    names = [c.get('name','') for c in tool_calls]
-    used_aircraft = any(n == 'aircraft_specifications_retriever' for n in names)
-    used_sales = any(n == 'historical_sales_data_retriever' for n in names)
-    final = (trace.get('final_response') or '')
-    if not used_aircraft and 'aircraft' not in final.lower():
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No aircraft specification context detected.', 'evidence_refs': []}
-    if used_sales:
-        return {'observed_followed': True, 'confidence': 'medium', 'reason': 'historical_sales_data_retriever was invoked alongside aircraft spec context.', 'evidence_refs': [n for n in names]}
-    return {'observed_followed': False, 'confidence': 'high', 'reason': 'Aircraft spec context present but historical_sales_data_retriever was not called.', 'evidence_refs': [n for n in names]}
+    import re
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

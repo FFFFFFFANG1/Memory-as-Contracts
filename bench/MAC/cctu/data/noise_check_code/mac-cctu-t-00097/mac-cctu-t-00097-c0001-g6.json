@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "tool_parallel",
         "spec": {
             "groups": [
@@ -25,10 +25,15 @@
                 ]
             ]
         },
-        "notes": [],
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "attempts": 1,
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:27:56.341193+00:00"
         }
     }
 }

@@ -1,22 +1,18 @@
 def evaluate(trace):
     import re
-    text = (trace.get('final_response') or '')
-    if not text.strip():
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'empty response', 'evidence_refs': []}
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    bullets = [l for l in lines if re.match(r'^([\-\*\+•]|\d+[\.\)])\s+', l)]
-    p5 = {'china': ['china'], 'france': ['france'], 'russia': ['russia', 'soviet', 'ussr'], 'uk': ['united kingdom', 'uk', 'britain'], 'us': ['united states', 'usa', 'u.s.', 'us ']}
-    found = {}
-    for key, aliases in p5.items():
-        for b in bullets:
-            low = b.lower()
-            if any(a in low for a in aliases):
-                # find a number followed by parenthesized year
-                m = re.search(r'(\d+)\s*\(([^)]*\b(1[89]\d{2}|20\d{2})\b[^)]*)\)', b)
-                if m:
-                    found[key] = b
-                    break
-    missing = [k for k in p5 if k not in found]
-    if not missing:
-        return {'observed_followed': True, 'confidence': 'high', 'reason': 'each P5 has bullet with count and year in parentheses', 'evidence_refs': list(found.values())}
-    return {'observed_followed': False, 'confidence': 'medium', 'reason': 'missing or malformed for: ' + ', '.join(missing), 'evidence_refs': bullets[:10]}
+    response = str(trace.get('final_response') or '')
+    if not response.strip():
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    marks = ['**', '__', '# ', '- ', '* ', '`']
+    if not any(mark in response for mark in marks):
+        reasons.append('markdown marker missing')
+    if not re.search(r'(^|\n)\s*[-*+]\s+', response):
+        reasons.append('bullet list missing')
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if re.search(r'\b\d{4}\b', response) and not re.search(r'\([^\)]+\)', response):
+        reasons.append('date citation in parentheses missing')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

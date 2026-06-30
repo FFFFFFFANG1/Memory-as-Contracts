@@ -16,12 +16,12 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "Checks only the species_record_locator max-2 constraint; fails when no tool calls occur since the constraint presumes tool usage."
         ],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/165/check_constraint_4.json",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:34.076667+00:00"
         }
     }
 }

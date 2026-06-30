@@ -16,11 +16,15 @@
         "status": "success",
         "evaluator_type": "python",
         "notes": [
-            "Permission-style constraint; default to followed when any trajectory exists."
+            "Permission-style constraint; default to followed when any trajectory exists.",
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "attempts": 1,
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:28:17.516136+00:00"
         }
     }
 }

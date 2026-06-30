@@ -15,14 +15,13 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "family": "response_content",
         "notes": [
-            "mixed local heuristic fallback",
-            "rewritten by verifier repair pass"
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "minimal_python_for_verify"
+            "method": "llm",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:36:13.099851+00:00"
         }
     }
 }

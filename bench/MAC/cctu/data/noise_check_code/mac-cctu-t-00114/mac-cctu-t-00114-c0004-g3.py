@@ -1,19 +1,16 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'no tool calls', 'evidence_refs': []}
-    forbidden = {'altitude_tool', 'geometry_tool'}
-    intake_tool = 'historical_event_info_retriever'
-    saw_intake = False
-    violations = []
-    for i, c in enumerate(calls):
-        name = c.get('name') or c.get('tool_name') or ''
-        if name == intake_tool:
-            saw_intake = True
-        elif name in forbidden and not saw_intake:
-            violations.append({'index': i, 'tool': name})
-    if violations:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'forbidden tool(s) called before any {intake_tool} disambiguation: {violations}', 'evidence_refs': violations}
-    if not saw_intake:
-        return {'observed_followed': None, 'confidence': 'low', 'reason': 'intake retriever never used; phase unclear', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'altitude_tool/geometry_tool not invoked before historical_event_info_retriever', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    required_tools = ['altitude_tool', 'geometry_tool', 'historical_event_info_retriever']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

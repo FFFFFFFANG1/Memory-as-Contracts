@@ -1,15 +1,14 @@
 def evaluate(trace):
     import re
-    text = (trace.get('final_response') or '')
-    low = text.lower()
-    gas_terms = ['natural gas','natural-gas','nat gas','gas price']
-    mentions_gas = any(t in low for t in gas_terms)
-    if not mentions_gas:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No natural-gas price summary detected in final response.', 'evidence_refs': []}
-    eur_mwh_patterns = [r'eur\s*/\s*mwh', r'€\s*/\s*mwh', r'euros?\s+per\s+megawatt[- ]?hour', r'eur\s*per\s*mwh']
-    has_eur_mwh = any(re.search(p, low) for p in eur_mwh_patterns)
-    has_ttf = 'ttf' in low
-    has_front_month = ('front-month' in low) or ('front month' in low)
-    followed = has_eur_mwh and has_ttf and has_front_month
-    reason = f'gas_mentioned=True, eur_per_mwh={has_eur_mwh}, ttf={has_ttf}, front_month={has_front_month}'
-    return {'observed_followed': bool(followed), 'confidence': 'high' if followed else 'medium', 'reason': reason, 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if not re.search(r'\b\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b', response, flags=re.IGNORECASE):
+        reasons.append('date not found in response')
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

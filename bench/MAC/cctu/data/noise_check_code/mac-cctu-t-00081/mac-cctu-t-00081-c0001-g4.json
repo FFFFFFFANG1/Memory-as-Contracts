@@ -15,14 +15,11 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "family": "response_content",
+        "notes": [],
         "generation": {
-            "method": "cctu_reference",
-            "source_artifact": "bench/CCTU/check_code/81/check_constraint_0.py",
-            "repair": "minimal_python_for_verify"
-        },
-        "notes": [
-            "rewritten by verifier repair pass"
-        ]
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:24.879755+00:00"
+        }
     }
 }

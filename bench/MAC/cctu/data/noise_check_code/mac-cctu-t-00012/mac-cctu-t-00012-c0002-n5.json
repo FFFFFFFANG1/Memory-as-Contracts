@@ -14,7 +14,7 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
+        "evaluator_type": "python",
         "family": "response_length",
         "spec": {
             "unit": "words",
@@ -22,7 +22,13 @@
             "max": null
         },
         "generation": {
-            "method": "heuristic"
-        }
+            "method": "heuristic",
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T07:16:11.958930+00:00"
+        },
+        "notes": [
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P4 spec repair pass"
+        ]
     }
 }

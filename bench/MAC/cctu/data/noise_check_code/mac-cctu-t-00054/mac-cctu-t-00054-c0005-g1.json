@@ -13,12 +13,26 @@
         "Interaction Rounds"
     ],
     "evaluator": {
+        "mode": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "paleontologist_discovery_finder": {
+                    "min": null,
+                    "max": 3
+                }
+            }
+        },
         "status": "success",
         "evaluator_type": "python",
-        "notes": [],
+        "notes": [
+            "unknown evaluator_type",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
+        ],
         "generation": {
             "method": "llm",
-            "attempts": 1
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:41:17.561462+00:00"
         }
     }
 }

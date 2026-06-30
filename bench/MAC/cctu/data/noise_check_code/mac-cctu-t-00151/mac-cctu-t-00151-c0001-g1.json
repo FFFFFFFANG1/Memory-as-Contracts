@@ -15,12 +15,11 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
-        "notes": [
-            "converted from structured evaluator by verifier repair pass"
-        ],
+        "notes": [],
         "generation": {
-            "method": "heuristic",
-            "repair": "structured_to_minimal_python"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:32.794637+00:00"
         }
     }
 }

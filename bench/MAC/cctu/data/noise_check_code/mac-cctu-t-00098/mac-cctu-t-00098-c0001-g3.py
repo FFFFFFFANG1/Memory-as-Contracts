@@ -1,16 +1,19 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'No tool calls found.', 'evidence_refs': []}
-    names = [c.get('name') for c in calls]
-    sdr_calls = [i for i,n in enumerate(names) if n == 'species_data_retriever']
-    if not sdr_calls:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'species_data_retriever not used as primary source.', 'evidence_refs': names}
-    distinct = set(names)
-    if len(calls) < 2 or len(distinct) < 2:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'Fewer than two independent tool calls for verification.', 'evidence_refs': names}
-    first_non_meta = next((n for n in names if n), None)
-    primary_ok = (names[0] == 'species_data_retriever') or (sdr_calls and sdr_calls[0] <= 1)
-    if not primary_ok:
-        return {'observed_followed': None, 'confidence': 'low', 'reason': 'species_data_retriever used but not clearly primary.', 'evidence_refs': names}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'species_data_retriever used as primary with additional independent tool call(s).', 'evidence_refs': names}
+    import re
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if tool_count < 2:
+        reasons.append('tool call count {tool_count} below 2')
+    _count_species_data_retriever = sum(1 for name in tool_names if name == 'species_data_retriever')
+    if _count_species_data_retriever < 2:
+        reasons.append('species_data_retriever' + ' call count ' + str(_count_species_data_retriever) + ' below 2')
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

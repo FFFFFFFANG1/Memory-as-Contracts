@@ -15,13 +15,22 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "specific_tool_call_count",
+        "spec": {
+            "per_tool": {
+                "paleontologist_discovery_finder": {
+                    "min": 1,
+                    "max": 5
+                }
+            }
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
+            "converted from structured LLM package"
         ],
         "generation": {
-            "method": "heuristic",
-            "repair": "minimal_python_for_verify"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:22.862166+00:00"
         }
     }
 }

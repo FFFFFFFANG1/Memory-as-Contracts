@@ -14,18 +14,12 @@
     ],
     "evaluator": {
         "status": "success",
-        "evaluator_type": "structured",
-        "family": "specific_tool_call_count",
-        "spec": {
-            "per_tool": {
-                "forest_tree_data_retriever": {
-                    "min": 2,
-                    "max": null
-                }
-            }
-        },
+        "evaluator_type": "python",
+        "notes": [],
         "generation": {
-            "method": "heuristic"
+            "method": "llm",
+            "repair": "llm_verify_repair",
+            "repaired_at": "2026-06-30T06:02:33.330409+00:00"
         }
     }
 }

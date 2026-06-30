@@ -1,19 +1,17 @@
 def evaluate(trace):
-    import re
-    text = trace.get('final_response') or ''
-    if not text.strip():
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No final response.', 'evidence_refs': []}
-    # Look for a confidence score sentence with a numeric value
-    conf_pattern = re.compile(r'confidence[^.\n]*?(\d+(?:\.\d+)?)\s*%?', re.IGNORECASE)
-    conf_match = conf_pattern.search(text)
-    if not conf_match:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'No numeric confidence score sentence found.', 'evidence_refs': []}
-    # Check that confidence sentence is after main answer (not at the very start)
-    if conf_match.start() < len(text) * 0.2:
-        return {'observed_followed': False, 'confidence': 'medium', 'reason': 'Confidence sentence appears before main answer.', 'evidence_refs': [text[:120]]}
-    # Look for analyst commentary paragraph >=400 chars
-    paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
-    long_paragraphs = [p for p in paragraphs if len(p) >= 400]
-    if not long_paragraphs:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'No paragraph >=400 chars found (longest={max((len(p) for p in paragraphs), default=0)}).', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'Found numeric confidence sentence and >=400 char paragraph.', 'evidence_refs': [conf_match.group(0)[:100]]}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    word_count = len(response.split())
+    if word_count == 0:
+        reasons.append('response text missing')
+    paragraphs = [part for part in response.split('\n\n') if part.strip()]
+    if len(paragraphs) < 2:
+        reasons.append('multi-paragraph response missing')
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

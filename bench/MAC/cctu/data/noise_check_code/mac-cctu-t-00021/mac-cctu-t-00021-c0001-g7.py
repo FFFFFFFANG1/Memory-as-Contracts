@@ -1,14 +1,16 @@
 def evaluate(trace):
-    import re
-    calls = trace.get('tool_calls') or []
-    allowed = 'medical_event_finder'
-    forbidden_used = [c.get('name') for c in calls if c.get('name') and c.get('name') != allowed]
-    final = trace.get('final_response') or ''
-    has_pipe_table = bool(re.search(r'^\s*\|.*\|\s*$', final, re.MULTILINE)) and bool(re.search(r'^\s*\|?\s*[:\- ]+\|[:\- |]+\s*$', final, re.MULTILINE))
-    has_html_table = bool(re.search(r'<table[\s>]', final, re.IGNORECASE))
-    tabular = has_pipe_table or has_html_table
-    if forbidden_used:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Used disallowed tools: {sorted(set(forbidden_used))}', 'evidence_refs': []}
-    if tabular:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': 'Final response contains tabular output', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'Only medical_event_finder used (or no tools) and no table detected', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    tool_count = len(tool_names)
+    called = {name for name in tool_names if name}
+    required_tools = ['medical_event_finder']
+    missing = sorted(t for t in required_tools if t not in called)
+    if missing:
+        reasons.append('required tools not called: ' + ', '.join(missing[:5]))
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

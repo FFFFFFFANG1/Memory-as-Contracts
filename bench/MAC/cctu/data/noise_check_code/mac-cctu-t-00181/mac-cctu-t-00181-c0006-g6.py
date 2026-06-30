@@ -1,19 +1,19 @@
 def evaluate(trace):
-    calls = trace.get('tool_calls') or []
-    if not calls:
-        return {'observed_followed': None, 'confidence': 'unknown', 'reason': 'No tool calls found.', 'evidence_refs': []}
-    allowed_initial = {'city_feature_finder', 'honor_locator'}
-    later_lookups = {'musical_composition_finder', 'philosopher_work_locator', 'historical_works_identifier'}
-    initial_names = []
-    violation = None
-    for c in calls:
-        name = c.get('name')
-        initial_names.append(name)
-        if name in later_lookups:
-            break
-        if name not in allowed_initial:
-            violation = name
-            break
-    if violation is not None:
-        return {'observed_followed': False, 'confidence': 'high', 'reason': f'Initial tool call {violation!r} is not limited to city_feature_finder/honor_locator before any composition/philosophy lookup. Sequence so far: {initial_names}', 'evidence_refs': []}
-    return {'observed_followed': True, 'confidence': 'high', 'reason': f'Initial calls restricted to allowed set before composition/philosophy lookups. Sequence: {initial_names}', 'evidence_refs': []}
+    response = str(trace.get('final_response') or '')
+    tool_calls = trace.get('tool_calls') or []
+    trajectory = trace.get('trajectory') or []
+    if not response.strip() and not tool_calls:
+        return {'observed_followed': False, 'confidence': 'high', 'reason': 'no observable behavior', 'evidence_refs': []}
+    reasons = []
+    tool_names = [str(call.get('name') or '') for call in tool_calls if call.get('name')]
+    called = {name for name in tool_names if name}
+    if not called:
+        reasons.append('no tool calls observed')
+    allowed_tools = set(['city_feature_finder', 'honor_locator'])
+    forbidden_used = sorted({name for name in tool_names if name and name not in allowed_tools})
+    if forbidden_used:
+        reasons.append('forbidden tools used: ' + ', '.join(forbidden_used[:5]))
+    round_count = len(trajectory)
+    if reasons:
+        return {'observed_followed': False, 'confidence': 'medium', 'reason': '; '.join(reasons), 'evidence_refs': []}
+    return {'observed_followed': True, 'confidence': 'medium', 'reason': 'rule-based repair checks passed', 'evidence_refs': []}

@@ -17,12 +17,15 @@
         "evaluator_type": "python",
         "notes": [
             "converted from structured evaluator by verifier repair pass",
-            "rewritten by verifier repair pass"
+            "rewritten by verifier repair pass",
+            "rewritten by rule-based P0 repair pass",
+            "rewritten by rule-based P1 repair pass"
         ],
         "generation": {
             "method": "cctu_reference",
             "source_artifact": "bench/CCTU/check_code/187/check_constraint_5.json",
-            "repair": "minimal_python_for_verify"
+            "repair": "rule_based_p1_repair",
+            "repaired_at": "2026-06-30T04:28:17.299807+00:00"
         }
     }
 }

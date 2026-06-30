@@ -15,13 +15,33 @@
     "evaluator": {
         "status": "success",
         "evaluator_type": "python",
+        "family": "tool_usage",
+        "spec": {
+            "required_tools": [
+                "architectural_style_locator",
+                "building_area_calculator"
+            ],
+            "forbidden_tools": [
+                "city_feature_finder",
+                "country_feature_locator",
+                "cultural_influence_finder",
+                "enhanced_arithmetic_calculator",
+                "historical_works_identifier",
+                "honor_locator",
+                "musical_composition_finder",
+                "nearby_mountain_range_locator",
+                "philosopher_work_locator"
+            ]
+        },
         "notes": [
-            "converted from structured evaluator by verifier repair pass"
+            "converted from structured LLM package",
+            "rewritten by rule-based P4 spec repair pass",
+            "rewritten by rule-based P4 spec repair pass"
         ],
         "generation": {
             "method": "llm",
-            "attempts": 1,
-            "repair": "structured_to_minimal_python"
+            "repair": "rule_based_p4_spec_repair",
+            "repaired_at": "2026-06-30T06:41:29.153097+00:00"
         }
     }
 }
