@@ -58,6 +58,7 @@ class ActionGate:
         signature: ActionSignature,
         *,
         tool_family: Iterable[str] | None = None,
+        contracts: Iterable[Contract] | None = None,
     ) -> GateResult:
         if _is_excluded(signature, self.exclude_actions):
             return self._finish(
@@ -68,9 +69,13 @@ class ActionGate:
                 result="excluded_action",
             )
 
-        contracts = self.store.list_contracts(
-            [ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT],
-            include_expired_status=True,
+        contracts_to_evaluate = (
+            list(contracts)
+            if contracts is not None
+            else self.store.list_contracts(
+                [ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT],
+                include_expired_status=True,
+            )
         )
         ask_response = self.store.matching_ask_response(
             session_id=signature.session.session_id,
@@ -94,7 +99,7 @@ class ActionGate:
             compiler=self.compiler,
         )
 
-        for contract in sorted(contracts, key=_gate_contract_rank, reverse=True):
+        for contract in sorted(contracts_to_evaluate, key=_gate_contract_rank, reverse=True):
             evaluation = evaluator.evaluate(
                 contract,
                 signature,
@@ -249,8 +254,10 @@ def _binding_specificity(contract: Contract) -> int:
 def _scope_specificity_value(contract: Contract) -> int:
     return {
         "global": 0,
+        "workspace": 2,
         "project": 3,
         "session": 5,
+        "path": 6,
         "module": 7,
     }.get(contract.scope.level.value, 0)
 

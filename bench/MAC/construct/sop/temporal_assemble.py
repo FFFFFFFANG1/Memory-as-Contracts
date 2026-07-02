@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Assemble per-task temporal noise turns into shuffled sequences with graph deltas.
+"""Assemble per-task SOP noise constraints into shuffled temporal sequences.
 
 Reads ``bench/MAC/sopbench/mid_data/eval_step3_temporal_noise.json`` and
 ``bench/MAC/sopbench/mid_data/eval_step2_anchors.json``, then writes
 ``bench/MAC/sopbench/mid_data/eval_step4_temporal_sequence.json``:
 
-- dedupe action-level noise fan-out across anchors on the same action
+- dedupe action-level noise fan-out across anchor_seeds on the same action
 - merge action turn groups into one shuffled sequence per task (CCTU-style insert)
 - compile ``user_goal_action_graph`` for each turn (patched dep_full)
 - record machine + human-readable ``graph_delta`` / ``dependency_delta`` between turns
@@ -565,9 +565,9 @@ def attach_sequence_deltas(
         action_subject = f"Executable graph for action `{action}`"
         if mutation:
             action_subject = f"Executable graph for action `{action}` ({mutation})"
-        dep_subject = f"SOP dependency tree for action `{action}`"
+        dep_subject = f"SOP dependency structure for action `{action}`"
         if mutation:
-            dep_subject = f"SOP dependency tree for action `{action}` ({mutation})"
+            dep_subject = f"SOP dependency structure for action `{action}` ({mutation})"
 
         action_baseline = action_baselines.get(action) or {}
         graph_before = (
@@ -970,7 +970,7 @@ def dependency_delta_summary(
     from_local_id: Any,
     diff: dict[str, Any],
 ) -> str:
-    dep_subject = f"SOP dependency tree for action `{action}`"
+    dep_subject = f"SOP dependency structure for action `{action}`"
     if mutation:
         dep_subject += f" ({mutation})"
     if from_local_id:

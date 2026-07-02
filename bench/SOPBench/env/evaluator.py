@@ -281,6 +281,7 @@ def evaluator_function_directed_graph(domain_str:str, task:dict, log_msg_fcall:l
         and evaluation_result["action_called_correctly"]
         and evaluation_result["dirgraph_satisfied"]
     )
+    evaluation_result["order_respecting_actions"] = sorted(successful_funccalls.keys())
     return evaluation_result
 
 

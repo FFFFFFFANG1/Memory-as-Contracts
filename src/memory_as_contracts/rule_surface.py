@@ -344,6 +344,11 @@ def validator_scope_key(
     level = contract.scope.level
     if level == ScopeLevel.SESSION:
         payload["session_id"] = session_id
+    elif level == ScopeLevel.PATH:
+        payload.update(
+            workspace=contract.scope.workspace or workspace,
+            path=contract.scope.path,
+        )
     elif level == ScopeLevel.MODULE:
         payload.update(
             workspace=contract.scope.workspace or workspace,
@@ -355,6 +360,8 @@ def validator_scope_key(
             workspace=contract.scope.workspace or workspace,
             project=contract.scope.project or repo or workspace,
         )
+    elif level == ScopeLevel.WORKSPACE:
+        payload["workspace"] = contract.scope.workspace or workspace
     elif level == ScopeLevel.GLOBAL:
         payload["user_id"] = contract.scope.user_id or user_id
     else:

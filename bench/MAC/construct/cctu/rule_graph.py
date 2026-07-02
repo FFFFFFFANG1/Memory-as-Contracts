@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate per-constraint scoped constraint histories for MACBench.
+"""Generate per-constraint scoped histories for MACBench.
 
 This stage operates independently for each selected CCTU constraint. It asks
-an LLM to generate same-domain noisy companion constraints for an anchor
-constraint. Graph construction and validation are handled by graph_validation.py.
+an LLM to generate same-domain noise constraints around one anchor constraint.
+Graph construction and validation are handled by graph_validation.py.
 """
 
 from __future__ import annotations
@@ -57,29 +57,30 @@ Scope, from broadest to narrowest:
 - phase: applies only while the agent is working inside one specific phase of a project.
 
 You are given one anchor constraint. Imagine the agent right now, at this exact
-moment in its current project and phase. At this moment the anchor must be the
-ONLY active constraint.
+moment in its current project and phase. At this moment the anchor constraint
+must be the ONLY active constraint.
 
 Your job is to derive a believable history that leads to this moment: a small
-tree/graph of constraints the agent has accumulated over time. Besides the anchor,
-this history contains several "noisy" constraints, for example older global
-defaults, rules from a different project, rules from an earlier phase, or one-off
-rules whose triggering situation is already over. Every noisy constraint must be
-out of scope (or otherwise overridden) at the current moment, so that when the
-graph is resolved here and now, the anchor is the single constraint left standing.
+temporal graph of constraints the agent has accumulated over time. Besides the
+anchor constraint, this history contains several noise constraints, for example
+older global defaults, rules from a different project, rules from an earlier
+phase, or one-off rules whose triggering situation is already over. Every noise
+constraint must be out of scope (or otherwise overridden) at the current moment,
+so that when the graph is resolved here and now, the anchor constraint is the
+single constraint left standing.
 
 How to write the constraints:
 - Stay inside the same task domain as the provided task description.
 - Write each constraint as a plain, standalone rule, in the same style as the
-  anchor. Do not phrase it conditionally ("if", "when", "only if", "in a different
+  anchor constraint. Do not phrase it conditionally ("if", "when", "only if", "in a different
   scenario"). Put any activation context in trigger_condition instead, and use
   trigger_condition_holds to say whether that context is true at the current moment.
-- Reuse introduced project and phase names when they fit the noisy constraint.
+- Reuse introduced project and phase names when they fit the noise constraint.
   You may introduce a new project or phase only when needed.
 - Treat provided current_global_constraints as existing history. You may reference
   or override them, but do not duplicate their text verbatim as filler.
-- Exactly one item is the anchor (is_anchor=true). The list is unordered, so the
-  anchor may appear anywhere in it.
+- Exactly one item is the anchor constraint (is_anchor=true). The list is unordered,
+  so the anchor constraint may appear anywhere in it.
 
 Return a single JSON object matching the requested output_schema. Return valid
 JSON only. Do not include markdown fences.
@@ -87,46 +88,49 @@ JSON only. Do not include markdown fences.
 
 ROLE_INSTRUCTIONS: dict[AnchorRole, str] = {
     "global": """
-The anchor is a global default, so it stays active no matter which project or
-phase the agent is in. Build the noise mostly from narrower project- or
-phase-scoped constraints that belong to OTHER projects or to earlier phases, so
-they are out of scope at the current moment. You may also add an older global
-default that the anchor has since replaced. Do not write constraints that
-contradict the anchor.
+The anchor constraint is a global default, so it stays active no matter which
+project or phase the agent is in. Build the noise mostly from narrower project-
+or phase-scoped constraints that belong to OTHER projects or to earlier phases,
+so they are out of scope at the current moment. You may also add an older global
+default that the anchor constraint has since replaced. Do not write constraints
+that contradict the anchor constraint.
 """.strip(),
     "project": """
-The anchor is a project-level constraint for the agent's current project, so it
-is active in the current phase. Build the noise from constraints tied to other
-projects or to earlier phases of this project, and optionally one older global
-default. They must all be out of scope now, leaving only the anchor active. Do
-not write constraints that contradict the anchor.
+The anchor constraint is a project-level constraint for the agent's current
+project, so it is active in the current phase. Build the noise from constraints
+tied to other projects or to earlier phases of this project, and optionally one
+older global default. They must all be out of scope now, leaving only the anchor
+constraint active. Do not write constraints that contradict the anchor
+constraint.
 """.strip(),
     "task": """
-The anchor is a phase-level constraint for the agent's current phase, so it is
-active right now. Build the noise from constraints that belonged to earlier
-phases, to other projects, or to broader defaults that no longer apply in this
-phase. They must all be out of scope now, leaving only the anchor active. Do not
-write constraints that contradict the anchor.
+The anchor constraint is a phase-level constraint for the agent's current phase,
+so it is active right now. Build the noise from constraints that belonged to
+earlier phases, to other projects, or to broader defaults that no longer apply
+in this phase. They must all be out of scope now, leaving only the anchor
+constraint active. Do not write constraints that contradict the anchor
+constraint.
 """.strip(),
     "exception": """
-The anchor is a short-lived, conditional constraint that holds only because the
-current moment matches its triggering situation. Include a broader fallback
-constraint that normally governs this behavior, and arrange the history so the
-anchor temporarily overrides that fallback. At the current moment the anchor's
-condition is satisfied (trigger_condition_holds=true) and the fallback is
-suppressed, so the anchor is the only constraint left active. Put except_by on
-the fallback/noisy constraint and set it to the local_id of the anchor/exception
+The anchor constraint is a short-lived, conditional constraint that holds only
+because the current moment matches its triggering situation. Include a broader
+fallback constraint that normally governs this behavior, and arrange the history
+so the anchor constraint temporarily overrides that fallback. At the current
+moment the anchor constraint's condition is satisfied
+(trigger_condition_holds=true) and the fallback is suppressed, so the anchor
+constraint is the only constraint left active. Put except_by on the
+fallback/noise constraint and set it to the local_id of the anchor/exception
 that suppresses it.
 """.strip(),
 }
 
-# Example item for output_schema.generated_constraints (one entry; repeat 5-6 noisy plus one anchor).
+# Example item for output_schema.generated_constraints (one entry; repeat 5-6 noise plus one anchor).
 OUTPUT_CONSTRAINT_ITEM: dict[str, Any] = {
     "local_id": "g1",
     "text": "constraint text in the same task domain",
     "scope": "global|project|phase",
     "is_anchor": False,
-    "except_by": "local_id of the exception/anchor that suppresses this constraint, or null",
+    "except_by": "local_id of the exception/anchor constraint that suppresses this constraint, or null",
     "trigger_condition": {
         "project": "specific project/application context, or null",
         "phase": "specific phase/evaluation turn context, or null",
@@ -136,17 +140,17 @@ OUTPUT_CONSTRAINT_ITEM: dict[str, Any] = {
 }
 
 PROMPT_REQUIREMENTS: list[str] = [
-    "Return 6-7 total generated_constraints, including exactly one anchor item and 5-6 noisy non-anchor items.",
-    "The anchor item must preserve the behavioral meaning of anchor_constraint.desc.",
+    "Return 6-7 total generated_constraints, including exactly one anchor constraint item and 5-6 noise items.",
+    "The anchor constraint item must preserve the behavioral meaning of anchor_constraint.desc.",
     "Constraint text must be standalone and unconditional; do not encode activation with if/when clauses.",
     "Use trigger_condition for activation context such as project, phase, occasion, user request, or scenario.",
     "Set trigger_condition_holds=true only when that condition is satisfied at the current moment.",
-    "To deactivate a noisy constraint, either make it out of scope or set except_by to the local_id of the exception/anchor that suppresses it.",
-    "Do not put the anchor first by default; place it naturally among peer constraints.",
+    "To deactivate a noise constraint, either make it out of scope or set except_by to the local_id of the exception/anchor constraint that suppresses it.",
+    "Do not put the anchor constraint first by default; place it naturally among peer constraints.",
     "Use only scope values: global, project, phase.",
     "Use 'constraint' terminology, not 'memory' or 'rule'.",
-    "For exception mode, include one broader fallback constraint and make the anchor trigger_condition_holds=true.",
-    "At the current moment the anchor must be the only active (decisive) constraint.",
+    "For exception mode, include one broader fallback constraint and make the anchor constraint trigger_condition_holds=true.",
+    "At the current moment the anchor constraint must be the only active (decisive) constraint.",
     "Stay in the same CCTU tool-use task domain; do not invent unrelated domains.",
 ]
 
@@ -632,7 +636,7 @@ def normalize_generation(
 
     anchor_items = [item for item in items if item["is_anchor"]]
     if len(anchor_items) != 1:
-        warnings.append(f"expected exactly one anchor item, got {len(anchor_items)}; normalized")
+        warnings.append(f"expected exactly one anchor constraint item, got {len(anchor_items)}; normalized")
         for item in items:
             item["is_anchor"] = False
         anchor_item = {
@@ -723,9 +727,9 @@ def pad_or_trim_items(
 
     noisy_count = sum(1 for item in items if not item.get("is_anchor"))
     if noisy_count < MIN_NOISY_CONSTRAINTS:
-        warnings.append(f"fewer than {MIN_NOISY_CONSTRAINTS} noisy constraints after padding")
+        warnings.append(f"fewer than {MIN_NOISY_CONSTRAINTS} noise constraints after padding")
     if noisy_count > MAX_NOISY_CONSTRAINTS:
-        warnings.append(f"more than {MAX_NOISY_CONSTRAINTS} noisy constraints after trimming")
+        warnings.append(f"more than {MAX_NOISY_CONSTRAINTS} noise constraints after trimming")
 
     return items
 

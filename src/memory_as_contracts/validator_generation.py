@@ -256,11 +256,6 @@ def _preflight(
     tool_capsules: Sequence[Any],
 ) -> ValidatorSnippetPackage | None:
     shape = contract.validator_enforcement_shape
-    if shape == ValidatorEnforcementShape.NO_VALIDATOR:
-        return ValidatorSnippetPackage(
-            status="fail",
-            notes=["contract does not request validator enforcement"],
-        )
     if not tool_capsules:
         return ValidatorSnippetPackage(status="fail", notes=["missing tool capsules"])
     if not contract.check_patterns:
@@ -437,7 +432,6 @@ def _normalize_package_payload(payload: Any) -> dict[str, Any]:
         "need_refinement": "fail",
         "manual_review": "fail",
         "manual review": "fail",
-        "no_validator": "fail",
     }
     if status in status_aliases:
         normalized["status"] = status_aliases[status]

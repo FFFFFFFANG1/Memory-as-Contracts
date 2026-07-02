@@ -2,7 +2,7 @@
 """Build one constraint sequence per task from per-constraint histories.
 
 For every task, prepare an independent constraint sequence ``cs`` that contains
-all anchor constraints and noisy constraints from that task's histories.
+all anchor constraints and noise constraints from that task's histories.
 
 Merge algorithm (per task, not shared across tasks):
 

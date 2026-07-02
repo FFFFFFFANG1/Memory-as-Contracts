@@ -30,6 +30,7 @@ from bench.MAC.sopbench.bridge import (
     list_sopbench_task_uids,
     load_sopbench_eval_tasks,
 )
+from bench.MAC.sopbench.clarification_reply import SOPClarificationContext
 from bench.MAC.agent.llm import LLMConfig, model_client_from_config
 from bench.MAC.agent.loop.cctu_tools import CCTUToolExecutor
 from bench.MAC.agent.loop.sopbench_tools import SOPBenchToolExecutor
@@ -38,8 +39,7 @@ from bench.MAC.agent.loop.llm_tools import (
     LLMToolExecutor,
     LLMToolReturnConfig,
 )
-from bench.MAC.agent.loop.memoryarena_tools import MemoryArenaWebShopToolExecutor
-from bench.MAC.agent.loop.runner import run_agent_loop
+from bench.MAC.agent.loop.runner import ClarificationPolicy, run_agent_loop
 from bench.MAC.agent.loop.tools import HeuristicToolExecutor
 from bench.MAC.agent.memory import MemoryRequest, available_memory_systems, get_memory_provider
 from bench.MAC.agent.memory.bm25 import BM25Config, BM25MemoryProvider
@@ -64,12 +64,6 @@ from bench.MAC.agent.memory.mem0 import (
     Mem0MemoryProvider,
 )
 from bench.MAC.agent.memory.rrf import RRFConfig, RRFMemoryProvider
-from bench.MAC.memoryarena.bridge import (
-    DEFAULT_BUNDLED_SHOPPING_PATH,
-    build_memoryarena_system_config,
-    list_memoryarena_task_uids,
-    load_memoryarena_eval_tasks,
-)
 from bench.MAC.scripts.run_paths import (
     bench_output_path,
     mac_graph_path,
@@ -77,7 +71,7 @@ from bench.MAC.scripts.run_paths import (
     memory_output_error_path,
 )
 
-BENCH_CHOICES = ["cctu", "sopbench", "memoryarena"]
+BENCH_CHOICES = ["cctu", "sopbench"]
 BENCH_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
 
@@ -116,17 +110,6 @@ def parse_args() -> argparse.Namespace:
         default=MAC_SOPBENCH_DATA_DIR,
         help="MAC SOPBench runtime data dir.",
     )
-    parser.add_argument(
-        "--memoryarena-data",
-        type=Path,
-        default=DEFAULT_BUNDLED_SHOPPING_PATH,
-        help="Path to MemoryArena bundled_shopping JSONL data.",
-    )
-    parser.add_argument(
-        "--memoryarena-category",
-        default="all",
-        help="MemoryArena bundled_shopping category prefix to run, e.g. baking; default all.",
-    )
     parser.add_argument("--output", type=Path)
     parser.add_argument(
         "--run-id",
@@ -135,7 +118,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=0, help="Maximum tasks to run; 0 means all.")
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--turn-index", type=int, default=-1)
-    parser.add_argument("--max-iterations", type=int, default=15)
+    parser.add_argument("--max-iterations", type=int, default=25)
+    parser.add_argument(
+        "--sop-clarification-reply",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="For sopbench, reply heuristically when send_message asks the user a question.",
+    )
+    parser.add_argument(
+        "--sop-max-clarification-rounds",
+        type=int,
+        default=3,
+        help="Maximum clarification reply rounds per SOP task.",
+    )
     parser.add_argument(
         "--max-worker",
         "--max-workers",
@@ -263,7 +258,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--tool-executor",
-        choices=["heuristic", "hybrid", "llm", "cctu", "sopbench", "memoryarena"],
+        choices=["heuristic", "hybrid", "llm", "cctu", "sopbench"],
         default="heuristic",
         help="Tool-return executor mode. `heuristic` preserves the original stub behavior.",
     )
@@ -275,21 +270,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tool-return-max-attempts", type=int, default=3)
     parser.add_argument("--tool-return-max-payload-chars", type=int, default=12000)
 
-    parser.add_argument("--memoryarena-env-server-url", default="http://0.0.0.0:8005")
-    parser.add_argument("--memoryarena-env-timeout", type=int, default=300)
-    parser.add_argument("--memoryarena-upstream-env-server-base", default="http://127.0.0.1:36004")
-    parser.add_argument("--memoryarena-action-format", default="react")
-    parser.add_argument("--memoryarena-max-rounds", type=int, default=25)
-    parser.add_argument("--memoryarena-reuse-env", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument(
-        "--memoryarena-bootstrap-upstream-env",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-    )
-    parser.add_argument("--memoryarena-enable-feedback", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--memoryarena-upstream-webshop-data-root")
-    parser.add_argument("--memoryarena-product-catalog-dir")
-    parser.add_argument("--memoryarena-domain-data-path")
     return parser.parse_args()
 
 
@@ -399,8 +379,6 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--bench cctu requires --tool-executor cctu (or heuristic for dry runs)")
     if args.bench == "sopbench" and args.tool_executor not in {"sopbench", "heuristic"}:
         raise ValueError("--bench sopbench requires --tool-executor sopbench (or heuristic for dry runs)")
-    if args.bench == "memoryarena" and args.tool_executor != "memoryarena" and not args.dry_run:
-        raise ValueError("--bench memoryarena requires --tool-executor memoryarena unless --dry-run is set")
     if args.merge_into and not args.retry_errors and not args.only_indices:
         raise ValueError("--merge-into requires --retry-errors or --only-indices")
     if args.retry_errors and not args.merge_into:
@@ -505,20 +483,6 @@ def load_run_context(
         tasks, task_set_summary = load_sopbench_eval_tasks(data_dir=args.sopbench_data_dir, uids=uids)
         system_config = build_sopbench_system_config(data_dir=args.sopbench_data_dir)
         return tasks, task_set_summary, system_config
-    if args.bench == "memoryarena":
-        category = None if args.memoryarena_category == "all" else args.memoryarena_category
-        uids = task_slice(
-            list_memoryarena_task_uids(data_path=args.memoryarena_data, category=category),
-            offset=offset,
-            limit=limit,
-        )
-        tasks, task_set_summary = load_memoryarena_eval_tasks(
-            data_path=args.memoryarena_data,
-            uids=uids,
-            category=category,
-        )
-        system_config = build_memoryarena_system_config()
-        return tasks, task_set_summary, system_config
     raise ValueError(f"Unsupported bench: {args.bench}")
 
 
@@ -619,21 +583,6 @@ async def run_one_task(
             executor = CCTUToolExecutor(task=task)
         elif args.tool_executor == "sopbench":
             executor = SOPBenchToolExecutor(task=task)
-        elif args.tool_executor == "memoryarena":
-            executor = MemoryArenaWebShopToolExecutor(
-                task=task,
-                env_server_url=args.memoryarena_env_server_url,
-                env_timeout=args.memoryarena_env_timeout,
-                upstream_env_server_base=args.memoryarena_upstream_env_server_base,
-                action_format=args.memoryarena_action_format,
-                max_rounds=args.memoryarena_max_rounds,
-                reuse_env=args.memoryarena_reuse_env,
-                bootstrap_upstream_env=args.memoryarena_bootstrap_upstream_env,
-                enable_feedback=args.memoryarena_enable_feedback,
-                upstream_webshop_data_root=args.memoryarena_upstream_webshop_data_root,
-                product_catalog_dir=args.memoryarena_product_catalog_dir,
-                domain_data_path=args.memoryarena_domain_data_path,
-            )
         elif args.tool_executor != "heuristic":
             executor = LLMToolExecutor(
                 agent=loop_input.agent,
@@ -657,6 +606,17 @@ async def run_one_task(
                     inner=executor or HeuristicToolExecutor(agent=loop_input.agent),
                     ask_pass=ask_pass,
                 )
+        clarification = None
+        if args.bench == "sopbench" and args.sop_clarification_reply:
+            sop_context = SOPClarificationContext.from_task(
+                task,
+                user_prompt=loop_input.user_prompt,
+                past_user_turns=loop_input.past_user_turns,
+            )
+            clarification = ClarificationPolicy(
+                reply_for=sop_context.reply_for,
+                max_rounds=max(0, args.sop_max_clarification_rounds),
+            )
         result = await run_agent_loop(
             agent=loop_input.agent,
             system_prompt=loop_input.system_prompt,
@@ -666,6 +626,7 @@ async def run_one_task(
             model_client=model_client,
             executor=executor,
             max_iterations=args.max_iterations,
+            clarification=clarification,
         )
         mac_graph_output = None
         if mac_state is not None:
@@ -699,6 +660,7 @@ async def run_one_task(
             "iterations": result.iterations,
             "prompt_hash": result.prompt_hash,
             "events": result.events,
+            "clarification_rounds": result.clarification_rounds,
         }
         if args.save_messages:
             row["messages"] = result.messages

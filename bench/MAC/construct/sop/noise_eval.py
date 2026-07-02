@@ -1,4 +1,4 @@
-"""Deterministic SOP temporal noise eval: spec export and trajectory grading.
+"""Deterministic SOP temporal noise eval: segment export and trajectory grading.
 
 Requires Python 3.10+ (SOPBench uses ``match`` statements).
 """
@@ -105,7 +105,7 @@ def graph_action_nodes(graph: Any) -> set[str]:
 def anchor_user_goal_dependency(step2_task: dict[str, Any]) -> Any:
     """Return SOPBench's original user-goal dependency.
 
-    Step3 stores per-anchor action fragments, so using it as the baseline can
+    Step3 stores per-seed action fragments, so using it as the baseline can
     accidentally replace the full SOPBench dependency with one sampled leaf.
     The grading oracle must stay attached to SOPBench's original task.
     """
@@ -308,10 +308,13 @@ def collect_eval_units(
     step3_task: dict[str, Any],
     sequence: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Collect dependency-single and graph-action units for anchor-based grading.
+    """Collect dependency-single and graph-action diagnostic segments.
 
-    Ground truth (``expected_should_apply``) comes from the step2 / SOPBench anchor.
-    Historical temporal revisions contribute noise units that should not apply at eval.
+    The exported JSON keeps the historical ``units`` field for compatibility,
+    but these rows are MAC diagnostic segments, not top-level constraints.
+    Ground truth (``expected_should_apply``) comes from active SOP constraints;
+    historical temporal revisions contribute noise segments that should not
+    apply at eval.
     """
     from temporal_noise import dependency_singles  # noqa: WPS433
 
@@ -497,6 +500,12 @@ def build_manifest_payload(
             "anchor_unit_count": sum(1 for unit in units if unit.get("expected_should_apply")),
             "noise_unit_count": sum(1 for unit in units if not unit.get("expected_should_apply")),
         },
+        "terminology": {
+            "units": "compatibility name for diagnostic segments",
+            "anchor_unit_count": "anchor diagnostic segment count",
+            "noise_unit_count": "noise diagnostic segment count",
+            "constraint": "action-scoped evaluable SOP unit; segments are nested diagnostics",
+        },
         "task_specs": task_specs,
         "units": units,
     }
@@ -593,10 +602,15 @@ def _replay_trajectory(
         results={"final_database": final_database},
         default_constraint_option="default",
     )
+    order_respecting_actions = {
+        str(name)
+        for name in (evaluation.get("order_respecting_actions") or [])
+    }
     return {
         "evaluation": evaluation,
         "final_database": final_database,
         "successful_actions": successful_actions,
+        "order_respecting_actions": order_respecting_actions,
         "user_goal_called": user_goal_called,
         "action_parameters": action_parameters,
         "domain_system_strict": domain_system_strict,
@@ -652,7 +666,7 @@ def evaluate_sopbench_unit(
         }
     if replay is None:
         replay = _replay_trajectory(domain, patched_task, func_calls)
-    successful_actions = replay.get("successful_actions") or set()
+    order_respecting_actions = replay.get("order_respecting_actions") or set()
     user_goal_called = bool(replay.get("user_goal_called"))
     domain_system_strict = replay.get("domain_system_strict")
 
@@ -663,11 +677,11 @@ def evaluate_sopbench_unit(
     action_parameters = replay.get("action_parameters") or set()
 
     if evaluator_type == "sopbench_action_call" or normalized in action_parameters:
-        observed = normalized in successful_actions
+        observed = normalized in order_respecting_actions
         reason = (
-            f"action `{normalized}` was successfully called in strict replay"
+            f"action `{normalized}` was successfully called in directed-graph order during strict replay"
             if observed
-            else f"action `{normalized}` was not successfully called in strict replay"
+            else f"action `{normalized}` was not successfully called in directed-graph order during strict replay"
         )
         return {
             "observed_followed": observed,
@@ -713,13 +727,6 @@ def evaluate_task(
     domain = str(task_spec.get("domain") or "")
     patched_task = copy.deepcopy(task_spec.get("patched_sopbench_task") or {})
     func_calls = func_calls_from_trace(trace)
-    if not func_calls:
-        return {
-            "success": False,
-            "dirgraph_satisfied": False,
-            "action_called_correctly": False,
-            "reason": "no tool calls",
-        }
     replay = _replay_trajectory(domain, patched_task, func_calls)
     evaluation = replay["evaluation"]
     return {
@@ -727,6 +734,7 @@ def evaluate_task(
         "user_goal_called": replay["user_goal_called"],
         "_replay": {
             "successful_actions": replay["successful_actions"],
+            "order_respecting_actions": replay["order_respecting_actions"],
             "user_goal_called": replay["user_goal_called"],
             "action_parameters": replay["action_parameters"],
             "domain_system_strict": replay["domain_system_strict"],
@@ -748,34 +756,69 @@ def outcome_bucket(expected: bool, observed: bool | None) -> str:
 
 def contract_metrics(details: list[dict[str, Any]]) -> dict[str, Any]:
     counts = Counter(str(row.get("outcome")) for row in details)
-    tp = counts["anchor_followed"]
-    fn = counts["anchor_missed"]
-    fp = counts["noise_followed"]
-    tn = counts["noise_ignored"]
-    known = tp + fn + fp + tn
-    precision = tp / (tp + fp) if (tp + fp) else None
-    recall = tp / (tp + fn) if (tp + fn) else None
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if precision is not None and recall is not None and (precision + recall)
-        else None
-    )
-    cfr = (tp + tn) / known if known else None
+    active_followed = counts["anchor_followed"]
+    active_missed = counts["anchor_missed"]
+    history_followed = counts["noise_followed"]
+    history_ignored = counts["noise_ignored"]
+    active_constraint_count = active_followed + active_missed
+    history_constraint_count = history_followed + history_ignored
+    constraint_count = active_constraint_count + history_constraint_count
+    correctly_followed = active_followed + history_ignored
+    wrongly_followed = active_missed + history_followed
     return {
-        "CFR": cfr,
-        "Precision": precision,
-        "Recall": recall,
-        "F1": f1,
-        "counts": {
-            "TP": tp,
-            "FN": fn,
-            "FP": fp,
-            "TN": tn,
+        "correct_follow_rate": correctly_followed / constraint_count if constraint_count else None,
+        "wrong_follow_rate": wrongly_followed / constraint_count if constraint_count else None,
+        "correctly_followed": correctly_followed,
+        "wrongly_followed": wrongly_followed,
+        "active_constraint_count": active_constraint_count,
+        "history_constraint_count": history_constraint_count,
+        "constraint_count": constraint_count,
+        "outcome_counts": {
+            "active_followed": active_followed,
+            "active_missed": active_missed,
+            "history_followed": history_followed,
+            "history_ignored": history_ignored,
         },
-        "support": {
-            "unit_count": known,
-            "active_unit_count": tp + fn,
-            "obsolete_unit_count": fp + tn,
+    }
+
+
+def follow_outcome(anchor_matched: bool, history_matched: bool) -> str:
+    if anchor_matched:
+        return "correct_follow"
+    if history_matched:
+        return "wrong_follow"
+    return "neither_followed"
+
+
+def follow_taxonomy_metrics(details: list[dict[str, Any]]) -> dict[str, Any]:
+    counts = Counter(str(row.get("follow_outcome") or row.get("outcome")) for row in details)
+    correct = counts["correct_follow"]
+    wrong = counts["wrong_follow"]
+    neither = counts["neither_followed"]
+
+    # Backwards-compatible fallback for legacy per-unit rows.
+    if not (correct or wrong or neither):
+        correct = counts["anchor_followed"] + counts["noise_ignored"]
+        wrong = counts["anchor_missed"] + counts["noise_followed"]
+
+    total = correct + wrong + neither
+    active_count = sum(int(row.get("active_constraint_count") or 0) for row in details)
+    history_count = sum(int(row.get("history_constraint_count") or 0) for row in details)
+    return {
+        "correct_follow_rate": correct / total if total else None,
+        "wrong_follow_rate": wrong / total if total else None,
+        "neither_follow_rate": neither / total if total else None,
+        "correctly_followed": correct,
+        "wrongly_followed": wrong,
+        "neither_followed": neither,
+        "comparison_count": total,
+        "active_constraint_count": active_count,
+        "history_constraint_count": history_count,
+        "constraint_count": active_count + history_count,
+        "outcome_counts": {
+            "correct_follow": correct,
+            "wrong_follow": wrong,
+            "neither_followed": neither,
         },
     }
 
@@ -790,6 +833,32 @@ def task_responded(trace: dict[str, Any]) -> bool:
 
 
 def task_acc(task_eval: dict[str, Any]) -> bool | None:
+    """SOPBench native task success (outcome + process)."""
     if "success" not in task_eval:
         return None
     return bool(task_eval.get("success"))
+
+
+def task_answer_pass(task_eval: dict[str, Any]) -> bool | None:
+    """SOPBench user-goal outcome only: should vs did call user_goal."""
+    if "action_called_correctly" not in task_eval:
+        return None
+    return bool(task_eval.get("action_called_correctly"))
+
+
+def task_joint_pass(task_eval: dict[str, Any]) -> bool | None:
+    """SOPBench native joint success; equivalent to answer pass AND process pass."""
+    return task_acc(task_eval)
+
+
+def task_process_constraint_pass(task_eval: dict[str, Any]) -> bool | None:
+    """Return SOPBench-native process compliance, excluding user-goal outcome."""
+    keys = (
+        "no_tool_call_error",
+        "constraint_not_violated",
+        "database_match",
+        "dirgraph_satisfied",
+    )
+    if any(key not in task_eval for key in keys):
+        return None
+    return all(bool(task_eval.get(key)) for key in keys)

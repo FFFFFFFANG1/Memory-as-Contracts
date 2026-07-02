@@ -73985,7 +73985,10 @@
                 }
             ],
             "data_source": "Parallel Single-Hop",
-            "answer": "35"
+            "answer": "35",
+            "cctu_sample": {
+                "answer": "35 or 30"
+            }
         },
         {
             "id": "102",
@@ -81480,7 +81483,10 @@
                 }
             ],
             "data_source": "Parallel Single-Hop",
-            "answer": "The start of Billy Graham's Los Angeles Crusade"
+            "answer": "The start of Billy Graham's Los Angeles Crusade",
+            "cctu_sample": {
+                "answer": "The start of Billy Graham's Los Angeles Crusade or Billy Graham"
+            }
         },
         {
             "id": "114",
@@ -88022,7 +88028,10 @@
                 }
             ],
             "data_source": "Parallel Single-Hop",
-            "answer": "54"
+            "answer": "54",
+            "cctu_sample": {
+                "answer": "54 or 44"
+            }
         },
         {
             "id": "124",
@@ -94341,7 +94350,10 @@
                 }
             ],
             "data_source": "Parallel Single-Hop",
-            "answer": "16,000"
+            "answer": "16,000",
+            "cctu_sample": {
+                "answer": "16,000 or 12,000, 4,000"
+            }
         },
         {
             "id": "134",
@@ -95479,7 +95491,10 @@
                 }
             ],
             "data_source": "Parallel Single-Hop",
-            "answer": "30,002"
+            "answer": "30,002",
+            "cctu_sample": {
+                "answer": "30,002 or 2, 30,000"
+            }
         },
         {
             "id": "136",
@@ -97005,7 +97020,10 @@
                 }
             ],
             "data_source": "Parallel Single-Hop",
-            "answer": "6"
+            "answer": "6",
+            "cctu_sample": {
+                "answer": "6 or 8"
+            }
         },
         {
             "id": "138",
@@ -102125,7 +102143,10 @@
                 }
             ],
             "data_source": "Parallel Single-Hop",
-            "answer": "5"
+            "answer": "5",
+            "cctu_sample": {
+                "answer": "5 or 3, 2"
+            }
         },
         {
             "id": "146",
@@ -112912,7 +112933,10 @@
                 }
             ],
             "data_source": "Parallel Multi-Hop",
-            "answer": "no"
+            "answer": "no",
+            "cctu_sample": {
+                "answer": "no or false"
+            }
         },
         {
             "id": "160",
@@ -141331,7 +141355,10 @@
                 }
             ],
             "data_source": "Parallel Multi-Hop",
-            "answer": "no"
+            "answer": "no",
+            "cctu_sample": {
+                "answer": "no or false"
+            }
         },
         {
             "id": "192",

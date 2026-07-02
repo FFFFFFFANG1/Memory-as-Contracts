@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Build and validate MAC contract graphs from generated constraint histories.
+"""Build and validate MAC temporal graphs from generated constraint histories.
 
 Graph construction is deterministic: generated constraints are mapped directly
 to ContractGraph nodes, and except_by becomes exception_to edges. For task
 sequence inputs, this script first validates the whole chain; if that fails, it
-also validates each source constraint graph to locate the bad subgraph.
+also validates each source constraint's temporal graph to locate the bad
+subgraph/segment.
 """
 
 from __future__ import annotations
@@ -241,9 +242,9 @@ def validate_graph_payload(artifact: dict[str, Any], graph_payload: dict[str, An
     anchor_items = [item for item in items if isinstance(item, dict) and item.get("is_anchor")]
     if artifact.get("chain_level"):
         if not anchor_items:
-            errors.append("expected at least one anchor item for chain-level graph")
+            errors.append("expected at least one anchor constraint item for chain-level graph")
     elif len(anchor_items) != 1:
-        errors.append(f"expected exactly one anchor item, got {len(anchor_items)}")
+        errors.append(f"expected exactly one anchor constraint item, got {len(anchor_items)}")
 
     expected_exception_edges = []
     local_to_node = {

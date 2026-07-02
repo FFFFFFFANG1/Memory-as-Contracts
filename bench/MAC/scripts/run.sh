@@ -8,7 +8,7 @@ set -a
 source "bench/.env"
 set +a
 
-# Available: cctu, sopbench, memoryarena
+# Available: cctu, sopbench
 BENCH="${BENCH:-cctu}"
 # Available: no_memory, long_context
 MEMORY_SYSTEM="${MEMORY_SYSTEM:-long_context}"
@@ -19,7 +19,7 @@ LIMIT="${LIMIT:-0}"
 OFFSET="${OFFSET:-0}"
 # -1 means the last user turn.
 TURN_INDEX="${TURN_INDEX:--1}"
-MAX_ITERATIONS="${MAX_ITERATIONS:-20}"
+MAX_ITERATIONS="${MAX_ITERATIONS:-25}"
 MAX_WORKER="${MAX_WORKER:-8}"
 TOOL_RETURN_LLM_MODEL="${TOOL_RETURN_LLM_MODEL:-$LLM_MODEL}"
 TOOL_RETURN_LLM_BASE_URL="${TOOL_RETURN_LLM_BASE_URL:-$LLM_BASE_URL}"
@@ -35,18 +35,14 @@ mkdir -p "$LOG_DIR" "${RESULTS_ROOT}/memory_output" "${RESULTS_ROOT}/memory_outp
 case "$BENCH" in
   cctu)
     TOOL_EXECUTOR="${TOOL_EXECUTOR:-cctu}"
-    GRADE_MODULE="bench.MAC.scripts.grade_cctu_answer"
-    ;;
-  memoryarena)
-    TOOL_EXECUTOR="${TOOL_EXECUTOR:-memoryarena}"
-    GRADE_MODULE=""
+    GRADE_MODULE="bench.MAC.cctu.grade_answer"
     ;;
   sopbench)
     echo "[run] error: BENCH=$BENCH is not configured in run.sh yet"
     exit 1
     ;;
   *)
-    echo "[run] error: unknown BENCH=$BENCH (expected cctu, sopbench, or memoryarena)"
+    echo "[run] error: unknown BENCH=$BENCH (expected cctu or sopbench)"
     exit 1
     ;;
 esac

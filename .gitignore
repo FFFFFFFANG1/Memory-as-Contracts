@@ -14,7 +14,6 @@ dist/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
-bench/MemoryArena/
 bench/MAC/agent/memory/repo/
 bench/MAC/.cache/
 bench/MAC/**/results/

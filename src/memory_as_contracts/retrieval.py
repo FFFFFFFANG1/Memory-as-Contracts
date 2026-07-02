@@ -128,7 +128,7 @@ class PromptIntakeRetriever:
                 ):
                     preferences.append(contract)
                 continue
-            if contract.scope.level in {ScopeLevel.GLOBAL, ScopeLevel.SESSION}:
+            if contract.scope.level in {ScopeLevel.GLOBAL, ScopeLevel.SESSION, ScopeLevel.WORKSPACE}:
                 if _prompt_scope_matches(
                     contract.scope,
                     prompt_context,
@@ -284,6 +284,13 @@ def _prompt_scope_matches(
         return True
     if scope.level == ScopeLevel.SESSION:
         return True
+    if scope.level == ScopeLevel.WORKSPACE:
+        return bool(scope.workspace and context.workspace and scope.workspace == context.workspace)
+    if scope.level == ScopeLevel.PATH:
+        if scope.workspace and context.workspace and scope.workspace != context.workspace:
+            return False
+        targets = _target_paths(context, query_text)
+        return bool(scope.path and any(_path_matches(target, scope.path) for target in targets))
     query_lower = query_text.lower()
     if scope.level == ScopeLevel.PROJECT:
         project = scope.project or scope.workspace
@@ -426,6 +433,8 @@ def _scope_label(scope: Scope) -> str:
         parts.append(f"project={scope.project}")
     if scope.module:
         parts.append(f"module={scope.module}")
+    if scope.path:
+        parts.append(f"path={scope.path}")
     return ";".join(parts)
 
 

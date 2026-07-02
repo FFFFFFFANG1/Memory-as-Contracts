@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Select per-task SOP anchors for MAC construct step 2.
+"""Select per-task SOP anchor_seeds for MAC construct step 2.
 
 Reads ``bench/MAC/sopbench/mid_data/eval_step1_sop.json`` and writes
 ``bench/MAC/sopbench/mid_data/eval_step2_anchors.json``.
 
 For each task:
-- **core anchors** = task-level ``•`` (``eval_scope=user_goal``)
+- **core anchor_seeds** = task-level ``•`` (``eval_scope=user_goal``)
   plus ``•`` on actions in ``directed_action_graph``
-- sample ``K`` additional anchors from the remaining domain-default pool,
+- sample ``K`` additional anchor_seeds from the remaining domain-default pool,
   where ``K`` is drawn from a truncated normal on ``[k_min, k_max]`` (default 5–12)
+
+The output keeps the historical JSON field name ``anchors`` for compatibility,
+but conceptually those records are construction seeds. MAC constraints are
+counted later by unique action/tool roots, not by raw seed count.
 """
 
 from __future__ import annotations
@@ -510,6 +514,10 @@ def main() -> int:
         "anchor_policy": {
             "core": "task-level (eval_scope=user_goal) ∪ bullets on directed_action_graph actions",
             "sampled": "K additional bullets from remaining domain-default pool",
+        },
+        "terminology": {
+            "anchors_field": "compatibility name for SOP anchor_seed records",
+            "constraint_counting": "count unique root actions among selected seeds, not raw seed records",
         },
         "selection_weights": {
             "path_check": WEIGHT_PATH_CHECK,

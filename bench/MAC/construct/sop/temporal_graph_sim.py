@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Dry-run simulator for graph-based temporal noise on SOPBench directed_action_graph.
+"""Dry-run simulator for SOPBench native graph changes behind MAC noise constraints.
 
-Mutates the action dependency graph (flip and/or, delete node, add OR branch),
-projects per-anchor local process snapshots, and prints whether each anchor
+Mutates native action dependency structures (flip and/or, delete node, add OR
+branch), projects per-seed local process snapshots, and prints whether each seed
 executable changed.
 
-Final anchor graph must match SOPBench; intermediate noisy graphs may differ widely
-(including flip of root AND), since user turns can walk back to the anchor state.
+Final native graph must match SOPBench; intermediate noise graphs may differ
+widely (including flip of root AND), since user turns can walk back to the
+anchor constraint state.
 """
 
 from __future__ import annotations

@@ -11,7 +11,6 @@ bench/MAC/
   scripts/            # run + grade entrypoints
   shared/             # cross-benchmark helpers
   cctu/               # CCTU adapter, data, mid_data, results
-  memoryarena/        # MemoryArena adapter, tasks, results
   sopbench/           # SOPBench adapter placeholder
 ```
 
@@ -24,7 +23,7 @@ bash bench/MAC/scripts/run.sh
 
 Environment variables:
 
-- `BENCH=cctu|memoryarena|sopbench`
+- `BENCH=cctu|sopbench`
 - `MEMORY_SYSTEM=no_memory|long_context`
 - `LIMIT`, `OFFSET`, `DRY_RUN`, `MAX_WORKER`
 

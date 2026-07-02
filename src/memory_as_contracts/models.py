@@ -52,6 +52,8 @@ class SourceKind(StrEnum):
 
 class ScopeLevel(StrEnum):
     SESSION = "session"
+    WORKSPACE = "workspace"
+    PATH = "path"
     MODULE = "module"
     PROJECT = "project"
     GLOBAL = "global"
@@ -159,7 +161,6 @@ class RuleOverrideType(StrEnum):
 
 
 class ValidatorEnforcementShape(StrEnum):
-    NO_VALIDATOR = "no_validator"
     CHECK_ONLY = "check_only"
     CHECK_UPDATE = "check_update"
 
@@ -191,6 +192,7 @@ class Scope(StrictModel):
     workspace: str | None = None
     project: str | None = None
     module: str | None = None
+    path: str | None = None
     user_id: str | None = None
 
     @model_validator(mode="before")
@@ -200,8 +202,12 @@ class Scope(StrictModel):
             return data
         normalized = dict(data)
         if "level" not in normalized:
-            if normalized.get("module"):
+            if normalized.get("path"):
+                normalized["level"] = ScopeLevel.PATH.value
+            elif normalized.get("module"):
                 normalized["level"] = ScopeLevel.MODULE.value
+            elif normalized.get("workspace") and not normalized.get("project"):
+                normalized["level"] = ScopeLevel.WORKSPACE.value
             elif normalized.get("workspace") or normalized.get("project"):
                 normalized["level"] = ScopeLevel.PROJECT.value
             else:
@@ -210,6 +216,10 @@ class Scope(StrictModel):
 
     @model_validator(mode="after")
     def validate_scope_boundary(self) -> Self:
+        if self.level == ScopeLevel.WORKSPACE and not self.workspace:
+            raise ValueError("workspace scope requires workspace")
+        if self.level == ScopeLevel.PATH and not self.path:
+            raise ValueError("path scope requires path")
         if self.level == ScopeLevel.PROJECT and not (self.workspace or self.project):
             raise ValueError("project scope requires project or workspace")
         if self.level == ScopeLevel.MODULE:
@@ -378,7 +388,7 @@ class Contract(StrictModel):
     semantics: RuleSemantics = Field(default_factory=RuleSemantics)
     override: OverridePolicy = Field(default_factory=OverridePolicy)
     validity: RuleValidity = Field(default_factory=RuleValidity)
-    validator_enforcement_shape: ValidatorEnforcementShape = ValidatorEnforcementShape.NO_VALIDATOR
+    validator_enforcement_shape: ValidatorEnforcementShape = ValidatorEnforcementShape.CHECK_ONLY
     check_patterns: list[ToolPattern] = Field(default_factory=list)
     update_patterns: list[ToolPattern] = Field(default_factory=list)
     state_fields: list[str] = Field(default_factory=list)
@@ -404,6 +414,12 @@ class Contract(StrictModel):
         if not isinstance(data, dict):
             return data
         normalized = dict(data)
+        missing = object()
+        valid_until = normalized.pop("valid_until", missing)
+        if valid_until is missing:
+            valid_until = normalized.pop("validate_until", missing)
+        if "validity" not in normalized and valid_until is not missing:
+            normalized["validity"] = {"until": valid_until}
         effect = _raw_enum_value(normalized.get("effect"))
         kind = _raw_enum_value(normalized.get("kind"))
         modality = _raw_enum_value(normalized.get("modality"))

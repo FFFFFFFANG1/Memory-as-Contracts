@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fnmatch import fnmatch
 import json
 
 from memory_as_contracts.models import (
@@ -29,6 +30,18 @@ def scope_matches(scope: Scope, signature: ActionSignature) -> bool:
         return True
     if scope.level == ScopeLevel.SESSION:
         return True
+    if scope.level == ScopeLevel.WORKSPACE:
+        return bool(scope.workspace and scope.workspace == workspace_root)
+    if scope.level == ScopeLevel.PATH:
+        if scope.workspace and scope.workspace != workspace_root:
+            return False
+        if not scope.path:
+            return False
+        haystack = [
+            *signature.targets,
+            _raw_arguments_text(signature),
+        ]
+        return any(_path_scope_matches(value, scope.path) for value in haystack)
     if scope.level == ScopeLevel.PROJECT:
         return _project_matches(scope, signature)
     if scope.level == ScopeLevel.MODULE:
@@ -60,6 +73,20 @@ def _project_matches(scope: Scope, signature: ActionSignature) -> bool:
     return project in {workspace_root, signature.workspace.repo}
 
 
+def path_scope_matches(value: str, path_scope: str) -> bool:
+    normalized = value.replace("\\", "/")
+    scope = path_scope.replace("\\", "/").rstrip("/")
+    if not scope:
+        return False
+    if fnmatch(normalized, scope) or fnmatch(normalized, f"{scope}/**"):
+        return True
+    return normalized == scope or normalized.startswith(f"{scope}/") or scope in normalized
+
+
+def _path_scope_matches(value: str, path_scope: str) -> bool:
+    return path_scope_matches(value, path_scope)
+
+
 def contract_applies_to_signature(contract: Contract, signature: ActionSignature) -> bool:
     if contract.status not in {ContractStatus.ACTIVE, ContractStatus.PENDING_CONFLICT}:
         return False
@@ -75,8 +102,10 @@ def edge_applies_to_signature(edge: ContractEdge, signature: ActionSignature) ->
 def scope_specificity(scope: Scope) -> int:
     order = {
         ScopeLevel.MODULE: 80,
+        ScopeLevel.PATH: 75,
         ScopeLevel.SESSION: 70,
         ScopeLevel.PROJECT: 50,
+        ScopeLevel.WORKSPACE: 40,
         ScopeLevel.GLOBAL: 10,
     }
     return order[scope.level]

@@ -1,7 +1,7 @@
 """Dump the exact MAC extractor OpenAI messages for one CCTU history turn.
 
 Usage:
-  uv run python -m bench.MAC.scripts.dump_mac_llm_prompts \\
+  uv run python -m bench.MAC.cctu.dump_mac_llm_prompts \\
     --task-uid mac-cctu-t-00000 --extract-turn-index 0 \\
     --output bench/MAC/cctu/results/mac_llm_prompts_cctu_task0_example.txt
 """

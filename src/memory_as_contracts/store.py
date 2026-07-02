@@ -40,7 +40,7 @@ from memory_as_contracts.schema_compat import (
 )
 
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 ASK_RESPONSE_TTL = timedelta(minutes=30)
 ACTION_LOG_SQL_COLUMNS = {
     "seq": "seq",
@@ -336,6 +336,16 @@ class ContractStore:
                 observed_at TEXT NOT NULL,
                 extracted_at TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS hook_turn_states (
+                adapter_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                task_key TEXT NOT NULL,
+                turn_key TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (adapter_id, session_id, task_key, turn_key)
+            );
             """
         )
         row = self.conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
@@ -349,11 +359,12 @@ class ContractStore:
         self.conn.commit()
 
     def _migrate_schema(self, version: int) -> None:
-        if version in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}:
+        if version in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}:
             self._ensure_contract_columns()
             self._ensure_action_log_columns()
             self._rebuild_action_log_without_task_or_org()
             self._ensure_validator_state_schema()
+            self._ensure_hook_turn_state_schema()
             self._backfill_contract_dedup_keys()
             self.conn.execute(
                 """
@@ -617,8 +628,23 @@ class ContractStore:
                     _dump_json(payload),
                     row["updated_at"],
                 ),
-            )
+        )
         self.conn.execute("DROP TABLE validator_states_legacy")
+
+    def _ensure_hook_turn_state_schema(self) -> None:
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS hook_turn_states (
+                adapter_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                task_key TEXT NOT NULL,
+                turn_key TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (adapter_id, session_id, task_key, turn_key)
+            )
+            """
+        )
 
     def add_contract(self, contract: Contract) -> Contract:
         now = utc_now().isoformat()
@@ -1063,6 +1089,120 @@ class ContractStore:
             (adapter_id, session_id, limit),
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def reset_hook_turn_state(
+        self,
+        *,
+        adapter_id: str,
+        session_id: str,
+        task_id: str | None,
+        turn_id: str | None,
+        updated_at: datetime,
+    ) -> dict[str, Any]:
+        return self._put_hook_turn_state(
+            adapter_id=adapter_id,
+            session_id=session_id,
+            task_id=task_id,
+            turn_id=turn_id,
+            active_paths=[],
+            updated_at=updated_at,
+        )
+
+    def merge_hook_turn_paths(
+        self,
+        *,
+        adapter_id: str,
+        session_id: str,
+        task_id: str | None,
+        turn_id: str | None,
+        paths: Iterable[str],
+        updated_at: datetime,
+    ) -> dict[str, Any]:
+        current = self.get_hook_turn_state(
+            adapter_id=adapter_id,
+            session_id=session_id,
+            task_id=task_id,
+            turn_id=turn_id,
+        )
+        active_paths = _dedupe_strings(
+            [
+                *(current.get("active_paths") or []),
+                *[path for path in paths if path],
+            ]
+        )
+        return self._put_hook_turn_state(
+            adapter_id=adapter_id,
+            session_id=session_id,
+            task_id=task_id,
+            turn_id=turn_id,
+            active_paths=active_paths,
+            updated_at=updated_at,
+        )
+
+    def get_hook_turn_state(
+        self,
+        *,
+        adapter_id: str,
+        session_id: str,
+        task_id: str | None,
+        turn_id: str | None,
+    ) -> dict[str, Any]:
+        row = self.conn.execute(
+            """
+            SELECT payload_json FROM hook_turn_states
+            WHERE adapter_id = ? AND session_id = ? AND task_key = ? AND turn_key = ?
+            """,
+            (adapter_id, session_id, _scope_key_part(task_id), _scope_key_part(turn_id)),
+        ).fetchone()
+        if row is None:
+            return {
+                "adapter_id": adapter_id,
+                "session_id": session_id,
+                "task_id": task_id,
+                "turn_id": turn_id,
+                "active_paths": [],
+            }
+        payload = _load_json(row["payload_json"])
+        return payload if isinstance(payload, dict) else {}
+
+    def _put_hook_turn_state(
+        self,
+        *,
+        adapter_id: str,
+        session_id: str,
+        task_id: str | None,
+        turn_id: str | None,
+        active_paths: list[str],
+        updated_at: datetime,
+    ) -> dict[str, Any]:
+        payload = {
+            "adapter_id": adapter_id,
+            "session_id": session_id,
+            "task_id": task_id,
+            "turn_id": turn_id,
+            "active_paths": active_paths,
+            "updated_at": updated_at.isoformat(),
+        }
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO hook_turn_states (
+                    adapter_id, session_id, task_key, turn_key, payload_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(adapter_id, session_id, task_key, turn_key) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    adapter_id,
+                    session_id,
+                    _scope_key_part(task_id),
+                    _scope_key_part(turn_id),
+                    _dump_json(payload),
+                    updated_at.isoformat(),
+                ),
+            )
+        return payload
 
     def mark_user_turns_extracted(self, sequences: Iterable[int]) -> None:
         seqs = list(sequences)
@@ -1813,6 +1953,22 @@ def _action_log_identity_payload(entry: ActionLogEntryV1) -> dict[str, Any]:
     payload.pop("seq", None)
     payload.pop("timestamp", None)
     return payload
+
+
+def _scope_key_part(value: str | None) -> str:
+    return value if value is not None else "<none>"
+
+
+def _dedupe_strings(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = str(value).replace("\\", "/").removeprefix("./").rstrip("/")
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return result
 
 
 def _validator_state_params(state: ValidatorState) -> tuple[Any, ...]:

@@ -7,7 +7,6 @@ This directory holds local benchmark checkouts and the MAC harness.
 ```text
 bench/
   CCTU/                 # upstream CCTU checkout (ignored by parent repo)
-  MemoryArena/          # upstream MemoryArena checkout (ignored)
   SOPBench/             # upstream SOPBench checkout (ignored)
   MAC/                  # project-owned harness and adapted benchmark data
     agent/              # shared MAC runtime
@@ -18,11 +17,6 @@ bench/
       data/             # MAC runtime exports (mac-cctu-*.json)
       mid_data/         # CCTU construction intermediates
       results/          # CCTU run outputs
-    memoryarena/
-      bridge.py
-      tasks/            # MAC eval task inputs
-      data/
-      results/
     sopbench/
       bridge.py
       data/
@@ -31,7 +25,7 @@ bench/
 
 ## Boundaries
 
-- **Upstream repos** under `bench/CCTU`, `bench/MemoryArena`, and `bench/SOPBench` stay in their original shape and are ignored by git.
+- **Upstream repos** under `bench/CCTU` and `bench/SOPBench` stay in their original shape and are ignored by git.
 - **MAC-owned artifacts** live under `bench/MAC/<bench>/` with per-benchmark `data/`, `mid_data/` (where applicable), and `results/`.
 - **Shared runtime code** lives under `bench/MAC/agent/` and `bench/MAC/scripts/`.
 

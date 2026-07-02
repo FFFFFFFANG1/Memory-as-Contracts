@@ -17,7 +17,7 @@
 	-> bench/MAC/construct/cctu/export_cctu_data.py
 	-> bench/MAC/scripts/build_mac_data.py
 	-> bench/MAC/scripts/build_mac_data.py
-	-> bench/MAC/scripts/grade_cctu_answer.py
+	-> bench/MAC/cctu/grade_answer.py
 
 
 ## main pipeline

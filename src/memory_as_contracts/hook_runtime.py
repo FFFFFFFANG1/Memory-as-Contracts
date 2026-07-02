@@ -9,13 +9,17 @@ from typing import Any
 from memory_as_contracts.extraction_dedup import build_similar_rule_context
 from memory_as_contracts.extractor import LLMCallError
 from memory_as_contracts.gate import ActionGate, GateResult
+from memory_as_contracts.hook_plan import (
+    build_active_hook_plan,
+    candidate_paths_from_signature,
+    signature_with_active_paths,
+)
 from memory_as_contracts.logging_config import log_event
 from memory_as_contracts.models import (
     ActionLogEntryV1,
     ActionOutcome,
     Contract,
     ContractStatus,
-    ValidatorEnforcementShape,
     ValidatorInstallationRecord,
     ValidatorInstallationStatus,
 )
@@ -82,12 +86,37 @@ class MacHookRuntime:
         context: Any,
     ) -> GateResult:
         signature = self.adapter.build_action_signature(event, context)
+        active_state = store.merge_hook_turn_paths(
+            adapter_id=signature.host,
+            session_id=signature.session.session_id,
+            task_id=signature.session.task_id,
+            turn_id=signature.session.turn_id,
+            paths=candidate_paths_from_signature(signature),
+            updated_at=signature.time.now,
+        )
+        plan = build_active_hook_plan(
+            store,
+            signature,
+            active_paths=active_state.get("active_paths") or [],
+        )
+        signature = signature_with_active_paths(signature, plan.active_paths)
+        log_event(
+            LOGGER,
+            "hook_plan.pre_tool",
+            adapter=self.adapter.host,
+            session_id=signature.session.session_id,
+            task_id=signature.session.task_id,
+            turn_id=signature.session.turn_id,
+            active_path_count=len(plan.active_paths),
+            prehook_count=len(plan.current_active_prehook),
+        )
         return ActionGate(
             store,
             exclude_actions=self.adapter.exclude_actions,
         ).gate(
             signature,
             tool_family=self.adapter.tool_family(signature.tool.name),
+            contracts=plan.prehook_contracts,
         )
 
     def observe_user_input(
@@ -130,6 +159,13 @@ class MacHookRuntime:
             turn_id=context.turn_id,
             text=user_turn,
             observed_at=context.current_time(),
+        )
+        store.reset_hook_turn_state(
+            adapter_id=self.adapter.host,
+            session_id=context.session_id,
+            task_id=context.task_id,
+            turn_id=context.turn_id,
+            updated_at=context.current_time(),
         )
         pending = store.pending_user_turns(
             adapter_id=self.adapter.host,
@@ -238,6 +274,29 @@ class MacHookRuntime:
         context: Any,
     ) -> dict[str, Any]:
         signature = self.adapter.build_action_signature(event, context)
+        active_state = store.merge_hook_turn_paths(
+            adapter_id=signature.host,
+            session_id=signature.session.session_id,
+            task_id=signature.session.task_id,
+            turn_id=signature.session.turn_id,
+            paths=candidate_paths_from_signature(signature),
+            updated_at=signature.time.now,
+        )
+        post_plan = build_active_hook_plan(
+            store,
+            signature,
+            active_paths=active_state.get("active_paths") or [],
+        )
+        log_event(
+            LOGGER,
+            "hook_plan.post_tool",
+            adapter=self.adapter.host,
+            session_id=signature.session.session_id,
+            task_id=signature.session.task_id,
+            turn_id=signature.session.turn_id,
+            active_path_count=len(post_plan.active_paths),
+            posthook_count=len(post_plan.current_active_posthook),
+        )
         result = _event_value(
             event,
             "tool_result",
@@ -298,6 +357,9 @@ class MacHookRuntime:
                 "action_log_seq": stored.seq,
                 "tool_call_id": stored.tool_call_id,
                 "outcome": stored.outcome.value,
+                "current_active_posthook": [
+                    entry.kind for entry in post_plan.current_active_posthook
+                ],
             }
         }
 
@@ -325,9 +387,7 @@ class MacHookRuntime:
                 installed = PatternInstaller(
                     store=store,
                     verifier=PatternVerifier(self.adapter.tool_capsules()),
-                    response_provider=_build_pattern_refiner(
-                        self.adapter._pattern_refiner_factory
-                    ),
+                    response_provider=None,
                 ).install(contract)
                 contract = installed.contract
                 log_event(
@@ -348,11 +408,7 @@ class MacHookRuntime:
             resolved.append(contract)
 
         for contract in resolved:
-            if (
-                contract.status != ContractStatus.ACTIVE
-                or contract.validator_enforcement_shape
-                == ValidatorEnforcementShape.NO_VALIDATOR
-            ):
+            if contract.status != ContractStatus.ACTIVE:
                 continue
             factory = (
                 self.adapter._validator_generator_factory

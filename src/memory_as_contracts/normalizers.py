@@ -50,13 +50,20 @@ class ScopeNormalizer:
 
     def normalize(self, text: str, context: NormalizationContext) -> Scope:
         lower = text.lower()
+        path = _selected_path_target(text, self)
+        if path:
+            return Scope(
+                level=ScopeLevel.PATH,
+                workspace=context.workspace,
+                path=path,
+                user_id=context.user_id,
+            )
         component_match = self.component_pattern.search(text)
         if component_match:
             return Scope(
-                level=ScopeLevel.MODULE,
+                level=ScopeLevel.PATH,
                 workspace=context.workspace,
-                project=context.repo or context.workspace,
-                module=component_match.group(1).rstrip(".,;:"),
+                path=component_match.group(1).rstrip(".,;:"),
                 user_id=context.user_id,
             )
         if "this session" in lower or "current session" in lower:
@@ -70,19 +77,17 @@ class ScopeNormalizer:
                 level=ScopeLevel.GLOBAL,
                 user_id=context.user_id,
             )
-        if any(token in lower for token in ("this repo", "this task", "current task")) and (
+        if any(token in lower for token in ("this repo", "this workspace", "this task", "current task")) and (
             context.repo or context.workspace
         ):
             return Scope(
-                level=ScopeLevel.PROJECT,
-                workspace=context.workspace,
-                project=context.repo or context.workspace,
+                level=ScopeLevel.WORKSPACE,
+                workspace=context.workspace or context.repo,
                 user_id=context.user_id,
             )
         return Scope(
-            level=ScopeLevel.PROJECT if context.workspace else ScopeLevel.GLOBAL,
-            workspace=context.workspace,
-            project=context.repo or context.workspace,
+            level=ScopeLevel.WORKSPACE if (context.workspace or context.repo) else ScopeLevel.GLOBAL,
+            workspace=context.workspace or context.repo,
             user_id=context.user_id,
         )
 
@@ -176,3 +181,16 @@ def _selected_bare_file_target(text: str, pattern: re.Pattern[str]) -> str | Non
         return matches[0].group(0).rstrip(".,;:")
     after_trigger = [match for match in matches if match.start() >= trigger.start()]
     return (after_trigger[0] if after_trigger else matches[0]).group(0).rstrip(".,;:")
+
+
+def _selected_path_target(text: str, normalizer: ScopeNormalizer) -> str | None:
+    relative_path = normalizer.relative_path_pattern.search(text)
+    if relative_path:
+        return relative_path.group(0).rstrip(".,;:")
+    path_match = normalizer.path_pattern.search(text)
+    if path_match:
+        return (path_match.group(1) or path_match.group(2)).rstrip(".,;:")
+    glob_match = normalizer.glob_pattern.search(text)
+    if glob_match:
+        return glob_match.group(1).rstrip(".,;:")
+    return _selected_bare_file_target(text, normalizer.bare_file_pattern)

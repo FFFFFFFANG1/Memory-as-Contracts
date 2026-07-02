@@ -7,7 +7,7 @@ from pathlib import Path
 
 from bench.MAC.agent.loop.prompt import REPO_ROOT
 
-BENCH_NAMES = ("cctu", "memoryarena", "sopbench")
+BENCH_NAMES = ("cctu", "sopbench")
 
 
 def bench_results_dir(bench: str) -> Path:

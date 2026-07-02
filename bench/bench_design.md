@@ -2,114 +2,321 @@
 
 ## Reporting Metrics
 
-MAC-Bench reports a small set of metrics that separate task completion from
-contract-memory behavior. The main table should use six metrics:
+MAC-Bench reports a small set of metrics that separate answer correctness,
+required process-constraint correctness, and memory contract-follow behavior.
+The main table should use four metrics:
 
 | Metric | Level | Meaning |
 | --- | --- | --- |
-| `ACC` | Task | The final task outcome is correct. |
-| `RSP` | Task | The run produced a terminal, gradable response. |
-| `CFR` | Contract | Overall contract-decision correctness. |
-| `F1` | Contract | Harmonic mean of contract precision and recall. |
-| `Precision` | Contract | Followed contracts that are currently active. |
-| `Recall` | Contract | Currently active contracts that were followed. |
+| `joint pass` | Task | The final answer/task outcome is correct and all required process constraints pass. |
+| `answer pass` | Task | The final answer or native task outcome is correct. |
+| `constraint pass` | Task | All required process constraints for the task pass. |
+| `constraint violation rate` | Constraint | Violated constraints divided by total constraints; lower is better. |
 
-`ACC` and `RSP` capture whether the agent completed the benchmark task at all.
-`CFR`, `F1`, `Precision`, and `Recall` capture whether the agent applied the
-right remembered contracts.
+`joint pass` is the headline task-success metric: a task only passes when both
+the answer and the required process are correct. `answer pass` isolates final
+answer/task-outcome correctness. `constraint pass` keeps the same all-or-nothing
+task granularity for the required process. `constraint violation rate` reports
+the per-constraint error rate so partial process failure is visible.
 
-We intentionally do not put constraint-level accuracy in the main table because
-it overlaps with `CFR`. Legacy benchmark-specific metrics such as CCTU
-`SR`/`PSR`/`SSR` can remain in detailed JSON outputs or appendix tables, but the
-main MAC-Bench comparison should focus on the six metrics above.
-
-## Contract Confusion Matrix
-
-For memory grading, each contract unit is evaluated as an active-vs-obsolete
-decision:
-
-| | Agent follows | Agent ignores |
-| --- | --- | --- |
-| Active/current contract | `TP` | `FN` |
-| Obsolete/inactive contract | `FP` | `TN` |
-
-From this matrix:
+Constraint-follow behavior for active vs obsolete remembered contracts is
+reported in a secondary table with:
 
 ```text
-Precision = TP / (TP + FP)
-Recall    = TP / (TP + FN)
-F1        = 2 * Precision * Recall / (Precision + Recall)
-CFR       = (TP + TN) / (TP + FP + FN + TN)
+correct_follow_rate = correctly_followed / (active_constraint_count + history_constraint_count)
+wrong_follow_rate   = wrongly_followed / (active_constraint_count + history_constraint_count)
 ```
 
-Use zero-division-safe implementations: if a denominator is zero, emit `null`
-for that metric and include support counts in the detail output.
+`correctly_followed` counts active constraints followed plus history constraints
+ignored. `wrongly_followed` counts active constraints missed plus history
+constraints followed. Benchmark-specific legacy metrics such as CCTU
+`ACC`/`SR`/`PSR`/`SSR` can remain in detailed JSON outputs or appendix tables,
+but they are not main MAC-Bench comparison metrics.
+
+## What Counts as One Constraint
+
+In MAC-Bench, a **constraint** is the unit that can be evaluated as current or
+obsolete. Every constraint has exactly one status at the final evaluation turn:
+
+- **anchor**: the constraint is active/current and should be followed.
+- **noise**: the constraint is obsolete/inactive and should be ignored.
+
+The benchmark-native object behind a constraint differs by slice, but the
+counting rule is the same: nested structure inside one evaluable unit does
+**not** create more constraints. Internal pieces are called **segments**.
+
+| Term | Meaning |
+| --- | --- |
+| **constraint** | One evaluable MAC unit. It is either `anchor` or `noise` at eval time. |
+| **anchor** | A current constraint that should be followed at eval time. |
+| **noise** | An obsolete constraint that appeared in history but should not be followed at eval time. |
+| **segment** | A nested internal part of one constraint. Segments help diagnostics but are not separate constraints. |
+| **anchor_seed** | A construction-time SOP seed selected in step 2 to generate anchor/noise constraints. It is not itself the cross-benchmark status label `anchor`. |
+
+### CCTU: one constraint = one `constraints_list` rule
+
+CCTU stores process rules in `constraints_list`. Each list entry is one
+constraint. A rule may be a simple single-turn response check or a structured
+handler with nested order/parallel logic; all internal checks are **segments**
+of that one constraint.
+
+Examples of **one** CCTU constraint:
+
+- `Behavior / Sequential Dependencies` with nine `(A -> B)` order segments in JSON
+- `Tool / Tool Parallel` with multiple `parallel_groups` segments combined by OR
+- `Response / Format` with one custom python validator
+
+What is **not** a CCTU constraint:
+
+- `unsolved_set` slots. These are intermediate tool-output evidence and belong
+  to **`answer pass`**, not `constraint pass`. They prevent guessing the final
+  answer without correct tool evidence.
+
+### SOPBench: one constraint = one action/tool-scoped SOP unit
+
+SOPBench stores executable SOP logic as dependency structures keyed by action
+name. In native SOPBench language these are dependency trees/graphs, but in MAC
+reporting they are simply **constraints**. The root action/tool defines the
+constraint scope. Inner `single`, `and`, `or`, `chain`, and `gate` nodes are
+**segments**, not additional constraints.
+
+Step 2 selects many **anchor_seeds** (individual SOP bullets). Several
+anchor_seeds can point at the same action-scoped constraint, or at different
+segments inside that constraint. When counting SOP constraints, use unique root
+actions among selected anchor_seeds, not raw seed count.
+
+Construction roles:
+
+| SOP object | MAC term | Counting unit |
+| --- | --- | --- |
+| Final action-scoped SOP unit | `anchor` constraint | Unique root `action` among active step-2 seeds |
+| Superseded action-scoped SOP draft | `noise` constraint | One temporal-sequence revision that patches an action's SOP |
+| Step-2 selected bullet | `anchor_seed` | Diagnostic/generation seed only |
+| Nested predicate/action inside an SOP unit | `segment` | Diagnostic only |
+| Native directed action graph | Native replay artifact | Used by SOPBench evaluator; not a MAC constraint count |
+
+At eval time the agent must follow anchor constraints and ignore noise
+constraints. The original SOPBench implementation may still describe these
+objects as trees or graphs, but MAC-Bench reports them at the constraint/segment
+level above.
+
+### Combined constraint counts (200-task slices)
+
+Process-constraint scale for the current MAC slices:
+
+| Quantity | CCTU | SOPBench |
+| --- | ---: | ---: |
+| Evaluation tasks | 200 | 200 |
+| **Process constraints / task** | | |
+| Mean | 4.57 rules | 7.41 anchor constraints |
+| Median | 4.0 | 7.0 |
+| Min / max | 1 / 9 | 3 / 13 |
+| **Total process constraints** | 914 rules | 1,482 anchor constraints |
+| **Answer-side slots / task** | | |
+| Mean unsolved slots (CCTU only) | 4.11 | — |
+| Median unsolved slots | 2.0 | — |
+| Min / max unsolved slots | 1 / 11 | — |
+| **Noise constraints / task (SOP history revisions only)** | | |
+| Mean | — | 20.09 |
+| Median | — | 20.0 |
+| Min / max | — | 10 / 34 |
+| **Total SOP noise constraints generated in history** | — | 4,017 |
+| **Mutated source actions in history / task** | — | 6.41 |
+| Step-2 anchor_seeds / task (diagnostic) | — | 13.35 |
+| Sampled K anchor_seeds / task | — | 8.40 |
+| Core anchor_seeds / task | — | 4.94 |
+
+Interpretation:
+
+- CCTU **`constraint violation rate`** denominator = `len(constraints_list)` per
+  task (914 rules total).
+- CCTU **`answer pass`** uses final answer text only; **`step pass rate`** tracks
+  `unsolved_set` slot satisfaction (821 slots total across 200 tasks). Those slots
+  are not process constraints.
+- SOPBench anchor constraint count (~7.4/task) is smaller than anchor_seed count
+  (~13.3/task) because multiple seeds can belong to different segments inside
+  the same action-scoped constraint.
+- SOPBench noise constraint count (~20.1/task) counts superseded drafts written
+  into conversation history, not eval-time anchor constraints.
+
+## Contract Follow Rates
+
+Each evaluable contract comparison asks whether the agent matched the current
+active contract, matched an obsolete history/scope contract, or matched neither.
+The core booleans are:
+
+```text
+A = current anchor contract matched
+H = obsolete history/scope contract matched
+```
+
+MAC-Bench reports three mutually exclusive contract-follow buckets:
+
+- `correct_follow`: `A` is true. If a broader obsolete contract is also
+  satisfied, the current anchor match wins.
+- `wrong_follow`: `A` is false and `H` is true. This is the intended
+  history/scope-confusion signal.
+- `neither_followed`: `A` is false and `H` is false. The agent followed neither
+  the current contract nor a known obsolete alternative.
+
+```text
+correct_follow_rate = correctly_followed / comparison_count
+wrong_follow_rate   = wrongly_followed / comparison_count
+neither_follow_rate = neither_followed / comparison_count
+```
+
+Use zero-division-safe implementations: if `comparison_count` is zero, emit
+`null` for the rates and include support counts in the detail output.
+`active_constraint_count` and `history_constraint_count` are still reported as
+support, but the taxonomy denominator is the number of comparisons, not the sum
+of flattened active/history segments. These scores diagnose active-vs-obsolete
+contract following; they do not replace the main task/process metrics.
 
 ## CCTU Mapping
 
-CCTU noise grading already has unit-level outcomes:
-
-- `anchor_followed`: baseline constraint correctly followed (`TP` side).
-- `anchor_missed`: baseline constraint missed (`FN` side).
-- `noise_followed`: inapplicable/noise constraint incorrectly followed (`FP` side).
-- `noise_ignored`: inapplicable/noise constraint correctly ignored (`TN` side).
-
-For MAC-Bench reporting:
+CCTU uses the same three-bucket taxonomy, with emphasis on **scope confusion**.
+Each comparison is a `(task_uid, source_constraint_uid)` group:
 
 ```text
-TP = anchor_followed count
-FN = anchor_missed count
-FP = noise_followed count
-TN = noise_ignored count
+A = the active/current-scope anchor evaluator for that source constraint passes
+H = any inactive/noise-scope evaluator for that source constraint passes
 ```
 
-`ACC` and `RSP` are task-level metrics. `CFR`, `F1`, `Precision`, and `Recall`
-are computed from the contract-unit counts above.
+The group is `correct_follow` when `A`, `wrong_follow` when `not A and H`, and
+`neither_followed` when `not A and not H`. This keeps CCTU's contract-follow
+diagnostic focused on whether the agent selected the right scope rather than
+whether it merely violated a flattened constraint segment.
+
+The CCTU main task/process metrics use upstream CCTU task data:
+
+- `answer pass`: final response text matches the task-level `answer` field.
+- `constraint pass`: every `constraints_list` rule passes under native replay over the
+  full trajectory (`constraint violation rate == 0` per task; vacuous when no rules).
+- `constraint violation rate`: violated `constraints_list` rules divided by all
+  required rules (`len(constraints_list)` per task; one nested rule = one
+  constraint).
+- `joint pass`: `answer pass` and `constraint pass` are both true.
+- `step pass rate` (CCTU step success): satisfied `unsolved_set` tool-output slots
+  divided by all required slots.
+
+`constraint pass` is task-level all-or-nothing, while headline
+`constraint violation rate` is a micro-average over all `constraints_list` rules.
+A task can satisfy most rules and still fail `constraint pass` when any one rule
+violates under full-trajectory replay. Appendix `SSR` (mean per-task rule
+satisfaction rate) therefore tends to be higher than `constraint pass`.
+
+Reference calibration on the 200-task CCTU slice, `memory_system=oracle`,
+run `1782909331-01-07-26` (aggregate `constraint violation rate` = 12.8%, mean
+`SSR` = 87.5%, mean 4.57 rules per task):
+
+```text
+0 violated rules  → 119 tasks (59.5%)  ← constraint pass
+1 violated rule   →  54 tasks
+2 violated rules  →  19 tasks
+3+ violated rules →   8 tasks
+```
+
+Among the 81 tasks with `constraint pass=false`, the failing tasks violate a
+mean of 1.44 rules each; 54 of them violate exactly one rule.
+
+The original CCTU `ACC` / all-or-nothing `unsolved_set` slot check is retained as
+`legacy_ACC` / `answer_data_pass` for appendix reporting only.
 
 ## SOPBench Temporal Mapping
 
 SOPBench temporal histories test whether the agent follows the **final SOP at
-evaluation time** rather than **superseded constraint trees** introduced earlier
-in the conversation.
+evaluation time** rather than superseded SOP constraints introduced earlier in
+the conversation.
 
-### Anchor vs Noise (Constraint-Tree Definition)
+### Anchor vs Noise
 
-For SOPBench, anchor and noise are defined at the **constraint-tree level**:
+For SOPBench, anchor/noise status is defined over action-scoped SOP
+constraints:
 
 | Label | Definition |
 | --- | --- |
-| **Anchor** | The **final** user-goal constraint tree at evaluation time (`g_t`). This is the effective SOP the agent should follow when answering the last user turn. |
-| **Noise** | Any **earlier** user-goal constraint tree that appeared in temporal history but is **not** part of the final anchor tree at eval time. These are obsolete / superseded SOP revisions. |
+| **Anchor constraint** | A final action-scoped SOP unit that remains active at evaluation time. |
+| **Noise constraint** | A superseded action-scoped SOP revision introduced in history but inactive at evaluation time. |
+| **Segment** | A nested SOP predicate or action-call requirement inside a constraint. |
 
-At grading time:
+The SOPBench evaluator still uses native dependency structures and directed
+action graphs to decide whether the agent followed an SOP constraint. MAC-Bench
+uses those native artifacts as implementation details and reports constraints
+and segments at the terminology level above.
+
+### Graph-Level Follow Outcomes
+
+SOPBench uses the same three-bucket taxonomy, with emphasis on **history
+confusion**. Each comparison is one evaluation task:
 
 ```text
-anchor tree   = final user-goal constraint tree at eval
-noise trees   = historical user-goal constraint trees \ anchor tree
+A = the final anchor directed action graph is satisfied, and the user-goal
+    outcome is correct under SOPBench native replay
+H = at least one obsolete history directed action graph is strictly hit:
+    the agent successfully called an obsolete-only action and that history graph
+    is satisfied under replay
 ```
 
-The grader flattens trees into contract units for MAC-style scoring: walk each
-tree into dependency singles and graph precall actions, label units against the
-final anchor tree, then replay the agent trajectory with strict SOPBench domain
-semantics.
+The task is `correct_follow` when `A`, `wrong_follow` when `not A and H`, and
+`neither_followed` when `not A and not H`. The grader intentionally does not
+report a separate `both` bucket because history graphs can be broader than the
+final anchor graph; when the current anchor is matched, the outcome is credited
+as correct.
 
-### Unit-Level Outcomes
+Flattened `graph_action` and `dependency_single` segments are retained as
+diagnostics and for `constraint violation rate`, but they are not the
+contract-follow taxonomy denominator.
 
-For each exported contract unit:
+The SOPBench main task/process metrics use native replay, separate from the
+action-scoped constraint counts above:
 
-- An **anchor** unit (`expected_should_apply=true`) that the agent follows is `TP`.
-- An anchor unit that the agent fails to follow is `FN`.
-- A **noise** unit (`expected_should_apply=false`) that the agent still follows is `FP`.
-- A noise unit that the agent ignores is `TN`.
+- `answer pass`: SOPBench user-goal outcome correctness
+  (`action_called_correctly`; whether the user-goal action should/should not
+  succeed).
+- `constraint pass`: all required native process checks pass:
+  `no_tool_call_error`, `constraint_not_violated`, `database_match`, and
+  `dirgraph_satisfied`.
+- `constraint violation rate`: violated action-call segments divided by all
+  action-call segments in the SOP native action graph diagnostics. A missed
+  active action-call segment and a wrongly followed history-only action-call
+  segment both count as violations.
+- `joint pass`: `answer pass` and `constraint pass` are both true.
 
-This makes `Precision` a stale-memory penalty and `Recall` an update-missing
-penalty relative to the final anchor SOP.
+Dependency-single segments (for example, database predicates such as
+credit-score eligibility) are retained in detailed grading outputs because they
+help explain which facts were true or false under replay. They are not separate
+MAC constraints: otherwise the grader could credit an agent for a predicate
+that was already true in the database even if the agent never called the
+verification tool that establishes it.
 
-Important interpretation note for SOPBench `ACC`: it follows SOPBench's native
-definition of success, where `action_called_correctly` means the observed user
-goal outcome matches `action_should_succeed`. A task with
-`action_should_succeed=false` can therefore receive `ACC=1` when the agent
-correctly avoids a successful user-goal call.
+### SOPBench Tool-Behavior Diagnostics
+
+In addition to the four main metrics, SOPBench reports tool-behavior breakdowns
+to explain graph-action failures:
+
+| Diagnostic | Meaning |
+| --- | --- |
+| `active_followed_constraints` | Active action-call constraints successfully followed. |
+| `active_missed_constraints` | Active action-call constraints missed. |
+| `history_followed_constraints` | History action-call constraints incorrectly followed. |
+| `history_ignored_constraints` | History action-call constraints correctly ignored. |
+| `off_policy_successful_actions` | Successfully called actions that are neither active nor history constraints for the task, excluding the user-goal action. |
+
+The first four diagnostics decompose flat action-segment outcomes by active vs
+history status. They explain `constraint violation rate` and tool behavior, but
+they are separate from the graph-level contract-follow denominator.
+`off_policy_successful_actions` is an error-taxonomy signal for actions that do
+not match either the final SOP or the historical SOP variants.
+Each count is reported with rates: active followed/missed rates use the active
+constraint denominator; history followed/ignored rates use the history
+constraint denominator; share rates use all contract constraints; task rates use
+the number of evaluated tasks.
+
+Important interpretation note for SOPBench `answer pass`: it follows
+SOPBench's native definition of success, where `action_called_correctly` means
+the observed user-goal outcome matches `action_should_succeed`. A task with
+`action_should_succeed=false` can therefore receive `answer pass=true` when the
+agent correctly avoids a successful user-goal call.
 
 ## Benchmark Construction
 
@@ -144,44 +351,45 @@ where constraints arrive incrementally and only the final turn is evaluated.
    introduce constraints over many turns. Style and domain context are sampled
    per agent; the final turn remains the held-out evaluation query.
 
-6. **Contract-spec export.** Export anchor vs obsolete units from the merged
-   constraint graph. Anchor units correspond to constraints active at eval
-   time; noise units correspond to constraints that appeared historically but
-   are no longer active.
+6. **Contract-spec export.** Export constraints from the merged temporal graph
+   with their eval-time status. Anchor constraints are active at eval time;
+   noise constraints appeared historically but are no longer active.
 
 7. **Runtime packaging.** Materialize task records, user-turn histories, tool
    registries, and grading manifests for memory-system evaluation.
 
-**Active vs obsolete (CCTU).** A constraint node in the merged graph is **anchor**
-if it is active on the final evaluation turn; otherwise it is **noise**. Units
-are flattened from graph nodes and replayed with python or structured
-validators.
+**Active vs obsolete (CCTU).** A constraint node in the merged graph is an
+**anchor constraint** if it is active on the final evaluation turn; otherwise it
+is a **noise constraint**. Nested handler internals are segments. Constraints
+are replayed with python or structured validators.
 
 ### SOPBench Temporal Construction Pipeline
 
-**Goal.** Turn static SOPBench SOPs into temporal memory benchmarks where
-user-goal constraint trees evolve over conversation and only the final tree is
-valid at evaluation time.
+**Goal.** Turn static SOPBench SOPs into temporal memory benchmarks where SOP
+constraints evolve over conversation and only the final constraints are valid at
+evaluation time.
 
 1. **Task sampling and SOP extraction.** Sample a fixed number of SOPBench tasks
    across domains. Expand each task into per-action SOP rules, domain system
-   prompts, tool schemas, and the native user-goal dependency tree.
+   prompts, tool schemas, and native dependency structures.
 
-2. **Anchor constraint selection.** For each task, select a set of anchor
-   constraints: mandatory user-goal and action-path rules, plus additional
-   sampled constraints from the domain pool. These define the baseline SOP
-   fragments that will be mutated downstream.
+2. **Anchor-seed selection.** For each task, select `anchor_seed` records from
+   three tiers: mandatory user-goal bullets, bullets on the user-goal directed
+   action graph, plus `K` additional sampled bullets from the domain-default
+   pool (`K` drawn from a truncated normal on `[5, 12]`, mean 8.4). These seeds
+   reference action-scoped constraints; counting constraints uses unique root
+   actions (~7.4/task), not raw seed count (~13.3/task).
 
-3. **Action-level temporal noise generation.** For each anchor, generate noisy
-   SOP revisions by structurally mutating action-local dependency trees and
-   compiled action graphs. Revisions are plausible superseded drafts of the same
-   business rule, not unrelated tasks.
+3. **Action-level temporal noise generation.** For each anchor_seed, generate
+   noise constraints by structurally mutating action-local dependency segments
+   and compiled action artifacts. Revisions are plausible superseded drafts of
+   the same business rule, not unrelated tasks.
 
 4. **Temporal sequence assembly.** Deduplicate action-level noise fan-out, merge
    revisions from different actions into one shuffled temporal sequence per task,
-   and compile the cumulative user-goal constraint tree and directed action
-   graph after each revision. Adjacent-turn semantic deltas are recorded for
-   history population.
+   and compile the cumulative user-goal native dependency/action artifacts after
+   each revision. Adjacent-turn semantic deltas are recorded for history
+   population.
 
 5. **User-turn history population.** Build three-phase histories per task:
    - **Warmup:** a short LLM-generated preamble that establishes the baseline
@@ -190,18 +398,19 @@ valid at evaluation time.
      revising SOP rules in conversational form, plus carryover filler turns.
    - **Evaluation:** the original task query on the last turn.
 
-6. **Contract-spec export.** Replay the temporal sequence, collect all
-   historical user-goal trees, and label the **final tree as anchor** and every
-   distinct earlier tree as **noise**. Flatten trees into grading units when
-   computing contract metrics.
+6. **Contract-spec export.** Replay the temporal sequence, collect anchor
+   constraints and noise constraints, and flatten their internal segments when
+   computing diagnostic contract metrics.
 
 7. **Runtime packaging.** Export task records, user-turn histories, per-task
    tool registries, and noise-eval manifests for memory-system evaluation.
 
-**Active vs obsolete (SOPBench).** At the tree level, each task contributes one
-**anchor constraint graph** (final `g_t`) and several **noisy constraint graphs**
-from historical revisions. At grading time, trees are flattened into contract
-units, but benchmark-scale reporting uses graph counts and ratios.
+**Active vs obsolete (SOPBench).** Each task has many **anchor constraints**
+(one per selected root action/tool) and many **noise constraints** (one per
+temporal-sequence revision that patches an action-scoped SOP). Contract metrics
+flatten these constraints into diagnostic segments (`sopbench_single`,
+`sopbench_action_call`), but process-constraint counting uses the action-scoped
+constraint units defined above.
 
 ### Shared Evaluation Protocol
 
@@ -210,8 +419,9 @@ All MAC memory runs use the same agent-loop shape:
 1. Inject retrieved memory from prior user turns.
 2. Present the current evaluation user turn.
 3. Allow tool use until a terminal response tool call.
-4. Grade task completion (`ACC`, `RSP`) and contract decisions (`CFR`, `F1`,
-   `Precision`, `Recall`).
+4. Grade task/process success (`joint pass`, `answer pass`,
+   `constraint pass`, `constraint violation rate`) and secondary
+   constraint-follow decisions (`correct_follow_rate`, `wrong_follow_rate`).
 
 Default turn policy is **last user turn**. Historical turns are never shown
 directly to the agent; they are only available through the memory system under
@@ -231,8 +441,8 @@ Supported memory baselines:
 
 | Bench | Task-level oracle | Contract oracle |
 | --- | --- | --- |
-| CCTU | Answer / task completion checks | Anchor vs obsolete nodes in merged constraint graph; validator replay |
-| SOPBench | SOPBench strict replay (`success`, `dirgraph_satisfied`, database match) | Final anchor constraint tree vs historical noise trees |
+| CCTU | Final `answer` text (`answer pass`); full-trajectory `constraints_list` replay (`constraint pass`, `constraint violation rate`); `unsolved_set` slots (`step pass rate`) | Anchor constraints vs noise constraints; validator replay |
+| SOPBench | User-goal outcome (`action_called_correctly`) plus native process replay | Anchor constraints vs noise constraints; flattened diagnostic segments |
 
 ## Benchmark Statistics
 
@@ -249,16 +459,20 @@ slices.
 | Mean history turns per task | 188.3 | 82.8 |
 | Median history turns per task | 181.0 | 83.0 |
 | Evaluation turns per task | 1 (last turn) | 1 (last turn) |
-| Contract units (graded) | 5,772 | — |
-| Active / anchor units | 805 (14.0%) | 200 (20.9%) |
-| Obsolete / noise units | 4,967 (86.0%) | 758 (79.1%) |
+| Diagnostic segments (graded) | 5,772 | 2,928 |
+| Anchor diagnostic segments | 805 (14.0%) | 2,167 (74.0%) |
+| Noise diagnostic segments | 4,967 (86.0%) | 761 (26.0%) |
 
-CCTU reports flattened contract units. SOPBench reports **constraint graphs**
-in the anchor/noise rows: one final anchor graph per task, plus unique
-historical noisy graphs accumulated across temporal replay.
+CCTU reports flattened diagnostic segments from merged per-constraint rule graphs.
+SOPBench reports flattened diagnostic segments from replaying anchor vs noise
+constraints. Process-constraint scale uses CCTU `constraints_list` rules (914
+total) and SOPBench anchor constraints (1,482 total) plus SOP noise constraints
+introduced in history (4,017 total).
 
-Across the two slices: **400 evaluation tasks**, **5,772 CCTU contract units**,
-and **958 SOPBench constraint graphs** (200 anchor + 758 noise).
+Across the two slices: **400 evaluation tasks**, **914 CCTU process constraints**,
+**821 CCTU answer-side unsolved slots**, **1,482 SOP anchor constraints**,
+**4,017 SOP noise constraints**, and **8,700 diagnostic segments** (5,772 CCTU +
+2,928 SOP).
 
 ### CCTU Slice
 
@@ -267,21 +481,26 @@ and **958 SOPBench constraint graphs** (200 anchor + 758 noise).
 | Tasks | 200 |
 | Source split | Single-Hop 50, Multi-Hop 50, Parallel Single-Hop 50, Parallel Multi-Hop 50 |
 | Inferred difficulty | easy 44, normal 105, hard 51 |
-| Mean constraints per task | 4.6 |
-| Median constraints per task | 4 |
-| Min / max constraints per task | 1 / 9 |
+| Mean process constraints per task (`constraints_list` rules) | 4.57 |
+| Median process constraints per task | 4 |
+| Min / max process constraints per task | 1 / 9 |
+| Total process constraints | 914 |
+| Mean answer-side unsolved slots per task | 4.11 |
+| Median answer-side unsolved slots per task | 2 |
+| Min / max answer-side unsolved slots per task | 1 / 11 |
+| Total answer-side unsolved slots | 821 |
 | Mean tools per task | 9.3 |
 | Median tools per task | 9 |
 | Mean history user turns | 188.3 |
 | Median history user turns | 181.0 |
 | Min / max history user turns | 54 / 402 |
-| Contract units | 5,772 |
-| Anchor units | 805 |
-| Noise units | 4,967 |
-| Mean units per task | 28.9 |
-| Median units per task | 28 |
-| Min / max units per task | 7 / 59 |
-| Unit evaluator types | python 5,445; structured 326; unsupported 1 |
+| Diagnostic segments | 5,772 |
+| Anchor diagnostic segments | 805 |
+| Noise diagnostic segments | 4,967 |
+| Mean diagnostic segments per task | 28.9 |
+| Median diagnostic segments per task | 28 |
+| Min / max diagnostic segments per task | 7 / 59 |
+| Segment evaluator types | python 5,445; structured 326; unsupported 1 |
 
 ### SOPBench Temporal Slice
 
@@ -304,24 +523,31 @@ and **958 SOPBench constraint graphs** (200 anchor + 758 noise).
 | Total evaluation turns | 200 |
 | `action_should_succeed=true` tasks | 62 (31.0%) |
 | `action_should_succeed=false` tasks | 138 (69.0%) |
-| Mean sampled anchor constraints per task | 13.3 |
-| Median sampled anchor constraints per task | 13 |
-| Temporal-noise revisions generated | 3,484 |
-| Mean temporal replay depth per task | 20.1 |
-| Median temporal replay depth per task | 20 |
-| Anchor constraint graphs | 200 |
-| Noise constraint graphs | 758 |
-| Anchor-graph share | 20.9% |
-| Noise-graph share | 79.1% |
-| Mean noise graphs per task | 3.8 |
-| Median noise graphs per task | 4.0 |
-| Min / max noise graphs per task | 0 / 9 |
-| Mean singles per anchor graph | 6.9 |
-| Median singles per anchor graph | 6 |
+| Mean anchor constraints per task (unique root actions) | 7.41 |
+| Median anchor constraints per task | 7 |
+| Min / max anchor constraints per task | 3 / 13 |
+| Total anchor constraints | 1,482 |
+| Mean step-2 anchor_seeds per task (diagnostic) | 13.35 |
+| Median step-2 anchor_seeds per task | 13 |
+| Mean core anchor_seeds per task | 4.94 |
+| Mean sampled `K` anchor_seeds per task | 8.40 |
+| Mean noise constraints per task (history revisions) | 20.09 |
+| Median noise constraints per task | 20 |
+| Min / max noise constraints per task | 10 / 34 |
+| Total noise constraints introduced in history | 4,017 |
+| Mean mutated source actions in history per task | 6.41 |
+| Step-3 noisy dependency drafts generated | 3,484 |
+| Diagnostic segments (`sopbench_single` + `sopbench_action_call`) | 2,928 |
+| Anchor diagnostic segments | 2,167 |
+| Noise diagnostic segments | 761 |
+| Distinct historical user-goal graph states per task (excl. final anchor) | 3.44 mean |
+| Mean `single` segments per native user-goal graph | 6.9 |
+| Median `single` segments per native user-goal graph | 6 |
 
-Constraint graphs by domain:
+Distinct historical user-goal compiled graph states by domain (native replay
+diagnostic; not the same as MAC constraint counts above):
 
-| Domain | Tasks | Anchor graphs | Noise graphs |
+| Domain | Tasks | Final user-goal native graphs | Distinct historical user-goal graph states |
 | --- | ---: | ---: | ---: |
 | bank | 32 | 32 | 110 |
 | dmv | 23 | 23 | 71 |
@@ -335,14 +561,96 @@ Constraint graphs by domain:
 
 For a main paper, the most useful MAC-Bench summary is:
 
-1. **Benchmark scale table**: tasks, history length, and anchor/noise distribution
-   (CCTU: contract units; SOPBench: constraint graphs).
-2. **Domain breakdown table**: SOPBench tasks and constraint graphs by domain.
-3. **Metric table**: `ACC`, `RSP`, `CFR`, `F1`, `Precision`, `Recall`.
-4. **Memory-system table**: rows for each memory baseline listed above.
+1. **Benchmark scale table**: tasks, history length, process-constraint counts
+   (CCTU rules; SOP anchor/noise constraints), and anchor/noise diagnostic
+   segment distribution.
+2. **Domain breakdown table**: SOPBench tasks and native graph diagnostics by
+   domain.
+3. **Metric table**: `joint pass`, `answer pass`, `constraint pass`,
+   `constraint violation rate`.
+4. **Constraint-follow appendix table**: confusion matrix plus
+   `correct_follow_rate`, `wrong_follow_rate`.
+5. **Memory-system table**: rows for each memory baseline listed above.
 
 For an appendix, additionally report:
 
 - CCTU source split and difficulty counts
-- SOPBench temporal construction counts (noise revisions, replay depth)
-- Per-task distributions of history length and noise-graph count
+- SOPBench temporal construction counts (anchor constraints, noise constraints,
+  anchor_seed sampling)
+- Per-task distributions of history length, anchor-constraint count, and
+  noise-constraint count
+
+## Appendix
+
+### CCTU golden-answer audit (oracle calibration)
+
+The 200-task CCTU slice can be audited for label quality by comparing oracle
+trajectory outcomes against upstream `answer` fields. Use the oracle run output
+(`memory_output`) together with its graded scores (`memory_grade`).
+
+**Procedure**
+
+1. Run or reuse an oracle trace over all 200 CCTU tasks
+   (`memory_system=oracle`, e.g. run `1782909331-01-07-26`).
+2. For each task, read per-task scores from the grade artifact:
+   - `legacy_ACC` (appendix name for upstream CCTU `ACC`): all required
+     `unsolved_set` tool-output slots are satisfied (`step pass rate == 1.0`).
+   - `answer pass`: final response text matches the task-level `answer` via
+     `answer_verify`.
+3. Flag tasks where **`legacy_ACC=true` and `answer pass=false`**. These are
+   cases where tool evidence is complete but the graded final answer disagrees
+   with the stored golden string—either a formatting mismatch, an agent
+   synthesis error, or a questionable upstream label.
+
+On run `1782909331-01-07-26`, this filter yields **19 tasks**. Rough breakdown
+before label fixes:
+
+| Category | Count | Task ids (CCTU) | Notes |
+| --- | ---: | --- | --- |
+| Date / prose format mismatch | 9 | 0, 1, 5, 11, 13, 18, 33, 43, 45 | Fixed in `answer_verify` via ISO ↔ natural-language date normalization (`bench/CCTU/utils/utils.py`). |
+| Upstream golden inconsistent with default tool path | 2 | 101, 123 | Gold summed or used a non-default tool parameter; oracle followed `unsolved_set` defaults. |
+| Agent gave separate values; gold incorrectly summed | 3 | 133, 135, 145 | Query/constraints ask for two results, not a single total. |
+| Other agent final-answer errors | 3 | 32, 125, 146 | Tool slots satisfied; final text wrong or off-topic. |
+| Answer phrasing / gold substring mismatch | 1 | 113 | Comparison question; oracle named the later event correctly but used abbreviated phrasing (`LA Crusade`) instead of the exact gold event name. |
+| Gold sum inconsistent with tool simulator | 1 | 137 | Question asks for combined count; tools return 4 + 4; gold was `6`, tool path yields `8`. |
+| Yes/no encoded as JSON boolean | 2 | 159, 191 | Oracle answered `false` in JSON; gold was literal `no`. |
+
+**Golden-answer patches applied**
+
+Nine tasks were patched in upstream CCTU data to keep the original gold while
+also accepting the tool-default / separately reported answer. The `answer`
+field uses **` or `** (case-insensitive) between alternatives; `answer_verify`
+passes if **any** alternative matches. Within one alternative, `, ` still means
+**all** substrings must appear (existing CCTU multi-part answers such as
+`Brazil, China` are unchanged).
+
+| CCTU id | Old `answer` | New `answer` | Rationale |
+| ---: | --- | --- | --- |
+| 101 | `35` | `35 or 30` | `35` assumes `include_dialects=True` on `eu_language_analyzer`; default path and `unsolved_set` imply `24 + 6 = 30`. |
+| 123 | `54` | `54 or 44` | Tool simulator returns Verdi 28 + Wagner 16; no path yields 54. |
+| 133 | `16,000` | `16,000 or 12,000, 4,000` | Constraints require JSON with separate `flight_distance` and `train_distance`; gold had summed miles. |
+| 135 | `30,002` | `30,002 or 2, 30,000` | Question asks for opera-half count **and** deportation count; constraint uses `###` separator, not a sum. |
+| 145 | `5` | `5 or 3, 2` | Question asks for laptop and smartphone brand counts **separately**; constraint requires `### Laptops:` / `### Smartphones:`. |
+| 113 | `The start of Billy Graham's Los Angeles Crusade` | `The start of Billy Graham's Los Angeles Crusade or Billy Graham` | Oracle answered with a correct comparative sentence using `LA Crusade`; substring gold required the full event name. |
+| 137 | `6` | `6 or 8` | `anatomy_facts_provider` and `anatomical_info_provider` each return `4`; combined total from tools is 8. |
+| 159 | `no` | `no or false` | Yes/no question; oracle final used JSON `"comparison": false` instead of the literal string `no`. |
+| 191 | `no` | `no or false` | Same JSON-boolean encoding as id 159. |
+
+**Files touched**
+
+- `bench/CCTU/data/input_data.jsonl` — upstream `answer` fields for ids 101, 123, 113, 133, 135, 137, 145, 159, 191.
+- `bench/MAC/cctu/data/mac-cctu-tasks.json` — mirrored `cctu_sample.answer` for the same ids.
+- `bench/CCTU/utils/utils.py` — `answer_verify` supports ` or ` alternatives; date-token normalization for prose/ISO mismatches.
+- `tests/test_cctu_answer_verify_dates.py` — regression tests for date matching and OR gold strings.
+
+After all nine OR gold patches and date-normalized `answer_verify`, re-grading
+oracle run `1782909331-01-07-26` yields **`answer pass` 86.0%** (was 75.0%
+before any label fixes) and **`joint pass` 53.0%** (was 46.5%). Remaining
+oracle `answer pass` failures are predominantly `legacy_ACC=false` tool-retrieval
+gaps and a small set of genuine final-answer errors (e.g. ids 32, 125, 146).
+Note: ids 159 and 191 still fail `legacy_ACC` because one `unsolved_set` slot
+each remains unsatisfied; the OR patch fixes `answer pass` only.
+
+Re-grade existing run outputs after these changes to refresh `answer pass` and
+`joint pass`; stored grade JSON under `bench/MAC/cctu/results/memory_grade/` is
+not updated automatically.

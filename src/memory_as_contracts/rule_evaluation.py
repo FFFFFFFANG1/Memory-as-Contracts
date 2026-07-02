@@ -16,7 +16,6 @@ from memory_as_contracts.models import (
     GateDecisionType,
     MatchOutcome,
     RuleEffect,
-    ValidatorEnforcementShape,
 )
 from memory_as_contracts.rule_surface import (
     bind_contract_check_patterns,
@@ -145,45 +144,27 @@ class RuleEvaluator:
                 ),
             )
 
-        if contract.validator_enforcement_shape != ValidatorEnforcementShape.NO_VALIDATOR:
-            if not contract.check_patterns:
-                return self._ignored(contract, "validator_unavailable")
-            binding = bind_contract_check_patterns(contract, signature)
-            if not binding.matched:
-                return self._ignored(contract, "validator_not_matched")
-            response = self._ask_response_evaluation(
-                contract,
-                None,
-                binding.outcome,
-                ask_response,
-            )
-            if response is not None:
-                return response
+        if not contract.check_patterns:
             return RuleEvaluation(
                 contract_id=contract.id,
                 decision=GateDecisionType.ASK,
-                reason=f"Rule {contract.id} requires a validator that is not available.",
-                match_outcome=binding.outcome,
+                reason=f"Rule {contract.id} requires validation hook patterns that are not available.",
                 used=True,
                 validator_verdicts=(
                     {
                         "contract_id": contract.id,
                         "validator_version_id": None,
                         "decision": GateDecisionType.ASK.value,
-                        "reason": "validator is not installed",
+                        "reason": "check patterns are not installed",
                         "evidence_refs": [],
                         "confidence": 0.0,
                     },
                 ),
                 ask_rule_ids=(contract.id,),
             )
-
-        pattern_version = self._active_pattern_version(contract)
-        if pattern_version is None:
-            return self._ignored(contract, "missing_check_pattern")
-        binding = bind_check_patterns(contract, signature, pattern_version.check_patterns)
+        binding = bind_contract_check_patterns(contract, signature)
         if not binding.matched:
-            return self._ignored(contract, "predicate_not_matched")
+            return self._ignored(contract, "validator_not_matched")
         response = self._ask_response_evaluation(
             contract,
             None,
@@ -192,34 +173,23 @@ class RuleEvaluator:
         )
         if response is not None:
             return response
-        edges_applied = tuple(self._active_edge_ids(signature, contract))
-        if contract.status == ContractStatus.PENDING_CONFLICT:
-            return RuleEvaluation(
-                contract_id=contract.id,
-                decision=GateDecisionType.ASK,
-                reason=_intervention_hint(contract),
-                match_outcome=binding.outcome,
-                used=True,
-                edges_applied=edges_applied,
-                ask_rule_ids=(contract.id,),
-            )
-        decision = (
-            GateDecisionType.REJECT
-            if contract.effect == RuleEffect.DENY
-            or contract.kind == ContractKind.PROHIBITION
-            else GateDecisionType.ALLOW
-        )
         return RuleEvaluation(
             contract_id=contract.id,
-            decision=decision,
-            reason=(
-                _intervention_hint(contract)
-                if decision != GateDecisionType.ALLOW
-                else f"matched non-blocking contract {contract.id}"
-            ),
+            decision=GateDecisionType.ASK,
+            reason=f"Rule {contract.id} requires a validator that is not available.",
             match_outcome=binding.outcome,
             used=True,
-            edges_applied=edges_applied,
+            validator_verdicts=(
+                {
+                    "contract_id": contract.id,
+                    "validator_version_id": None,
+                    "decision": GateDecisionType.ASK.value,
+                    "reason": "validator is not installed",
+                    "evidence_refs": [],
+                    "confidence": 0.0,
+                },
+            ),
+            ask_rule_ids=(contract.id,),
         )
 
     @staticmethod

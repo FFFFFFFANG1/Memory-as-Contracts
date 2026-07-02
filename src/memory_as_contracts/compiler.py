@@ -42,17 +42,6 @@ class PolicyCompiler:
     ) -> RulePatternVersion:
         check_patterns = list(contract.check_patterns)
         tags = set(contract.semantics.tags)
-        grounding = self._grounding_cache(contract)
-        path_globs = grounding.ground_paths(
-            text=contract.text,
-            hint_paths=_path_hints(contract.text, self),
-            scope_globs=[],
-        )
-        check_patterns = _ground_seed_patterns(
-            contract=contract,
-            seed_patterns=check_patterns,
-            path_globs=path_globs,
-        )
 
         return RulePatternVersion(
             contract_id=contract.id,

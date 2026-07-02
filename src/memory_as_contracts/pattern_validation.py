@@ -67,10 +67,8 @@ class PatternVerifier:
 
     def verify(self, contract: Contract) -> PatternVerificationResult:
         issues: list[PatternValidationIssue] = []
-        if (
-            contract.kind != ContractKind.FACT
-            and not contract.check_patterns
-        ):
+        shape = contract.validator_enforcement_shape
+        if contract.kind != ContractKind.FACT and not contract.check_patterns:
             issues.append(
                 PatternValidationIssue(
                     code="missing_check_patterns",
@@ -79,7 +77,6 @@ class PatternVerifier:
                 )
             )
 
-        shape = contract.validator_enforcement_shape
         self._verify_group("check_patterns", contract.check_patterns, issues)
 
         if shape == ValidatorEnforcementShape.CHECK_UPDATE and not contract.update_patterns:

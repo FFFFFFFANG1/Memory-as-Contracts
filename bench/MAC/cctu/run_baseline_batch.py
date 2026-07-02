@@ -177,7 +177,7 @@ def grade_run(output_path: Path, grade_path: Path) -> dict:
         "run",
         "python",
         "-m",
-        "bench.MAC.scripts.grade_cctu_answer",
+        "bench.MAC.cctu.grade_answer",
         str(output_path),
         "--output",
         str(grade_path),

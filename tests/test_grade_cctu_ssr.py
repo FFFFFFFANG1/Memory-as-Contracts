@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bench.MAC.scripts.grade_cctu_answer import compute_ssr
+from bench.MAC.cctu.grade_answer import compute_ssr
 
 
 def test_compute_ssr_all_satisfied() -> None:

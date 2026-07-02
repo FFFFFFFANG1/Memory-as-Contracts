@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Generate per-anchor temporal SOP revision histories for MAC SOPBench construct step 3.
+"""Generate per-seed temporal SOP revisions for MAC SOPBench construct step 3.
 
 Reads ``bench/MAC/sopbench/mid_data/eval_step2_anchors.json`` and writes
 ``bench/MAC/sopbench/mid_data/eval_step3_temporal_noise.json``:
 
 - per task: ``domain``, ``task_description``
-- per constraint: anchor ``text``, ``anchor_dependency``,
+- per anchor_seed: seed ``text``, ``anchor_dependency``,
   ``anchor_compiled_graph``, and ``temporal_noise`` entries with ``dependency``,
   ``compiled_graph``, ``mutation``, and ``dependency_diff``
 
 Default generator: rule-based dependency mutations (add/delete/flip/swap) on
-action-level dependency trees. For each action/subtree the sampler tries up to
-10 shuffled mutation candidates and keeps the first validated graph-changing
-variants: 4-5 for composite subtrees, 1-2 for small single-constraint subtrees.
+action-scoped dependency structures. For each action/segment group the sampler
+tries up to 10 shuffled mutation candidates and keeps the first validated
+graph-changing variants: 4-5 for composite structures, 1-2 for small
+single-segment structures.
 Use ``--llm`` for the legacy LLM prose+dependency path.
 """
 
@@ -71,60 +72,60 @@ EXECUTABLE_GUIDE = """
 ### Executable model
 
 This data is for SOPBench tool evaluation. Do not write tool-call processes or
-graphs directly. SOPBench derives those from dependency trees.
+graphs directly. SOPBench derives those from native dependency structures.
 
-`anchor_dependency` is the current SOP dependency subtree:
-- `["single", constraint_id, params]`: one known SOP constraint.
-- `["and", [a, b]]`: all child constraints are required.
-- `["or", [a, b]]`: any one child constraint is enough.
+`anchor_dependency` is the dependency structure attached to the anchor_seed:
+- `["single", constraint_id, params]`: one known SOP segment.
+- `["and", [a, b]]`: all child segments are required.
+- `["or", [a, b]]`: any one child segment is enough.
 
-For each noisy draft, write a changed `noisy_dependency`. The program will call
+For each noise draft, write a changed `noisy_dependency`. The program will call
 SOPBench's graph builder on that dependency and accept the draft only if the
-compiled graph differs from the anchor graph.
+compiled graph differs from the seed's compiled graph.
 """.strip()
 
 PROMPT_REQUIREMENTS: list[str] = [
-    "Return exactly `noise_count` noisy items, then the anchor item last.",
+    "Return exactly `noise_count` noise items, then the anchor_seed item last.",
     "Each item: `text` plus `noisy_dependency`.",
     "Do not output `process`, `compiled_graph`, or tool-call plans; those are derived by SOPBench.",
     "Every `single` constraint_id must come from `allowed_constraints`.",
     "Every params object must use only the provided placeholder values for that constraint.",
-    "Noisy dependencies must compile with SOPBench and must compile to a graph different from the anchor graph.",
+    "Noise dependencies must compile with SOPBench and must compile to a graph different from the seed graph.",
     "Do not copy or lightly paraphrase `other_anchor_constraints`.",
-    "Use `other_constraints_on_action` for context, but do not duplicate one of them as the noisy dependency unless the revision explicitly adds an AND/OR combination.",
+    "Use `other_constraints_on_action` for context, but do not duplicate one as the noise dependency unless the revision explicitly adds an AND/OR combination.",
     "Write direct standalone rules; avoid if/when/only-if scaffolding.",
-    "Anchor item: exact `anchor_constraint.text` and exact `anchor_dependency`.",
+    "anchor_seed item: exact `anchor_constraint.text` and exact `anchor_dependency`.",
     "Output valid JSON only; no markdown or extra metadata.",
 ]
 
 # --- LLM prompts (edit below) ---
 
 SYSTEM_PROMPT_BODY = """
-Generate temporal noise for one SOP constraint.
+Generate temporal noise for one SOP anchor_seed.
 
-The anchor is the current rule. Noisy items are plausible earlier revisions of
-the same rule thread, and must be obsolete in an executable way. Keep the same
-domain, target action, and business topic. Write standalone SOP rules in the
-same tone as the anchor.
+The anchor_seed points to the current active SOP constraint. Noise items are
+plausible earlier revisions of the same action-scoped constraint, and must be
+obsolete in an executable way. Keep the same domain, target action, and business
+topic. Write standalone SOP rules in the same tone as the seed text.
 """.strip()
 
 NOISE_REVISION_GUIDE = """
 ### Writing superseded drafts
 
-Each noisy item should read like an older version the team later replaced—not a
+Each noise item should read like an older version the team later replaced—not a
 different rule, a new user goal, or an unrelated policy.
 
 Revision axes (change one main axis when possible):
 - **Composition**: add/remove a known sibling requirement with AND.
 - **Alternative**: broaden/narrow a known OR branch.
-- **Requirement swap**: replace the anchor with a nearby known constraint on the
+- **Requirement swap**: replace the seed segment with a nearby known segment on the
   same action.
 - **Prerequisite shape**: make an older draft require a different known
   checkable condition that SOPBench can compile.
 
 Prose and dependency must agree. Do not invent new policy names or verifier
 functions. If you need a stricter or looser predicate, express it using known
-constraints and AND/OR structure rather than free-form process edits.
+segments and AND/OR structure rather than free-form process edits.
 
 Avoid: unrelated tools or topics; copying `other_anchor_constraints`; conditional
 scaffolding ("if/when/only if")—write direct SOP statements; flipping the rule
@@ -161,7 +162,7 @@ def prompt_output_schema(*, noise_count: int) -> dict[str, Any]:
         for index in range(1, max(1, noise_count) + 1)
     ]
     anchor_item = {
-        "text": "anchor constraint text (same as anchor_constraint.text)",
+        "text": "anchor_seed text (same as anchor_constraint.text)",
         "noisy_dependency": "same as anchor_dependency",
     }
     if noise_count == 0:
@@ -1187,7 +1188,7 @@ def noise_dedup_items(
             similarity_threshold=similarity_threshold,
         )
         if is_duplicate:
-            rejected_reasons.append(f"noisy item {index}: task dedup: {reason}")
+            rejected_reasons.append(f"noise item {index}: task dedup: {reason}")
             continue
         kept.append(item)
         registry.append(
@@ -1592,7 +1593,7 @@ def normalize_temporal_sequence(
     anchor_raw = parsed_items[-1]
     noisy_raws = parsed_items[:-1]
     if job.noise_target == 0 and noisy_raws:
-        warnings.append("noise_target=0 but LLM returned noisy items; dropped extras")
+        warnings.append("noise_target=0 but LLM returned noise items; dropped extras")
         noisy_raws = []
 
     non_anchor: list[dict[str, Any]] = []
@@ -1603,7 +1604,7 @@ def normalize_temporal_sequence(
         accepted, reason = validate_dependency_tree(dep, known_params=known_params)
         if not accepted:
             validation["rejected"] += 1
-            validation["reject_reasons"].append(f"noisy item {index}: {reason}")
+            validation["reject_reasons"].append(f"noise item {index}: {reason}")
             continue
         try:
             compiled = compile_dependency_graph(
@@ -1614,14 +1615,14 @@ def normalize_temporal_sequence(
         except Exception as exc:  # noqa: BLE001
             validation["rejected"] += 1
             validation["reject_reasons"].append(
-                f"noisy item {index}: graph-builder compilation failed: {exc}"
+                f"noise item {index}: graph-builder compilation failed: {exc}"
             )
             continue
         compiled_graph_sig = graph_signature(compiled.get("graph"))
         if compiled_graph_sig == anchor_graph_sig:
             validation["rejected"] += 1
             validation["reject_reasons"].append(
-                f"noisy item {index}: compiled graph equivalent to anchor graph"
+                f"noise item {index}: compiled graph equivalent to seed graph"
             )
             continue
         executable = executable_from_compiled(
@@ -1637,7 +1638,7 @@ def normalize_temporal_sequence(
         )
         if not accepted:
             validation["rejected"] += 1
-            validation["reject_reasons"].append(f"noisy item {index}: {reason}")
+            validation["reject_reasons"].append(f"noise item {index}: {reason}")
             continue
         is_duplicate, dedup_reason = noise_dedup_is_duplicate(
             item["text"],
@@ -1647,7 +1648,7 @@ def normalize_temporal_sequence(
         if is_duplicate:
             validation["rejected"] += 1
             validation["task_dedup_rejected"] += 1
-            validation["reject_reasons"].append(f"noisy item {index}: task dedup: {dedup_reason}")
+            validation["reject_reasons"].append(f"noise item {index}: task dedup: {dedup_reason}")
             continue
         validation["accepted"] += 1
         dedup_registry.append({"text": item["text"], "mac_constraint_uid": constraint_uid})
@@ -1677,13 +1678,13 @@ def normalize_temporal_sequence(
         ordered = [anchor_item]
     elif len(non_anchor) > job.noise_target:
         warnings.append(
-            f"truncated noisy items from {len(non_anchor)} to noise_target={job.noise_target}"
+            f"truncated noise items from {len(non_anchor)} to noise_target={job.noise_target}"
         )
         ordered = non_anchor[: job.noise_target] + [anchor_item]
     else:
         if len(non_anchor) < job.noise_target:
             warnings.append(
-                f"only {len(non_anchor)} noisy item(s) accepted; target was {job.noise_target}"
+                f"only {len(non_anchor)} noise item(s) accepted; target was {job.noise_target}"
             )
         ordered = non_anchor + [anchor_item]
 
@@ -1981,7 +1982,7 @@ def rulebase_temporal_sequence(
 
     if len(accepted) < job.noise_target:
         warnings.append(
-            f"only {len(accepted)} noisy item(s) accepted for anchor; target was {job.noise_target}"
+            f"only {len(accepted)} noise item(s) accepted for anchor_seed; target was {job.noise_target}"
         )
 
     ordered = accepted + [anchor_item]
@@ -2015,7 +2016,7 @@ def rulebase_action_temporal_sequence(
     target_action = str(job.action or "")
     action_dep = get_action_dependency(job.task, target_action)
     if action_dep is None:
-        raise ValueError(f"action {target_action} has no dependency tree; cannot run action-level rulebase")
+        raise ValueError(f"action {target_action} has no dependency structure; cannot run action-level rulebase")
 
     known_params = known_constraint_params(job.task)
     try:
@@ -2154,7 +2155,7 @@ def rulebase_action_temporal_sequence(
 
     if len(accepted) < job.noise_target:
         warnings.append(
-            f"only {len(accepted)} noisy item(s) accepted for action={target_action}; "
+            f"only {len(accepted)} noise item(s) accepted for action={target_action}; "
             f"target was {job.noise_target}"
         )
 
@@ -2189,7 +2190,7 @@ def rulebase_action_temporal_sequence_sequential(
     target_action = str(job.action or "")
     action_dep = get_action_dependency(job.task, target_action)
     if action_dep is None:
-        raise ValueError(f"action {target_action} has no dependency tree; cannot run sequential rulebase")
+        raise ValueError(f"action {target_action} has no dependency structure; cannot run sequential rulebase")
 
     known_params = known_constraint_params(job.task)
     try:
@@ -2350,7 +2351,7 @@ def rulebase_action_temporal_sequence_sequential(
 
     if len(accepted) < job.noise_target:
         warnings.append(
-            f"only {len(accepted)} sequential noisy item(s) accepted for action={target_action}; "
+            f"only {len(accepted)} sequential noise item(s) accepted for action={target_action}; "
             f"target was {job.noise_target}"
         )
 
@@ -2572,15 +2573,15 @@ def process_anchor_job(
                 break
             if attempt < max_attempts:
                 warnings.append(
-                    f"attempt {attempt}: only {accepted_noisy_count(sequence)} noisy item(s) accepted; retrying"
+                    f"attempt {attempt}: only {accepted_noisy_count(sequence)} noise item(s) accepted; retrying"
                 )
 
         if not sequence:
-            warnings.append("validation retries exhausted; no noisy items accepted")
+            warnings.append("validation retries exhausted; no noise items accepted")
         elif accepted_noisy_count(sequence) < job.noise_target:
             warnings.append(
                 f"validation retries exhausted; only {accepted_noisy_count(sequence)} "
-                f"noisy item(s) accepted; target was {job.noise_target}"
+                f"noise item(s) accepted; target was {job.noise_target}"
             )
 
         return generation_artifact(

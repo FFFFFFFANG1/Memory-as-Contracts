@@ -20,7 +20,18 @@ if str(REPO_ROOT) not in sys.path:
 
 from bench.MAC.agent.trajectory import build_raw_history  # noqa: E402
 from bench.MAC.cctu.bridge import MAC_CCTU_DATA_DIR, cctu_samples_by_id, load_cctu_eval_tasks  # noqa: E402
-from bench.MAC.scripts.grade_cctu_answer import grade_one  # noqa: E402
+from bench.MAC.cctu.grade_answer import grade_one  # noqa: E402
+from bench.MAC.construct.sop.noise_eval import (  # noqa: E402
+    contract_metrics,
+    follow_outcome,
+    follow_taxonomy_metrics,
+)
+from bench.MAC.grading.score_format import (  # noqa: E402
+    build_grade_document,
+    format_cctu_legacy_scores,
+    format_main_scores,
+)
+from bench.MAC.scripts.run_paths import bench_grade_path, make_run_unique_index  # noqa: E402
 
 DEFAULT_MANIFEST = Path("bench/MAC/cctu/data/mac-cctu-noise_eval_specs.json")
 DEFAULT_OUTPUT = Path("bench/MAC/cctu/results/noise_eval_grade.json")
@@ -46,9 +57,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("answers_file", type=Path, help="JSON output from bench/MAC/scripts/run_memory_eval.py")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--tasks", type=Path, default=DEFAULT_TASKS)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--bench", choices=["cctu"], default="cctu")
+    parser.add_argument("--difficulty", choices=["easy", "normal", "hard", "all"])
+    parser.add_argument("--memory-system")
+    parser.add_argument("--run-id")
     parser.add_argument("--detail", action="store_true")
     return parser.parse_args()
+
+
+def infer_memory_system(args: argparse.Namespace, header: dict[str, Any]) -> str:
+    return str(args.memory_system or header.get("memory_system") or "unknown")
+
+
+def output_path(
+    args: argparse.Namespace,
+    *,
+    header: dict[str, Any],
+    memory_system: str,
+) -> Path:
+    if args.output:
+        return args.output
+    run_id = args.run_id or header.get("run_id") or make_run_unique_index()
+    if args.output_dir:
+        return args.output_dir / f"{memory_system}_{args.bench}_{run_id}.json"
+    return bench_grade_path(memory_system, args.bench, str(run_id))
 
 
 def read_memory_output(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -458,11 +492,35 @@ def outcome_bucket(expected: bool, observed: bool | None) -> str:
 
 
 def cctu_task_metrics(task_grades: dict[str, dict[str, Any]]) -> dict[str, float | None]:
-    """Aggregate CCTU default task metrics (same as grade_cctu_answer.py)."""
+    """Aggregate CCTU task and process-constraint metrics."""
     graded = [grade for grade in task_grades.values() if not grade.get("error")]
     if not graded:
-        return {"ACC": None, "SR": None, "PSR": None, "SSR": None}
+        return {
+            "joint pass": None,
+            "answer pass": None,
+            "constraint pass": None,
+            "constraint violation rate": None,
+            "step pass rate": None,
+            "ACC": None,
+            "SR": None,
+            "PSR": None,
+            "SSR": None,
+        }
+    constraint_total = sum(int(grade.get("constraint_total") or 0) for grade in graded)
+    constraint_satisfied = sum(int(grade.get("constraint_satisfied") or 0) for grade in graded)
+    unsolved_slot_total = sum(int(grade.get("unsolved_slot_total") or 0) for grade in graded)
+    unsolved_slot_satisfied = sum(int(grade.get("unsolved_slot_satisfied") or 0) for grade in graded)
+    constraint_violated = max(0, constraint_total - constraint_satisfied)
     return {
+        "joint pass": sum(1 for grade in graded if grade.get("joint_pass")) / len(graded),
+        "answer pass": sum(1 for grade in graded if grade.get("answer_pass")) / len(graded),
+        "constraint pass": sum(1 for grade in graded if grade.get("constraint_pass")) / len(graded),
+        "constraint violation rate": (
+            constraint_violated / constraint_total if constraint_total else 0.0
+        ),
+        "step pass rate": (
+            unsolved_slot_satisfied / unsolved_slot_total if unsolved_slot_total else 1.0
+        ),
         "ACC": sum(1 for grade in graded if grade.get("acc")) / len(graded),
         "SR": sum(1 for grade in graded if grade.get("SR")) / len(graded),
         "PSR": sum(1 for grade in graded if grade.get("PSR")) / len(graded),
@@ -470,66 +528,143 @@ def cctu_task_metrics(task_grades: dict[str, dict[str, Any]]) -> dict[str, float
     }
 
 
+def build_main_score_values(
+    details: list[dict[str, Any]],
+    task_grades: dict[str, dict[str, Any]],
+    task_rsp: dict[str, bool] | None = None,
+) -> dict[str, float | None]:
+    cctu_scores = cctu_task_metrics(task_grades)
+    return {
+        "joint pass": cctu_scores["joint pass"],
+        "answer pass": cctu_scores["answer pass"],
+        "constraint pass": cctu_scores["constraint pass"],
+        "constraint violation rate": cctu_scores["constraint violation rate"],
+    }
+
+
+def build_contract_diagnostics(details: list[dict[str, Any]]) -> dict[str, Any]:
+    contract = follow_taxonomy_metrics(details)
+    return {
+        "constraint_follow_scores": {
+            "correct_follow_rate": contract["correct_follow_rate"],
+            "wrong_follow_rate": contract["wrong_follow_rate"],
+            "neither_follow_rate": contract["neither_follow_rate"],
+        },
+        "support": {
+            "comparison_count": contract["comparison_count"],
+            "constraint_count": contract["constraint_count"],
+            "active_constraint_count": contract["active_constraint_count"],
+            "history_constraint_count": contract["history_constraint_count"],
+            "correctly_followed": contract["correctly_followed"],
+            "wrongly_followed": contract["wrongly_followed"],
+            "neither_followed": contract["neither_followed"],
+        },
+    }
+
+
+def build_scope_follow_details(details: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in details:
+        task_uid = str(row.get("task_uid") or "")
+        source_uid = str(row.get("source_constraint_uid") or row.get("node_id") or "")
+        if not task_uid or not source_uid:
+            continue
+        grouped[(task_uid, source_uid)].append(row)
+
+    follow_details: list[dict[str, Any]] = []
+    for (task_uid, source_uid), rows in sorted(grouped.items()):
+        active_rows = [row for row in rows if row.get("expected_should_apply")]
+        history_rows = [row for row in rows if not row.get("expected_should_apply")]
+        anchor_matched = any(row.get("observed_followed") is True for row in active_rows)
+        history_matched = any(row.get("observed_followed") is True for row in history_rows)
+        first = rows[0]
+        follow_details.append(
+            {
+                "task_uid": task_uid,
+                "source_constraint_uid": source_uid,
+                "source_anchor_role": first.get("source_anchor_role"),
+                "family": first.get("family"),
+                "follow_outcome": follow_outcome(anchor_matched, history_matched),
+                "anchor_matched": anchor_matched,
+                "history_matched": history_matched,
+                "active_constraint_count": len(active_rows),
+                "history_constraint_count": len(history_rows),
+                "history_hit_count": sum(1 for row in history_rows if row.get("observed_followed") is True),
+            }
+        )
+    return follow_details
+
+
 def score_rows(
     details: list[dict[str, Any]],
     task_grades: dict[str, dict[str, Any]],
     task_rsp: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
-    counts = Counter(str(row.get("outcome")) for row in details)
-    known = (
-        counts["anchor_followed"]
-        + counts["anchor_missed"]
-        + counts["noise_followed"]
-        + counts["noise_ignored"]
-    )
-    anchor_total = counts["anchor_followed"] + counts["anchor_missed"]
-    noise_total = counts["noise_followed"] + counts["noise_ignored"]
-    task_rsp = task_rsp or {}
+    contract = contract_metrics(details)
     cctu_scores = cctu_task_metrics(task_grades)
+    task_rsp = task_rsp or {}
     graded_tasks = [grade for grade in task_grades.values() if not grade.get("error")]
     return {
+        **build_main_score_values(details, task_grades, task_rsp),
         **cctu_scores,
-        "RSP": (sum(1 for value in task_rsp.values() if value) / len(task_rsp)) if task_rsp else None,
-        "anchor_followed": counts["anchor_followed"] / anchor_total if anchor_total else None,
-        "anchor_missed": counts["anchor_missed"] / anchor_total if anchor_total else None,
-        "noise_followed": counts["noise_followed"] / noise_total if noise_total else None,
-        "noise_ignored": counts["noise_ignored"] / noise_total if noise_total else None,
-        "counts": {
-            "anchor_followed": counts["anchor_followed"],
-            "anchor_missed": counts["anchor_missed"],
-            "noise_followed": counts["noise_followed"],
-            "noise_ignored": counts["noise_ignored"],
+        "constraint_follow_support": {
+            "constraint_count": contract["constraint_count"],
+            "active_constraint_count": contract["active_constraint_count"],
+            "history_constraint_count": contract["history_constraint_count"],
+            "correctly_followed": contract["correctly_followed"],
+            "wrongly_followed": contract["wrongly_followed"],
         },
         "support": {
             "task_count": len(task_grades),
             "cctu_graded_task_count": len(graded_tasks),
             "rsp_task_count": len(task_rsp),
-            "constraint_count": known,
-            "anchor_constraint_count": anchor_total,
-            "noise_constraint_count": noise_total,
         },
     }
 
 
-def grouped_scores(
+def grouped_main_scores(
     details: list[dict[str, Any]],
     key: str,
     task_grades: dict[str, dict[str, Any]],
-) -> dict[str, Any]:
-    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    task_rsp: dict[str, bool],
+) -> dict[str, list[dict[str, Any]]]:
+    grouped_details: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in details:
-        grouped[str(row.get(key) or "unknown")].append(row)
-    return {
-        name: score_rows(
-            rows,
-            {
-                task_uid: task_grades[task_uid]
-                for task_uid in {str(row.get("task_uid") or "") for row in rows}
-                if task_uid in task_grades
-            },
-        )
-        for name, rows in sorted(grouped.items())
-    }
+        grouped_details[str(row.get(key) or "unknown")].append(row)
+    score_groups: dict[str, list[dict[str, Any]]] = {}
+    for name, rows in sorted(grouped_details.items()):
+        task_uids = {str(row.get("task_uid") or "") for row in rows}
+        group_grades = {task_uid: task_grades[task_uid] for task_uid in task_uids if task_uid in task_grades}
+        group_rsp = {task_uid: task_rsp[task_uid] for task_uid in task_uids if task_uid in task_rsp}
+        score_groups[name] = format_main_scores(build_main_score_values(rows, group_grades, group_rsp))
+    return score_groups
+
+
+def grouped_by_data_source(
+    details: list[dict[str, Any]],
+    task_grades: dict[str, dict[str, Any]],
+    task_rsp: dict[str, bool],
+    tasks_by_uid: dict[str, dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    grouped_details: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in details:
+        task_uid = str(row.get("task_uid") or "")
+        task = tasks_by_uid.get(task_uid) or {}
+        source = str(task.get("data_source") or task.get("cctu_data_source") or "Unknown")
+        grouped_details[source].append(row)
+
+    score_groups: dict[str, list[dict[str, Any]]] = {}
+    all_task_uids = set(task_grades)
+    overall_rows = [row for row in details if str(row.get("task_uid") or "") in all_task_uids]
+    score_groups["Overall"] = format_main_scores(
+        build_main_score_values(overall_rows, task_grades, task_rsp)
+    )
+    for name, rows in sorted(grouped_details.items()):
+        task_uids = {str(row.get("task_uid") or "") for row in rows}
+        group_grades = {task_uid: task_grades[task_uid] for task_uid in task_uids if task_uid in task_grades}
+        group_rsp = {task_uid: task_rsp[task_uid] for task_uid in task_uids if task_uid in task_rsp}
+        score_groups[name] = format_main_scores(build_main_score_values(rows, group_grades, group_rsp))
+    return score_groups
 
 
 def main() -> int:
@@ -590,21 +725,40 @@ def main() -> int:
             }
         )
 
-    payload = {
-        "schema_version": "MACCCTUNoiseEvalGradeV1",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "source_answers": str(args.answers_file),
-        "source_manifest": str(args.manifest),
-        "run_header": {
+    scope_follow_details = build_scope_follow_details(details)
+    payload = build_grade_document(
+        scores=format_main_scores(build_main_score_values(details, task_grades, task_rsp)),
+        schema_version="MACCCTUGradeV2",
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        source_answers=str(args.answers_file),
+        source_manifest=str(args.manifest),
+        bench=args.bench,
+        difficulty=args.difficulty,
+        memory_system=infer_memory_system(args, header),
+        run_header={
             "run_id": header.get("run_id"),
             "bench": header.get("bench"),
             "memory_system": header.get("memory_system"),
         },
-        "graded_unit_count": len(details),
-        "missing_task_unit_count": missing_tasks,
-        "task_scores": {
+        graded_unit_count=len(details),
+        missing_task_unit_count=missing_tasks,
+        task_error_count=sum(1 for row in records if row.get("record_type") == "task_error"),
+        graded_task_count=len(task_grades),
+        appendix_scores={
+            "legacy_cctu_task_metrics": format_cctu_legacy_scores(cctu_task_metrics(task_grades)),
+        },
+        score_groups=grouped_by_data_source(details, task_grades, task_rsp, tasks_by_uid),
+        constraint_follow_analysis=build_contract_diagnostics(scope_follow_details),
+        contract_diagnostics=build_contract_diagnostics(scope_follow_details),
+        task_scores={
             task_uid: {
-                "ACC": grade.get("acc"),
+                "joint pass": grade.get("joint_pass"),
+                "answer pass": grade.get("answer_pass"),
+                "constraint pass": grade.get("constraint_pass"),
+                "constraint violation rate": grade.get("constraint_violation_rate"),
+                "step pass rate": grade.get("step_pass_rate"),
+                "RSP": task_rsp.get(task_uid),
+                "legacy_ACC": grade.get("acc"),
                 "SR": grade.get("SR"),
                 "PSR": grade.get("PSR"),
                 "SSR": grade.get("SSR"),
@@ -612,14 +766,17 @@ def main() -> int:
             }
             for task_uid, grade in sorted(task_grades.items())
         },
-        "scores": score_rows(details, task_grades, task_rsp),
-        "scores_by_family": grouped_scores(details, "family", task_grades),
-        "scores_by_source_anchor_role": grouped_scores(details, "source_anchor_role", task_grades),
-        "details": details if args.detail else [],
-    }
-    write_json(args.output, payload)
+        scores_by_family=grouped_main_scores(details, "family", task_grades, task_rsp),
+        scores_by_source_anchor_role=grouped_main_scores(
+            details, "source_anchor_role", task_grades, task_rsp
+        ),
+        details=details if args.detail else [],
+        contract_follow_details=scope_follow_details if args.detail else [],
+    )
+    target = output_path(args, header=header, memory_system=infer_memory_system(args, header))
+    write_json(target, payload)
     print(json.dumps(payload["scores"], indent=2, ensure_ascii=False))
-    print(f"Wrote {resolve_path(args.output)}")
+    print(f"Wrote {resolve_path(target)}")
     return 0
 
 

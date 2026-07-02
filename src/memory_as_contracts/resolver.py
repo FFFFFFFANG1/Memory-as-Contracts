@@ -163,22 +163,6 @@ class ConflictResolver:
         )
         result = ResolutionResult(contract=candidate)
 
-        strict_duplicate = self.find_indexed_dedup_candidate(candidate, existing_contracts)
-        if strict_duplicate is None:
-            strict_duplicate = self.find_strict_edit_dedup_candidate(candidate, existing_contracts)
-        if strict_duplicate is not None:
-            result.relation = strict_duplicate.relation
-            candidate, edge = self._apply_relation(
-                candidate,
-                strict_duplicate.existing,
-                strict_duplicate.relation,
-            )
-            result.contract = candidate
-            result.edges.append(edge)
-            self.store.add_contract(candidate)
-            self.store.add_edge(edge)
-            return result
-
         relation_decisions = self.classify_update_relations(candidate, existing_contracts)
         for decision in relation_decisions:
             if decision.relation == EdgeRelation.INDEPENDENT:
@@ -206,25 +190,7 @@ class ConflictResolver:
             include_expired_status=False,
         )
         relation_decisions: list[RelationDecision] = []
-        remaining_candidates: list[Contract] = []
-        for candidate in candidates:
-            strict_duplicate = self.find_indexed_dedup_candidate(candidate, existing_contracts)
-            if strict_duplicate is None:
-                strict_duplicate = self.find_strict_edit_dedup_candidate(candidate, existing_contracts)
-            if strict_duplicate is None:
-                remaining_candidates.append(candidate)
-                continue
-            relation_decisions.append(
-                RelationDecision(
-                    candidate=candidate,
-                    existing=strict_duplicate.existing,
-                    relation=strict_duplicate.relation,
-                    similarity=strict_duplicate.similarity,
-                    text_score=strict_duplicate.text_score,
-                    semantic_score=strict_duplicate.semantic_score,
-                    pattern_score=strict_duplicate.pattern_score,
-                )
-            )
+        remaining_candidates: list[Contract] = list(candidates)
         relation_candidates_by_new = {
             candidate.id: self.find_relation_candidates(candidate, existing_contracts)
             for candidate in remaining_candidates
@@ -264,18 +230,7 @@ class ConflictResolver:
             decisions = self._classify_with_llm(candidate, relation_candidates)
             if decisions is not None:
                 return decisions
-        return [
-            RelationDecision(
-                candidate=candidate,
-                existing=item.existing,
-                relation=self.classify_relation(candidate, item.existing),
-                similarity=item.similarity,
-                text_score=item.text_score,
-                semantic_score=item.semantic_score,
-                pattern_score=item.pattern_score,
-            )
-            for item in relation_candidates
-        ]
+        return []
 
     def find_dedup_candidates(
         self,
@@ -524,7 +479,7 @@ class ConflictResolver:
                     RelationDecision(
                         candidate=candidate,
                         existing=item.existing,
-                        relation=self.classify_relation(candidate, item.existing),
+                        relation=EdgeRelation.INDEPENDENT,
                         similarity=item.similarity,
                         text_score=item.text_score,
                         semantic_score=item.semantic_score,
@@ -547,12 +502,12 @@ class ConflictResolver:
                 decisions = self._classify_with_llm(candidate, relation_candidates)
                 if decisions is not None:
                     return decisions
-            return self._fallback_component_decisions(candidates, relation_candidates_by_new)
+            return []
         if self.relation_response_provider is not None:
             decisions = self._classify_batch_with_llm(candidates, relation_candidates_by_new)
             if decisions is not None:
                 return decisions
-        return self._fallback_component_decisions(candidates, relation_candidates_by_new)
+        return []
 
     def _classify_batch_with_llm(
         self,
@@ -622,7 +577,7 @@ class ConflictResolver:
                 RelationDecision(
                     candidate=candidate,
                     existing=item.existing,
-                    relation=self.classify_relation(candidate, item.existing),
+                    relation=EdgeRelation.INDEPENDENT,
                     similarity=item.similarity,
                     text_score=item.text_score,
                     semantic_score=item.semantic_score,
@@ -637,24 +592,8 @@ class ConflictResolver:
         existing: Contract,
         proposed: EdgeRelation,
     ) -> EdgeRelation:
-        deterministic = self.classify_relation(candidate, existing)
-        if deterministic in {
-            EdgeRelation.DUPLICATE,
-            EdgeRelation.EXCEPTION_TO,
-            EdgeRelation.SUPERSEDES,
-            EdgeRelation.CONFLICTS_WITH,
-        }:
-            return deterministic
-        if proposed == EdgeRelation.DUPLICATE and not _can_be_duplicate(candidate, existing):
-            return deterministic
-        if proposed == EdgeRelation.EXCEPTION_TO and not _can_be_exception(candidate, existing):
-            return deterministic
-        if proposed == EdgeRelation.SUPERSEDES and not _can_supersede(candidate, existing):
-            return deterministic
-        if proposed == EdgeRelation.REFINEMENT and not _can_be_refinement(candidate, existing):
-            return deterministic
-        if proposed == EdgeRelation.CONFLICTS_WITH and not _overlaps(candidate, existing):
-            return deterministic
+        if proposed != EdgeRelation.INDEPENDENT and not _scope_lifecycle_overlaps(candidate, existing):
+            return EdgeRelation.INDEPENDENT
         return proposed
 
     def _fallback_component_decisions(
@@ -1000,6 +939,7 @@ def _scope_boundaries_compatible(left: Scope, right: Scope) -> bool:
         "workspace",
         "project",
         "module",
+        "path",
         "user_id",
     )
     for field_name in scalar_boundaries:
@@ -1102,6 +1042,7 @@ def _scope_contains(broader: Scope, narrower: Scope) -> tuple[bool, bool]:
         "workspace",
         "project",
         "module",
+        "path",
         "user_id",
     )
     for field_name in scalar_boundaries:

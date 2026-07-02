@@ -144,6 +144,48 @@ def cctu_messages_from_events(row: dict[str, Any], sample: dict[str, Any]) -> li
     return messages
 
 
+def final_assistant_response(messages: list[dict[str, Any]]) -> str:
+    for message in reversed(messages):
+        if message.get("role") == "assistant":
+            return str(message.get("content") or "")
+    return ""
+
+
+def required_tool_slot_counts(
+    messages: list[dict[str, Any]],
+    unsolved_set: dict[str, Any],
+) -> tuple[int, int]:
+    """Return satisfied and total required CCTU tool-output slots."""
+    remain = {str(k): list(v) for k, v in unsolved_set.items()}
+    total = sum(len(values) for values in remain.values())
+    build_tool_call_id2name = import_cctu_attr("utils.utils", "build_tool_call_id2name")
+    answer_verify = import_cctu_attr("utils.utils", "answer_verify")
+    id2name = build_tool_call_id2name(messages)
+    satisfied = 0
+
+    for message in messages:
+        if message.get("role") != "tool":
+            continue
+        call_id = message.get("tool_call_id")
+        if not call_id:
+            continue
+        tool_name = id2name.get(str(call_id))
+        if not tool_name:
+            continue
+        answers = remain.get(tool_name, [])
+        if not answers:
+            continue
+
+        content = message.get("content") or ""
+        for answer in list(answers):
+            if answer_verify(content, answer):
+                answers.remove(answer)
+                satisfied += 1
+                break
+
+    return satisfied, total
+
+
 def handler_constraint_indices(checker: Any) -> list[int]:
     """Map each checker handler back to its index in constraints_list."""
     registry = import_cctu_attr("utils.constraint_checker.handlers", "HANDLER_REGISTRY")
@@ -270,15 +312,31 @@ def grade_one(row: dict[str, Any], task: dict[str, Any] | None, samples: dict[st
 
     messages = cctu_messages_from_events(row, sample)
     solve_rate_is_one = import_cctu_attr("evaluation", "solve_rate_is_one")
+    compute_if_flags = import_cctu_attr("evaluation", "compute_if_flags")
+    answer_verify = import_cctu_attr("utils.utils", "answer_verify")
     unsolved_set = json.loads(sample.get("unsolved_set"))
+    unsolved_slot_satisfied, unsolved_slot_total = required_tool_slot_counts(messages, unsolved_set)
     acc = bool(solve_rate_is_one(messages, unsolved_set))
-    violations, violated_indices, constraint_total = replay_constraint_analysis(messages, sample)
-    ssr = compute_ssr(constraint_total=constraint_total, violated_indices=violated_indices)
-    constraint_satisfied = constraint_total - len(violated_indices)
+    answer_text_pass = bool(answer_verify(final_assistant_response(messages), sample.get("answer")))
+    answer_data_pass = acc
+    answer_pass = bool(answer_text_pass)
+    violations, violated_indices, response_constraint_total = replay_constraint_analysis(messages, sample)
+    has_if_error, has_last_if_error = compute_if_flags(messages)
+    response_constraint_satisfied = response_constraint_total - len(violated_indices)
+    constraint_pass = bool(
+        response_constraint_total == 0 or response_constraint_satisfied == response_constraint_total
+    )
+    ssr = compute_ssr(constraint_total=response_constraint_total, violated_indices=violated_indices)
+    constraint_violation_rate = (
+        len(violated_indices) / response_constraint_total if response_constraint_total else 0.0
+    )
+    step_pass_rate = (
+        unsolved_slot_satisfied / unsolved_slot_total if unsolved_slot_total else 1.0
+    )
     final_index = max((idx for idx, msg in enumerate(messages) if msg.get("role") == "assistant"), default=-1)
     final_violations = [item for item in violations if item.get("message_index") == final_index]
-    sr = bool(acc and not final_violations)
-    psr = bool(acc and not violations)
+    sr = bool(acc and not has_last_if_error)
+    psr = bool(acc and not has_if_error)
     return {
         "task_uid": task_uid,
         "cctu_id": cctu_id,
@@ -286,9 +344,22 @@ def grade_one(row: dict[str, Any], task: dict[str, Any] | None, samples: dict[st
         "PSR": psr,
         "SSR": ssr,
         "acc": acc,
-        "constraint_total": constraint_total,
-        "constraint_satisfied": constraint_satisfied,
+        "answer_text_pass": answer_text_pass,
+        "answer_data_pass": answer_data_pass,
+        "answer_pass": answer_pass,
+        "constraint_pass": constraint_pass,
+        "joint_pass": bool(answer_pass and constraint_pass),
+        "constraint_total": response_constraint_total,
+        "constraint_satisfied": response_constraint_satisfied,
+        "constraint_violation_rate": constraint_violation_rate,
+        "step_pass_rate": step_pass_rate,
+        "unsolved_slot_total": unsolved_slot_total,
+        "unsolved_slot_satisfied": unsolved_slot_satisfied,
+        "response_constraint_total": response_constraint_total,
+        "response_constraint_satisfied": response_constraint_satisfied,
         "violated_constraint_indices": sorted(violated_indices),
+        "has_if_error": bool(has_if_error),
+        "has_last_if_error": bool(has_last_if_error),
         "constraints": constraint_summaries(sample, violated_indices),
         "violation_count": len(violations),
         "final_violation_count": len(final_violations),
@@ -338,36 +409,9 @@ def output_path(
 
 
 def main() -> None:
-    args = parse_args()
-    header, records = read_memory_output(args.answers_file)
-    bench = infer_bench(args, header)
-    difficulty = infer_difficulty(args, header)
-    memory_system = infer_memory_system(args, header)
-    tasks_by_uid = task_index(args, header)
-    samples = cctu_samples_by_id()
-    details = [
-        grade_one(row, tasks_by_uid.get(str(row.get("task_uid") or "")), samples)
-        for row in records
-        if row.get("record_type") == "task_result"
-    ]
-    task_errors = sum(1 for row in records if row.get("record_type") == "task_error")
-    payload = {
-        "schema_version": "MACCCTUGradeV1",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "source_answers": str(args.answers_file),
-        "bench": bench,
-        "difficulty": difficulty,
-        "memory_system": memory_system,
-        "task_error_count": task_errors,
-        "graded_task_count": len(details),
-        "scores": aggregate(details, tasks_by_uid),
-        "details": details if args.detail else [],
-    }
-    target = output_path(args, header=header, bench=bench, memory_system=memory_system)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Wrote {target}")
-    print(json.dumps(payload["scores"], indent=2, ensure_ascii=False))
+    from bench.construct.cctu.noise_eval_grade import main as grade_main
+
+    raise SystemExit(grade_main())
 
 
 if __name__ == "__main__":
