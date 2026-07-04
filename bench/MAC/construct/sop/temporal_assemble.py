@@ -52,6 +52,12 @@ from temporal_noise import (  # noqa: E402
     rulebase_action_temporal_sequence_sequential,
     DEFAULT_RULEBASE_MAX_ATTEMPTS,
 )
+from temporal_quality import QualityThresholds, task_quality  # noqa: E402
+
+KIND_ANCHOR_ALIGNMENT = "anchor_alignment"
+DEFAULT_QUALITY_MAX_ATTEMPTS = 20
+USER_GOAL_NOISE_TARGETS = (5, 6, 6)
+OTHER_NOISE_TARGETS = (3, 4, 5)
 
 
 def resolve_path(path: Path) -> Path:
@@ -408,13 +414,128 @@ def sequential_v2_noise_target(
     action: str,
     *,
     seed: int,
+    user_goal: str = "",
 ) -> int:
-    """Reduced chain depth for v3: large subtree 3-4, small subtree 0-1."""
+    """v4 split-stream targets: user_goal gets a longer dedicated chain; others stay moderate."""
     action_dep = get_action_dependency(step2_task, action)
     rng = random.Random(action_seed(seed=seed, task_uid=str(step2_task.get("mac_task_uid") or ""), action=action) + 17)
+    if action == user_goal:
+        return rng.choice(USER_GOAL_NOISE_TARGETS)
     if action_dep is not None and is_small_subtree(action_dep):
-        return rng.choice([0, 1])
-    return rng.choice([3, 4])
+        return rng.choice([1, 2])
+    return rng.choice(OTHER_NOISE_TARGETS)
+
+
+def append_generated_turns(
+    groups: dict[str, list[dict[str, Any]]],
+    *,
+    action: str,
+    generated: list[dict[str, Any]],
+    step3_task: dict[str, Any],
+    task_existing_noisy: list[dict[str, Any]],
+) -> None:
+    anchor_uid = source_anchor_uid(step3_task, action)
+    for index, noise in enumerate(generated, start=1):
+        noise_payload = copy.deepcopy(noise)
+        noise_payload["generation_mode"] = "sequential_chain"
+        groups[action].append(
+            turn_from_noise_item(
+                action=action,
+                turn_index=index,
+                noise=noise_payload,
+                source_mac_constraint_uid=anchor_uid,
+            )
+        )
+        dep_sig = canonical_dependency_signature(noise.get("dependency"))
+        if dep_sig:
+            task_existing_noisy.append(
+                {
+                    "dependency_signature": dep_sig,
+                    "mac_constraint_uid": f"action:{action}",
+                }
+            )
+
+
+def generate_sequential_action_turns(
+    step2_task: dict[str, Any],
+    step3_task: dict[str, Any],
+    *,
+    action: str,
+    seed: int,
+    task_existing_noisy: list[dict[str, Any]],
+    max_attempts: int = DEFAULT_RULEBASE_MAX_ATTEMPTS,
+    require_first_step_graph_ne_anchor: bool = False,
+    prioritize_structural_mutations: bool = False,
+) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
+    task_uid = str(step2_task.get("mac_task_uid") or "")
+    row = next(
+        (
+            item
+            for item in (step3_task.get("action_noise") or [])
+            if isinstance(item, dict) and str(item.get("action") or "") == action
+        ),
+        None,
+    )
+    user_goal = str(step2_task.get("user_goal") or "").strip()
+    step3_noise_target = int((row or {}).get("noise_target") or 0)
+    noise_target = sequential_v2_noise_target(step2_task, action, seed=seed, user_goal=user_goal)
+    action_stats: dict[str, Any] = {
+        "noise_target": noise_target,
+        "step3_noise_target": step3_noise_target,
+        "noise_generated": 0,
+        "stream": "user_goal" if action == user_goal else "other_anchor",
+        "require_first_step_graph_ne_anchor": require_first_step_graph_ne_anchor,
+        "prioritize_structural_mutations": prioritize_structural_mutations,
+    }
+    if noise_target <= 0:
+        action_stats["skipped"] = True
+        return [], [], action_stats
+
+    job = ActionJob(
+        ordinal=0,
+        total=1,
+        task=step2_task,
+        task_index=int(step2_task.get("task_index") or 0),
+        action=action,
+        anchors=tuple(),
+        noise_target=noise_target,
+        task_seed=action_seed(seed=seed, task_uid=task_uid, action=action),
+    )
+    try:
+        sequence, seq_warnings, validation = rulebase_action_temporal_sequence_sequential(
+            job,
+            task_existing_noisy=task_existing_noisy,
+            max_attempts=max_attempts,
+            require_first_step_graph_ne_anchor=require_first_step_graph_ne_anchor,
+            prioritize_structural_mutations=prioritize_structural_mutations,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return [], [f"{task_uid}/{action}: sequential generation failed: {exc}"], action_stats
+
+    generated = [item for item in sequence if not item.get("is_anchor")]
+    action_stats["noise_generated"] = len(generated)
+    action_stats["validation"] = validation
+    action_stats["chain_stopped_early"] = len(generated) < noise_target
+    return generated, seq_warnings, action_stats
+
+
+def merge_split_temporal_sequence(
+    user_goal_turns: list[dict[str, Any]],
+    other_turn_groups: list[list[dict[str, Any]]],
+    *,
+    rng: random.Random,
+) -> list[dict[str, Any]]:
+    """Pin the first user_goal turn as g0, then merge the remaining streams."""
+    if not user_goal_turns:
+        return merge_constraint_sequence(other_turn_groups, rng=rng)
+
+    g0_turn = user_goal_turns[0]
+    rest_groups: list[list[dict[str, Any]]] = []
+    if len(user_goal_turns) > 1:
+        rest_groups.append(user_goal_turns[1:])
+    rest_groups.extend(group for group in other_turn_groups if group)
+    rest_merged = merge_constraint_sequence(rest_groups, rng=rng) if rest_groups else []
+    return [g0_turn, *rest_merged]
 
 
 def collect_sequential_action_turn_groups(
@@ -433,89 +554,51 @@ def collect_sequential_action_turn_groups(
         "total_generated": 0,
         "chain_stopped_early": 0,
         "skipped_actions": 0,
-        "noise_target_policy": "v3_reduced: large=3-4, small=0-1",
+        "noise_target_policy": (
+            "v4_split_stream: user_goal=5-6 with g0!=anchor gate, other large=3-5, small=1-2"
+        ),
+        "merge_policy": "user_goal_first_turn_pinned_as_g0",
     }
     task_uid = str(step2_task.get("mac_task_uid") or "")
     task_existing_noisy: list[dict[str, Any]] = []
     action_order = ordered_actions(step3_task)
+    user_goal = str(step2_task.get("user_goal") or "").strip()
+    ordered_stream = []
+    if user_goal and user_goal in action_order:
+        ordered_stream.append(user_goal)
+    ordered_stream.extend(action for action in action_order if action != user_goal)
 
-    for action in action_order:
-        row = next(
-            (
-                item
-                for item in (step3_task.get("action_noise") or [])
-                if isinstance(item, dict) and str(item.get("action") or "") == action
-            ),
-            None,
-        )
-        if row is None:
-            continue
-        step3_noise_target = int(row.get("noise_target") or 0)
-        noise_target = sequential_v2_noise_target(step2_task, action, seed=seed)
-        generation_stats["total_target"] += noise_target
-        generation_stats["total_step3_target"] = generation_stats.get("total_step3_target", 0) + step3_noise_target
-        if noise_target <= 0:
-            generation_stats["skipped_actions"] += 1
-            generation_stats["actions"][action] = {
-                "noise_target": noise_target,
-                "step3_noise_target": step3_noise_target,
-                "noise_generated": 0,
-                "skipped": True,
-            }
-            continue
-
-        job = ActionJob(
-            ordinal=0,
-            total=1,
-            task=step2_task,
-            task_index=int(step2_task.get("task_index") or 0),
+    for action in ordered_stream:
+        require_first = action == user_goal and bool(user_goal)
+        generated, seq_warnings, action_stats = generate_sequential_action_turns(
+            step2_task,
+            step3_task,
             action=action,
-            anchors=tuple(),
-            noise_target=noise_target,
-            task_seed=action_seed(seed=seed, task_uid=task_uid, action=action),
+            seed=seed,
+            task_existing_noisy=task_existing_noisy,
+            max_attempts=max_attempts,
+            require_first_step_graph_ne_anchor=require_first,
+            prioritize_structural_mutations=require_first,
         )
-        try:
-            sequence, seq_warnings, validation = rulebase_action_temporal_sequence_sequential(
-                job,
-                task_existing_noisy=task_existing_noisy,
-                max_attempts=max_attempts,
-            )
-        except Exception as exc:  # noqa: BLE001
-            warnings.append(f"{task_uid}/{action}: sequential generation failed: {exc}")
-            continue
-
         warnings.extend(seq_warnings)
-        generated = [item for item in sequence if not item.get("is_anchor")]
-        generation_stats["actions"][action] = {
-            "noise_target": noise_target,
-            "step3_noise_target": step3_noise_target,
-            "noise_generated": len(generated),
-            "validation": validation,
-        }
-        generation_stats["total_generated"] += len(generated)
-        if len(generated) < noise_target:
+        generation_stats["actions"][action] = action_stats
+        generation_stats["total_target"] += int(action_stats.get("noise_target") or 0)
+        generation_stats["total_step3_target"] += int(action_stats.get("step3_noise_target") or 0)
+        if action_stats.get("skipped"):
+            generation_stats["skipped_actions"] += 1
+            continue
+        generation_stats["total_generated"] += int(action_stats.get("noise_generated") or 0)
+        if action_stats.get("chain_stopped_early"):
             generation_stats["chain_stopped_early"] += 1
-
-        anchor_uid = source_anchor_uid(step3_task, action)
-        for index, noise in enumerate(generated, start=1):
-            noise_payload = copy.deepcopy(noise)
-            noise_payload["generation_mode"] = "sequential_chain"
-            groups[action].append(
-                turn_from_noise_item(
-                    action=action,
-                    turn_index=index,
-                    noise=noise_payload,
-                    source_mac_constraint_uid=anchor_uid,
-                )
-            )
-            dep_sig = canonical_dependency_signature(noise.get("dependency"))
-            if dep_sig:
-                task_existing_noisy.append(
-                    {
-                        "dependency_signature": dep_sig,
-                        "mac_constraint_uid": f"action:{action}",
-                    }
-                )
+        if not generated:
+            continue
+        append_generated_turns(
+            groups,
+            action=action,
+            generated=generated,
+            step3_task=step3_task,
+            task_existing_noisy=task_existing_noisy,
+        )
 
     return dict(groups), warnings, generation_stats
 
@@ -535,6 +618,163 @@ def action_anchor_baselines(task: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return baselines
 
 
+def task_action_anchor_dependencies(
+    step2_task: dict[str, Any],
+    step3_task: dict[str, Any],
+    *,
+    involved_actions: set[str] | None = None,
+) -> dict[str, Any]:
+    actions = set(involved_actions or set())
+    actions.update(ordered_actions(step3_task))
+    user_goal = str(step2_task.get("user_goal") or "").strip()
+    if user_goal:
+        actions.add(user_goal)
+    baselines = action_anchor_baselines(step3_task)
+    deps: dict[str, Any] = {}
+    for action in sorted(actions):
+        if not action:
+            continue
+        dep = get_action_dependency(step2_task, action)
+        if dep is None:
+            dep = (baselines.get(action) or {}).get("dependency")
+        if dep is not None:
+            deps[action] = copy.deepcopy(dep)
+    return deps
+
+
+def compile_cumulative_user_goal_state(
+    step2_task: dict[str, Any],
+    cumulative_action_deps: dict[str, Any],
+) -> tuple[Any, dict[str, Any]]:
+    from noise_eval import (  # noqa: WPS433
+        build_patched_dep_full,
+        compile_user_goal_graph,
+        user_goal_dependency,
+    )
+
+    dep = user_goal_dependency(step2_task, cumulative_action_deps)
+    dep_full = build_patched_dep_full(step2_task, cumulative_action_deps)
+    graph = compile_user_goal_graph(
+        step2_task,
+        user_goal_dep=dep,
+        dep_full=dep_full,
+    )
+    return dep, graph
+
+
+def apply_sequence_step(
+    cumulative_action_deps: dict[str, Any],
+    step: dict[str, Any],
+) -> dict[str, Any]:
+    updated = copy.deepcopy(cumulative_action_deps)
+    if str(step.get("kind") or "") == KIND_ANCHOR_ALIGNMENT:
+        for action, dependency in (step.get("action_patches") or {}).items():
+            action_key = str(action or "").strip()
+            if action_key and dependency is not None:
+                updated[action_key] = copy.deepcopy(dependency)
+        return updated
+    action = str(step.get("action") or "").strip()
+    dependency = step.get("dependency")
+    if action and dependency is not None:
+        updated[action] = copy.deepcopy(dependency)
+    return updated
+
+
+def build_anchor_alignment_turn(
+    step2_task: dict[str, Any],
+    step3_task: dict[str, Any],
+    *,
+    mutated_actions: set[str],
+) -> dict[str, Any]:
+    user_goal = str(step2_task.get("user_goal") or "")
+    anchor_deps = task_action_anchor_dependencies(
+        step2_task,
+        step3_task,
+        involved_actions=mutated_actions,
+    )
+    cumulative = task_action_anchor_dependencies(step2_task, step3_task)
+    patches: dict[str, Any] = {}
+    for action in sorted(mutated_actions):
+        if action in anchor_deps:
+            patches[action] = copy.deepcopy(anchor_deps[action])
+            cumulative[action] = copy.deepcopy(anchor_deps[action])
+    user_goal_dep, user_goal_graph = compile_cumulative_user_goal_state(step2_task, cumulative)
+    return {
+        "local_id": "task::anchor_alignment",
+        "kind": KIND_ANCHOR_ALIGNMENT,
+        "is_anchor": True,
+        "scope": "task",
+        "action": user_goal,
+        "action_patches": patches,
+        "mutation": "anchor_alignment",
+        "dependency": copy.deepcopy(user_goal_dep),
+        "compiled_graph": copy.deepcopy(user_goal_graph),
+        "text": "[structural-only] task anchor_alignment",
+        "generation_mode": "anchor_alignment",
+    }
+
+
+def g0_constraints_from_dependency(
+    step2_task: dict[str, Any],
+    user_goal_dep: Any,
+) -> list[dict[str, Any]]:
+    domain = str(step2_task.get("domain") or "")
+    dep_params = task_dep_params(step2_task)
+    user_goal = str(step2_task.get("user_goal") or "")
+    uid_by_constraint: dict[str, str] = {}
+    for constraint in step2_task.get("constraints") or []:
+        if not isinstance(constraint, dict):
+            continue
+        if str(constraint.get("action") or "") != user_goal:
+            continue
+        metadata = constraint.get("metadata") or {}
+        constraint_id = str(metadata.get("constraint_id") or "")
+        uid = str(constraint.get("mac_constraint_uid") or "")
+        if constraint_id and uid and constraint_id not in uid_by_constraint:
+            uid_by_constraint[constraint_id] = uid
+
+    constraints: list[dict[str, Any]] = []
+    seen_text: set[str] = set()
+    for constraint_id, params in dependency_singles(user_goal_dep):
+        text = verbalize_single_constraint(domain, constraint_id, params, dep_params).strip()
+        if not text or text in seen_text:
+            continue
+        seen_text.add(text)
+        constraints.append(
+            {
+                "mac_constraint_uid": uid_by_constraint.get(
+                    constraint_id,
+                    f"{step2_task.get('mac_task_uid')}-g0-{constraint_id}",
+                ),
+                "text": text,
+                "constraint_id": constraint_id,
+            }
+        )
+    return constraints
+
+
+def build_g0_payload(
+    step2_task: dict[str, Any],
+    *,
+    first_step: dict[str, Any],
+    cumulative_action_deps: dict[str, Any],
+) -> dict[str, Any]:
+    user_goal_dep, user_goal_graph = compile_cumulative_user_goal_state(
+        step2_task,
+        cumulative_action_deps,
+    )
+    return {
+        "sequence_order": first_step.get("sequence_order"),
+        "local_id": first_step.get("local_id"),
+        "user_goal": step2_task.get("user_goal"),
+        "dependency_signature": dependency_signature(user_goal_dep),
+        "user_goal_dependency": copy.deepcopy(user_goal_dep),
+        "user_goal_action_graph": copy.deepcopy(user_goal_graph),
+        "cumulative_action_deps": copy.deepcopy(cumulative_action_deps),
+        "constraints": g0_constraints_from_dependency(step2_task, user_goal_dep),
+    }
+
+
 def attach_sequence_deltas(
     sequence: list[dict[str, Any]],
     *,
@@ -546,126 +786,146 @@ def attach_sequence_deltas(
     dep_params = task_dep_params(step2_task)
     anchor_graph = anchor_user_goal_graph(step2_task)
     anchor_sig = graph_signature(anchor_graph)
-    action_baselines = action_anchor_baselines(step3_task)
+
+    involved_actions: set[str] = set()
+    for step in sequence:
+        if not isinstance(step, dict):
+            continue
+        action = str(step.get("action") or "").strip()
+        if action:
+            involved_actions.add(action)
+        if str(step.get("kind") or "") == KIND_ANCHOR_ALIGNMENT:
+            involved_actions.update(str(key) for key in (step.get("action_patches") or {}))
+
+    cumulative = task_action_anchor_dependencies(
+        step2_task,
+        step3_task,
+        involved_actions=involved_actions,
+    )
+    prev_cumulative = copy.deepcopy(cumulative)
+    prev_user_goal_dep, prev_user_goal_graph = compile_cumulative_user_goal_state(
+        step2_task,
+        prev_cumulative,
+    )
 
     enriched: list[dict[str, Any]] = []
-    prev_graph: Any = None
-    prev_dep: Any = None
-    prev_user_goal_graph: Any = None
     prev_local_id: str | None = None
 
     for order, item in enumerate(sequence, start=1):
         entry = copy.deepcopy(item)
         entry["sequence_order"] = order
+        kind = str(entry.get("kind") or "")
         action = str(entry.get("action") or "")
         mutation = str(entry.get("mutation") or "").strip()
-        current_graph = entry.get("compiled_graph")
-        current_dep = entry.get("dependency")
 
-        action_subject = f"Executable graph for action `{action}`"
-        if mutation:
-            action_subject = f"Executable graph for action `{action}` ({mutation})"
-        dep_subject = f"SOP dependency structure for action `{action}`"
-        if mutation:
-            dep_subject = f"SOP dependency structure for action `{action}` ({mutation})"
+        user_goal_dep_before = copy.deepcopy(prev_user_goal_dep)
+        user_goal_graph_before = copy.deepcopy(prev_user_goal_graph)
 
-        action_baseline = action_baselines.get(action) or {}
-        graph_before = (
-            prev_graph
-            if prev_graph is not None
-            else action_baseline.get("compiled_graph")
-        )
-        dep_before = (
-            prev_dep
-            if prev_dep is not None
-            else action_baseline.get("dependency")
+        cumulative = apply_sequence_step(cumulative, entry)
+        user_goal_dep_after, user_goal_graph_after = compile_cumulative_user_goal_state(
+            step2_task,
+            cumulative,
         )
 
-        graph_delta = build_graph_delta(
-            graph_before,
-            current_graph,
-            domain=domain,
-            target_action=action,
-            dep_params=dep_params,
-            subject=action_subject,
-            intro=(
-                None
-                if prev_graph is not None
-                else f"Changes to executable graph for `{action}` ({mutation}):"
-                if mutation
-                else f"Changes to executable graph for `{action}`:"
-            ),
-        )
-        graph_delta["from_local_id"] = prev_local_id
-        graph_delta["to_local_id"] = entry.get("local_id")
-        entry["graph_delta"] = graph_delta
+        if kind == KIND_ANCHOR_ALIGNMENT:
+            action_dep_before = prev_cumulative.get(action)
+            action_dep_after = cumulative.get(action)
+            action_graph_before = user_goal_graph_before
+            action_graph_after = user_goal_graph_after
+            action_subject = f"Task-wide SOP realignment to anchor ({mutation})"
+            dep_subject = action_subject
+        else:
+            action_dep_before = prev_cumulative.get(action)
+            action_dep_after = cumulative.get(action)
+            action_graph_before = None
+            action_graph_after = entry.get("compiled_graph")
+            action_subject = f"Executable graph for action `{action}`"
+            if mutation:
+                action_subject = f"Executable graph for action `{action}` ({mutation})"
+            dep_subject = f"SOP dependency structure for action `{action}`"
+            if mutation:
+                dep_subject = f"SOP dependency structure for action `{action}` ({mutation})"
 
         dep_delta = build_dependency_delta(
-            dep_before,
-            current_dep,
+            user_goal_dep_before,
+            user_goal_dep_after,
             domain=domain,
             dep_params=dep_params,
             subject=dep_subject,
             intro=(
-                None
-                if prev_dep is not None
-                else f"Changes to SOP dependency for `{action}` ({mutation}):"
+                f"Changes to task SOP state ({mutation}):"
                 if mutation
-                else f"Changes to SOP dependency for `{action}`:"
+                else f"Changes to task SOP state for `{action}`:"
             ),
         )
         dep_delta["from_local_id"] = prev_local_id
         dep_delta["to_local_id"] = entry.get("local_id")
         entry["dependency_delta"] = dep_delta
+        entry["task_dependency_delta"] = copy.deepcopy(dep_delta)
 
-        user_goal_graph, compile_error = compile_turn_user_goal_graph(
-            step2_task,
-            mutated_action=action,
-            noisy_dependency=current_dep,
-        )
-        entry["user_goal_action_graph"] = user_goal_graph
-        if compile_error:
-            entry["user_goal_compile_error"] = compile_error
-
-        user_goal_subject = f"User-goal executable graph (`{user_goal}`) under this SOP revision"
-        if mutation:
-            user_goal_subject = (
-                f"User-goal executable graph (`{user_goal}`) after `{action}` revision ({mutation})"
+        if action_graph_before is not None or action_graph_after is not None:
+            graph_delta = build_graph_delta(
+                action_graph_before if action_graph_before is not None else user_goal_graph_before,
+                action_graph_after if action_graph_after is not None else user_goal_graph_after,
+                domain=domain,
+                target_action=action or user_goal,
+                dep_params=dep_params,
+                subject=action_subject,
             )
+        else:
+            graph_delta = build_graph_delta(
+                user_goal_graph_before,
+                user_goal_graph_after,
+                domain=domain,
+                target_action=user_goal,
+                dep_params=dep_params,
+                subject=f"User-goal executable graph (`{user_goal}`) under this SOP revision",
+            )
+        graph_delta["from_local_id"] = prev_local_id
+        graph_delta["to_local_id"] = entry.get("local_id")
+        entry["graph_delta"] = graph_delta
+
+        entry["cumulative_action_deps"] = copy.deepcopy(cumulative)
+        entry["user_goal_action_graph"] = copy.deepcopy(user_goal_graph_after)
+        entry["task_state_delta"] = {
+            "user_goal_dependency_before": user_goal_dep_before,
+            "user_goal_dependency_after": user_goal_dep_after,
+            "user_goal_graph_before": user_goal_graph_before,
+            "user_goal_graph_after": user_goal_graph_after,
+            "from_local_id": prev_local_id,
+            "to_local_id": entry.get("local_id"),
+        }
+
         user_goal_delta = build_graph_delta(
-            prev_user_goal_graph if prev_user_goal_graph is not None else anchor_graph,
-            user_goal_graph,
+            user_goal_graph_before,
+            user_goal_graph_after,
             domain=domain,
             target_action=user_goal,
             dep_params=dep_params,
-            subject=user_goal_subject,
-            intro=(
-                None
-                if prev_user_goal_graph is not None
-                else f"Changes to `{user_goal}` vs task anchor after `{action}` revision ({mutation}):"
-                if mutation
-                else f"Changes to `{user_goal}` vs task anchor after `{action}` revision:"
-            ),
+            subject=f"User-goal executable graph (`{user_goal}`) under this SOP revision",
         )
         user_goal_delta["from_local_id"] = prev_local_id
         user_goal_delta["to_local_id"] = entry.get("local_id")
         entry["user_goal_graph_delta"] = user_goal_delta
-
-        user_goal_anchor_delta = build_graph_delta(
+        entry["user_goal_graph_changed_from_anchor"] = (
+            graph_signature(user_goal_graph_after) != anchor_sig
+        )
+        entry["user_goal_graph_anchor_delta"] = build_graph_delta(
             anchor_graph,
-            user_goal_graph,
+            user_goal_graph_after,
             domain=domain,
             target_action=user_goal,
             dep_params=dep_params,
             subject=f"User-goal graph vs task anchor (`{user_goal}`)",
         )
-        entry["user_goal_graph_changed_from_anchor"] = graph_signature(user_goal_graph) != anchor_sig
-        entry["user_goal_graph_anchor_delta"] = user_goal_anchor_delta
+
+        if order == 1 and kind != KIND_ANCHOR_ALIGNMENT:
+            entry["establishes_g0"] = True
 
         enriched.append(entry)
-        prev_graph = current_graph
-        prev_dep = current_dep
-        prev_user_goal_graph = user_goal_graph
+        prev_cumulative = copy.deepcopy(cumulative)
+        prev_user_goal_dep = user_goal_dep_after
+        prev_user_goal_graph = user_goal_graph_after
         prev_local_id = str(entry.get("local_id") or "")
 
     return enriched
@@ -700,19 +960,58 @@ def build_task_sequence(
     extra_actions = sorted(set(action_groups) - set(action_order))
     ordered = action_order + extra_actions
 
-    source_graphs: list[list[dict[str, Any]]] = []
-    source_actions: list[str] = []
     raw_turn_count = 0
+    user_goal_turns = list(action_groups.get(user_goal) or []) if user_goal else []
+    other_turn_groups: list[list[dict[str, Any]]] = []
+    source_actions: list[str] = []
     for action in ordered:
+        if action == user_goal:
+            if user_goal_turns:
+                source_actions.append(action)
+                raw_turn_count += len(user_goal_turns)
+            continue
         turns = action_groups.get(action) or []
         if not turns:
             continue
         raw_turn_count += len(turns)
         source_actions.append(action)
-        source_graphs.append(turns)
+        other_turn_groups.append(turns)
 
-    merged = merge_constraint_sequence(source_graphs, rng=rng)
-    sequence = attach_sequence_deltas(merged, step2_task=step2_task, step3_task=task)
+    if generation_mode == "sequential_chain" and user_goal_turns:
+        merged = merge_split_temporal_sequence(user_goal_turns, other_turn_groups, rng=rng)
+    else:
+        source_graphs = []
+        for action in ordered:
+            turns = action_groups.get(action) or []
+            if turns:
+                source_graphs.append(turns)
+        merged = merge_constraint_sequence(source_graphs, rng=rng)
+    g0_payload: dict[str, Any] | None = None
+    if merged:
+        mutated_actions = {
+            str(step.get("action") or "").strip()
+            for step in merged
+            if isinstance(step, dict) and str(step.get("action") or "").strip()
+        }
+        alignment_turn = build_anchor_alignment_turn(
+            step2_task,
+            task,
+            mutated_actions=mutated_actions,
+        )
+        full_sequence = [*merged, alignment_turn]
+        sequence = attach_sequence_deltas(
+            full_sequence,
+            step2_task=step2_task,
+            step3_task=task,
+        )
+        first_step = sequence[0]
+        g0_payload = build_g0_payload(
+            step2_task,
+            first_step=first_step,
+            cumulative_action_deps=first_step.get("cumulative_action_deps") or {},
+        )
+    else:
+        sequence = []
 
     user_goal_changed_from_anchor = sum(
         1 for step in sequence if step.get("user_goal_graph_changed_from_anchor")
@@ -724,10 +1023,16 @@ def build_task_sequence(
         "user_goal": user_goal,
         "task_description": task.get("task_description"),
         "anchor_user_goal_action_graph": anchor_user_goal_graph(step2_task),
+        "g0": g0_payload,
+        "g0_sequence_order": (g0_payload or {}).get("sequence_order"),
+        "anchor_alignment_sequence_order": (
+            sequence[-1].get("sequence_order") if sequence else None
+        ),
         "source_action_count": len(source_actions),
         "source_actions": source_actions,
         "raw_turn_count": raw_turn_count,
         "sequence_turn_count": len(sequence),
+        "history_turn_count": max(len(sequence) - 1, 0),
         "user_goal_graph_changed_turn_count": user_goal_changed_from_anchor,
         "action_noise": copy.deepcopy(task.get("action_noise") or []),
         "generation_mode": generation_mode,
@@ -752,6 +1057,9 @@ def build_all_task_sequences(
     *,
     seed: int,
     generation_mode: str = "anchor_rewrite",
+    enforce_quality_gates: bool = False,
+    max_quality_attempts: int = DEFAULT_QUALITY_MAX_ATTEMPTS,
+    quality_thresholds: QualityThresholds | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[str]]:
     assembled: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -765,6 +1073,9 @@ def build_all_task_sequences(
     total_steps = 0
     dependency_diff_lines: list[int] = []
     anchor_diff_lines: list[int] = []
+    quality_rows: list[dict[str, Any]] = []
+    thresholds = quality_thresholds or QualityThresholds()
+    should_enforce = enforce_quality_gates and generation_mode == "sequential_chain"
 
     for task in tasks:
         if not isinstance(task, dict):
@@ -774,16 +1085,61 @@ def build_all_task_sequences(
         if step2_task is None:
             warnings.append(f"missing step2 task for {task_uid}; skipped")
             continue
-        rng = random.Random(f"{seed}:{task_uid}")
-        row = build_task_sequence(
-            task,
-            step2_task,
-            rng=rng,
-            generation_mode=generation_mode,
-            seed=seed,
-            sequential_warnings=warnings,
-            sequential_stats=sequential_stats_by_task,
-        )
+
+        attempt_budget = max_quality_attempts if should_enforce else 1
+        row: dict[str, Any] | None = None
+        quality: dict[str, Any] | None = None
+        for attempt in range(attempt_budget):
+            attempt_seed = seed + attempt * 1009
+            rng = random.Random(f"{seed}:{task_uid}:{attempt}")
+            try:
+                row = build_task_sequence(
+                    task,
+                    step2_task,
+                    rng=rng,
+                    generation_mode=generation_mode,
+                    seed=attempt_seed,
+                    sequential_warnings=warnings,
+                    sequential_stats=sequential_stats_by_task,
+                )
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(
+                    f"{task_uid}: sequence assembly failed on attempt {attempt + 1}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                row = None
+                continue
+            if not should_enforce:
+                break
+            quality = task_quality(row, active_mode="anchor", thresholds=thresholds)
+            row["quality_gates"] = quality["gates"]
+            row["quality_metrics"] = {
+                key: quality.get(key)
+                for key in (
+                    "event_count",
+                    "final_graph_edit_distance",
+                    "stale_conflict_count",
+                    "g0_user_goal_graph_ne_anchor",
+                    "g0_to_anchor_edit_distance",
+                )
+            }
+            if quality["gates"]["all"]:
+                break
+            failed = [name for name, passed in quality["gates"].items() if name != "all" and not passed]
+            warnings.append(
+                f"{task_uid}: quality gates failed attempt {attempt + 1}/{attempt_budget}: {', '.join(failed)}"
+            )
+        else:
+            if should_enforce and quality is not None:
+                warnings.append(
+                    f"{task_uid}: kept last attempt despite failing quality gates after {attempt_budget} tries"
+                )
+
+        if row is None:
+            warnings.append(f"{task_uid}: skipped because sequence assembly failed on all attempts")
+            continue
+        if quality is not None:
+            quality_rows.append(quality)
         assembled.append(row)
         sequence_lengths.append(int(row.get("sequence_turn_count") or 0))
         source_action_counts.append(int(row.get("source_action_count") or 0))
@@ -872,6 +1228,33 @@ def build_all_task_sequences(
         ),
         "sequential_adjusted_target_total": (
             noise_target_total if generation_mode == "sequential_chain" else None
+        ),
+        "quality_gate_enforced": should_enforce,
+        "quality_gate_pass_count": (
+            sum(1 for row in quality_rows if (row.get("gates") or {}).get("all"))
+            if should_enforce
+            else None
+        ),
+        "quality_gate_pass_rate": (
+            (
+                sum(1 for row in quality_rows if (row.get("gates") or {}).get("all"))
+                / len(quality_rows)
+            )
+            if should_enforce and quality_rows
+            else None
+        ),
+        "avg_g0_to_anchor_edit_distance": (
+            float(statistics.mean(row.get("g0_to_anchor_edit_distance") or 0 for row in quality_rows))
+            if should_enforce and quality_rows
+            else None
+        ),
+        "g0_user_goal_graph_ne_anchor_rate": (
+            (
+                sum(1 for row in quality_rows if row.get("g0_user_goal_graph_ne_anchor"))
+                / len(quality_rows)
+            )
+            if should_enforce and quality_rows
+            else None
         ),
         "sequential_generated_total": (
             noise_generated_total if generation_mode == "sequential_chain" else None
@@ -989,8 +1372,8 @@ def turn_delta_record(
     domain: str,
     dep_params: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Extract semantic dependency change between this turn and its sequence predecessor."""
-    dep_delta = step.get("dependency_delta")
+    """Extract semantic task-level dependency change between this turn and its predecessor."""
+    dep_delta = step.get("task_dependency_delta") or step.get("dependency_delta")
     if not isinstance(dep_delta, dict):
         return None
     diff = diff_dependency_constraints(
@@ -1001,11 +1384,14 @@ def turn_delta_record(
     )
     action = str(step.get("action") or "")
     mutation = str(step.get("mutation") or "").strip()
+    kind = str(step.get("kind") or "")
     return {
         "sequence_order": step.get("sequence_order"),
         "local_id": step.get("local_id"),
         "action": action,
         "mutation": mutation or None,
+        "kind": kind or None,
+        "establishes_g0": bool(step.get("establishes_g0")),
         "scope": step.get("scope"),
         "generation_mode": step.get("generation_mode"),
         "source_mac_constraint_uid": step.get("source_mac_constraint_uid"),
@@ -1016,7 +1402,7 @@ def turn_delta_record(
         "after_signature": dep_delta.get("after_signature"),
         "diff": diff,
         "summary": dependency_delta_summary(
-            action=action,
+            action=action or ("task" if kind == KIND_ANCHOR_ALIGNMENT else "unknown"),
             mutation=mutation,
             from_local_id=dep_delta.get("from_local_id"),
             diff=diff,
@@ -1069,6 +1455,10 @@ def build_temporal_delta_payload(
                 "user_goal": task.get("user_goal"),
                 "generation_mode": task.get("generation_mode") or generation_mode,
                 "sequence_turn_count": task.get("sequence_turn_count"),
+                "g0": copy.deepcopy(task.get("g0")),
+                "g0_sequence_order": task.get("g0_sequence_order"),
+                "anchor_alignment_sequence_order": task.get("anchor_alignment_sequence_order"),
+                "history_turn_count": task.get("history_turn_count"),
                 "turns": turns,
             }
         )
@@ -1169,6 +1559,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=13, help="Seed for per-task shuffle/merge.")
     parser.add_argument("--limit", type=int, default=None, help="Process at most N tasks.")
+    parser.add_argument(
+        "--enforce-quality-gates",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Resample sequential_chain tasks until SOP-temporal hard gates pass (default: on).",
+    )
+    parser.add_argument(
+        "--max-quality-attempts",
+        type=int,
+        default=DEFAULT_QUALITY_MAX_ATTEMPTS,
+        help="Maximum resample attempts per task when --enforce-quality-gates is enabled.",
+    )
     return parser.parse_args()
 
 
@@ -1239,6 +1641,8 @@ def main() -> int:
             step2_by_uid,
             seed=args.seed,
             generation_mode=mode,
+            enforce_quality_gates=args.enforce_quality_gates,
+            max_quality_attempts=args.max_quality_attempts,
         )
         if mode == "anchor_rewrite":
             v1_tasks, v1_summary = assembled, summary

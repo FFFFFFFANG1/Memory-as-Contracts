@@ -21,9 +21,6 @@ _CLARIFICATION_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-_REQUEST_TURN_KINDS = frozenset({"carryover", "actual_evaluation"})
-
-
 def is_agent_clarification_request(text: str) -> bool:
     """Return True when send_message text looks like the agent is asking the user."""
     cleaned = text.strip()
@@ -32,66 +29,32 @@ def is_agent_clarification_request(text: str) -> bool:
     return bool(_CLARIFICATION_PATTERNS.search(cleaned))
 
 
-def _dedupe_preserve_order(items: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique: list[str] = []
-    for item in items:
-        if item in seen:
-            continue
-        seen.add(item)
-        unique.append(item)
-    return unique
-
-
 def collect_known_user_information(
     *,
     user_prompt: str,
-    past_user_turns: list[dict[str, Any]] | None = None,
     user_known: dict[str, Any] | None = None,
-    max_request_snippets: int = 5,
 ) -> str:
-    """Summarize information already present in user turns and user_known."""
+    """Summarize task-bound user information for the current evaluation turn."""
     parts: list[str] = []
 
     if user_known:
         parts.append(json.dumps(user_known, ensure_ascii=False, sort_keys=True))
 
-    request_snippets: list[str] = []
-    for turn in past_user_turns or []:
-        if not isinstance(turn, dict):
-            continue
-        kind = str(turn.get("kind") or "")
-        phase = str(turn.get("phase") or "")
-        if kind not in _REQUEST_TURN_KINDS and phase != "evaluation":
-            continue
-        content = turn.get("content")
-        if isinstance(content, str) and content.strip():
-            request_snippets.append(content.strip())
-
     if user_prompt.strip():
-        request_snippets.append(user_prompt.strip())
-
-    request_snippets = _dedupe_preserve_order(request_snippets)
-    if request_snippets:
-        tail = request_snippets[-max_request_snippets:]
-        parts.append("From our conversation: " + " | ".join(tail))
+        parts.append(user_prompt.strip())
 
     if parts:
         return ". ".join(parts)
-    if user_prompt.strip():
-        return user_prompt.strip()
     return "nothing further beyond what I already shared."
 
 
 def build_clarification_reply(
     *,
     user_prompt: str,
-    past_user_turns: list[dict[str, Any]] | None = None,
     user_known: dict[str, Any] | None = None,
 ) -> str:
     known = collect_known_user_information(
         user_prompt=user_prompt,
-        past_user_turns=past_user_turns,
         user_known=user_known,
     )
     return f"All information I know is {known}"
@@ -120,6 +83,5 @@ class SOPClarificationContext:
             return None
         return build_clarification_reply(
             user_prompt=self.user_prompt,
-            past_user_turns=self.past_user_turns,
             user_known=self.user_known,
         )

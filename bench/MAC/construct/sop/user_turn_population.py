@@ -2,9 +2,14 @@
 """Populate SOPBench user turn histories from step4 semantic dependency deltas.
 
 Per task:
-- **warmup** (LLM): 3–4 user turns establishing g0 baseline SOP for ``user_goal``
-- **normal**: per delta — LLM introduce + heuristic carryover (randomized filler fields)
+- **warmup** (LLM): 3–4 user turns establishing g0 baseline SOP from the first turn in the
+  composed temporal sequence (not the eval anchor)
+- **normal**: per delta after g0 — LLM introduce + 1–10 heuristic carryover turns (truncated
+  normal) sampled from a domain action request pool (one pool per visible tool/action with
+  SOPBench user_goal templates)
 - **actual_evaluation**: original ``mac_task_summary`` from step2
+
+The final temporal turn realigns all mutated actions back to anchor before evaluation.
 
 Reads ``eval_step4_temporal_delta.json`` + ``eval_step2_anchors.json``;
 writes ``eval_step5_task_histories.json``.
@@ -40,10 +45,26 @@ DEFAULT_DELTA = Path("bench/MAC/sopbench/mid_data/eval_step4_temporal_delta.json
 DEFAULT_STEP2 = Path("bench/MAC/sopbench/mid_data/eval_step2_anchors.json")
 DEFAULT_OUTPUT = Path("bench/MAC/sopbench/mid_data/eval_step5_task_histories.json")
 DEFAULT_CACHE = Path("bench/MAC/sopbench/mid_data/user_turn_population_cache.json")
-CACHE_VERSION = 2
+DEFAULT_POOL_SOURCE = Path("bench/SOPBench/data")
+CACHE_VERSION = 4
+
+SOPBENCH_DOMAIN_FILES = (
+    "bank_tasks.json",
+    "dmv_tasks.json",
+    "healthcare_tasks.json",
+    "hotel_tasks.json",
+    "library_tasks.json",
+    "online_market_tasks.json",
+    "university_tasks.json",
+)
 
 sys.path.insert(0, str(SOP_ROOT))
-from temporal_noise import get_action_dependency  # noqa: E402
+from temporal_noise import get_action_dependency, sample_truncated_normal_int  # noqa: E402
+
+DEFAULT_CARRYOVER_MIN = 1
+DEFAULT_CARRYOVER_MAX = 10
+DEFAULT_CARRYOVER_MEAN = 5.5
+DEFAULT_CARRYOVER_STD = 2.0
 
 INTRODUCE_SYSTEM_PROMPT = """
 You generate user-only messages for a benchmark where the user is revising a domain SOP specification.
@@ -279,6 +300,70 @@ class G0Baseline:
     constraints: list[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class ActionRequestTemplate:
+    prompt: str
+    user_known: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ActionRequestPool:
+    """Customer-style request templates keyed by (domain, action)."""
+
+    templates: dict[tuple[str, str], tuple[ActionRequestTemplate, ...]]
+
+    @classmethod
+    def from_sopbench_data(cls, data_dir: Path) -> ActionRequestPool:
+        grouped: dict[tuple[str, str], list[ActionRequestTemplate]] = {}
+        root = resolve_path(data_dir)
+        for filename in SOPBENCH_DOMAIN_FILES:
+            path = root / filename
+            if not path.is_file():
+                raise FileNotFoundError(path)
+            domain = filename.removesuffix("_tasks.json")
+            raw = load_json(path)
+            if not isinstance(raw, dict):
+                raise ValueError(f"Expected top-level object in {path}")
+            for action, tasks in raw.items():
+                if not isinstance(tasks, list):
+                    continue
+                key = (domain, str(action))
+                seen_prompt_keys: set[str] = set()
+                for task in tasks:
+                    if not isinstance(task, dict):
+                        continue
+                    prompt = str(task.get("user_prompt") or task.get("user_instruction") or "").strip()
+                    if not prompt:
+                        continue
+                    prompt_key = normalize_carryover_dedupe_key(prompt)
+                    if not prompt_key or prompt_key in seen_prompt_keys:
+                        continue
+                    seen_prompt_keys.add(prompt_key)
+                    grouped.setdefault(key, []).append(
+                        ActionRequestTemplate(
+                            prompt=prompt,
+                            user_known=copy.deepcopy(task.get("user_known") or {}),
+                        )
+                    )
+        frozen = {key: tuple(values) for key, values in grouped.items() if values}
+        return cls(templates=frozen)
+
+    def actions_for_domain(self, domain: str) -> set[str]:
+        return {action for domain_name, action in self.templates if domain_name == domain}
+
+    def summary(self) -> dict[str, Any]:
+        by_domain: dict[str, int] = {}
+        template_counts: dict[str, int] = {}
+        for (domain, action), entries in self.templates.items():
+            by_domain[domain] = by_domain.get(domain, 0) + 1
+            template_counts[f"{domain}:{action}"] = len(entries)
+        return {
+            "action_count": len(self.templates),
+            "actions_by_domain": by_domain,
+            "template_count": sum(template_counts.values()),
+        }
+
+
 def resolve_path(path: Path) -> Path:
     return path if path.is_absolute() else REPO_ROOT / path
 
@@ -449,11 +534,43 @@ def index_step2_tasks(tasks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return indexed
 
 
-def collect_g0_baseline(step2_task: dict[str, Any]) -> G0Baseline:
-    user_goal = str(step2_task.get("user_goal") or "")
+def collect_g0_baseline(
+    step2_task: dict[str, Any],
+    g0_payload: dict[str, Any] | None = None,
+) -> G0Baseline:
+    payload = g0_payload if isinstance(g0_payload, dict) else {}
+    user_goal = str(payload.get("user_goal") or step2_task.get("user_goal") or "")
+    constraints = payload.get("constraints") if isinstance(payload.get("constraints"), list) else []
+    normalized_constraints: list[dict[str, Any]] = []
+    seen_text: set[str] = set()
+    for constraint in constraints:
+        if not isinstance(constraint, dict):
+            continue
+        text = str(constraint.get("text") or "").strip()
+        if not text or text in seen_text:
+            continue
+        seen_text.add(text)
+        normalized_constraints.append(
+            {
+                "mac_constraint_uid": str(constraint.get("mac_constraint_uid") or ""),
+                "text": text,
+                "constraint_id": constraint.get("constraint_id"),
+            }
+        )
+    if normalized_constraints:
+        dep_sig = str(payload.get("dependency_signature") or "")
+        if not dep_sig and payload.get("user_goal_dependency") is not None:
+            dep_sig = dependency_signature(payload.get("user_goal_dependency"))
+        return G0Baseline(
+            user_goal=user_goal,
+            dependency_signature=dep_sig,
+            constraints=normalized_constraints,
+        )
+
+    # Legacy fallback: step2 anchor dependency (pre g0-from-sequence fix).
     dep = get_action_dependency(step2_task, user_goal)
     seen: set[str] = set()
-    constraints: list[dict[str, Any]] = []
+    fallback_constraints: list[dict[str, Any]] = []
     for constraint in step2_task.get("constraints") or []:
         if not isinstance(constraint, dict):
             continue
@@ -464,7 +581,7 @@ def collect_g0_baseline(step2_task: dict[str, Any]) -> G0Baseline:
         if not text or text in seen:
             continue
         seen.add(text)
-        constraints.append(
+        fallback_constraints.append(
             {
                 "mac_constraint_uid": uid,
                 "text": text,
@@ -474,7 +591,7 @@ def collect_g0_baseline(step2_task: dict[str, Any]) -> G0Baseline:
     return G0Baseline(
         user_goal=user_goal,
         dependency_signature=dependency_signature(dep),
-        constraints=constraints,
+        constraints=fallback_constraints,
     )
 
 
@@ -543,6 +660,14 @@ def build_warmup_prompt(*, step2_task: dict[str, Any], g0: G0Baseline, turn_coun
 
 
 def dry_run_introduce(delta_turn: dict[str, Any]) -> dict[str, str]:
+    if str(delta_turn.get("kind") or "") == "anchor_alignment":
+        return {
+            "content": (
+                "Realign all previously revised SOP actions back to the current anchor "
+                "specification so every constraint matches the approved final version."
+            ),
+            "scope_expression": "Task-wide SOP realignment to anchor.",
+        }
     action = str(delta_turn.get("action") or "the action")
     diff = constraint_diff_record(delta_turn)
     parts = [f"Revise SOP dependency rules for `{action}`."]
@@ -928,6 +1053,21 @@ def sanitize_carryover_text(text: str) -> str:
     return cleaned
 
 
+def normalize_carryover_dedupe_key(content: str) -> str:
+    cleaned = sanitize_carryover_text(str(content or ""))
+    cleaned = cleaned.replace("'", "'")
+    cleaned = re.sub(r"[^\w\s$]", " ", cleaned.casefold())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def register_carryover_dedupe_key(seen_keys: set[str], content: str) -> str | None:
+    key = normalize_carryover_dedupe_key(content)
+    if not key or key in seen_keys:
+        return None
+    seen_keys.add(key)
+    return key
+
+
 def content_has_eval_grounding(content: str, grounding: set[str]) -> bool:
     lowered = content.casefold()
     for value in grounding:
@@ -1108,11 +1248,13 @@ def generate_carryover_block(
     forbidden: set[str],
     carryover_count: int,
     rng: random.Random,
+    seen_keys: set[str] | None = None,
 ) -> list[str]:
+    dedupe_keys = seen_keys if seen_keys is not None else set()
     generated: list[str] = []
-    seen: set[str] = set()
     attempt = 0
-    while len(generated) < carryover_count and attempt < carryover_count + 16:
+    max_attempts = max(carryover_count * 16, 64)
+    while len(generated) < carryover_count and attempt < max_attempts:
         attempt += 1
         content = heuristic_carryover_turn(
             eval_prompt=eval_prompt,
@@ -1122,15 +1264,120 @@ def generate_carryover_block(
             eval_grounding=eval_grounding,
             rng=rng,
         )
-        if not content or content in seen:
+        if not content or register_carryover_dedupe_key(dedupe_keys, content) is None:
             continue
-        seen.add(content)
         generated.append(content)
     return generated
 
 
+def visible_tool_actions(step2_task: dict[str, Any]) -> set[str]:
+    names: set[str] = set()
+    for tool in step2_task.get("tools") or []:
+        if not isinstance(tool, dict):
+            continue
+        fn = tool.get("function") if tool.get("type") == "function" else tool
+        if not isinstance(fn, dict):
+            continue
+        name = str(fn.get("name") or "").strip()
+        if name and name != "send_message":
+            names.add(name)
+    return names
+
+
+def eligible_carryover_actions(
+    *,
+    domain: str,
+    visible_actions: set[str],
+    action_pool: ActionRequestPool,
+) -> list[str]:
+    return sorted(
+        action
+        for action in visible_actions
+        if action_pool.templates.get((domain, action))
+    )
+
+
+def template_task_stub(template: ActionRequestTemplate) -> dict[str, Any]:
+    return {"original_sopbench": {"user_known": copy.deepcopy(template.user_known)}}
+
+
+def generate_carryover_block_from_pool(
+    *,
+    domain: str,
+    visible_actions: set[str],
+    action_pool: ActionRequestPool,
+    eval_prompt: str,
+    eval_grounding: set[str],
+    forbidden: set[str],
+    carryover_count: int,
+    rng: random.Random,
+    seen_keys: set[str],
+) -> list[dict[str, Any]]:
+    eligible_actions = eligible_carryover_actions(
+        domain=domain,
+        visible_actions=visible_actions,
+        action_pool=action_pool,
+    )
+    if not eligible_actions:
+        return []
+
+    generated: list[dict[str, Any]] = []
+    attempt = 0
+    max_attempts = max(carryover_count * 24, len(seen_keys) + carryover_count * 12, 96)
+    while len(generated) < carryover_count and attempt < max_attempts:
+        attempt += 1
+        action = rng.choice(eligible_actions)
+        templates = action_pool.templates[(domain, action)]
+        template = rng.choice(templates)
+        field_slots, _ = collect_eval_field_slots(template.prompt, template_task_stub(template))
+        content = heuristic_carryover_turn(
+            eval_prompt=template.prompt,
+            variant=attempt + rng.randint(0, max(len(CARRYOVER_VARIANTS) - 1, 0)),
+            forbidden=forbidden,
+            field_slots=field_slots,
+            eval_grounding=eval_grounding,
+            rng=rng,
+        )
+        if not content or register_carryover_dedupe_key(seen_keys, content) is None:
+            continue
+        generated.append({"content": content, "source_action": action})
+    return generated
+
+
+def seed_carryover_seen_keys(
+    *,
+    eval_prompt: str,
+    output_turns: list[dict[str, Any]],
+) -> set[str]:
+    seen_keys: set[str] = set()
+    if eval_prompt.strip():
+        eval_key = normalize_carryover_dedupe_key(eval_prompt)
+        if eval_key:
+            seen_keys.add(eval_key)
+    for turn in output_turns:
+        if turn.get("kind") != "carryover":
+            continue
+        content = str(turn.get("content") or "")
+        key = normalize_carryover_dedupe_key(content)
+        if key:
+            seen_keys.add(key)
+    return seen_keys
+
+
+CARRYOVER_POLICY = (
+    "domain action request pool sampled from visible tools with SOPBench user_goal templates; "
+    "entity_variation_pool with eval-grounding scrub; normalized task-level dedupe; no greetings/filler"
+)
+
+
 def plan_carryover_count(rng: random.Random, args: argparse.Namespace) -> int:
-    return rng.randint(args.carryover_min, args.carryover_max)
+    return sample_truncated_normal_int(
+        rng,
+        value_min=args.carryover_min,
+        value_max=args.carryover_max,
+        mean=args.carryover_mean,
+        std=args.carryover_std,
+    )
 
 
 def plan_warmup_count(rng: random.Random, args: argparse.Namespace) -> int:
@@ -1176,14 +1423,29 @@ def process_task(
     print(f"populating user turns {job.ordinal}/{job.total} task={task_uid}", flush=True)
 
     eval_prompt = str(step2_task.get("mac_task_summary") or "").strip()
-    carryover_field_slots, eval_grounding = collect_eval_field_slots(eval_prompt, step2_task)
-    g0 = collect_g0_baseline(step2_task)
+    _, eval_grounding = collect_eval_field_slots(eval_prompt, step2_task)
+    domain = str(step2_task.get("domain") or "")
+    visible_actions = visible_tool_actions(step2_task)
+    action_pool: ActionRequestPool = args.action_pool
+    g0_payload = delta_task.get("g0") if isinstance(delta_task.get("g0"), dict) else {}
+    g0 = collect_g0_baseline(step2_task, g0_payload)
+    g0_sequence_order = int(
+        g0_payload.get("sequence_order")
+        or delta_task.get("g0_sequence_order")
+        or 1
+    )
     turns_delta = sorted(
-        [t for t in (delta_task.get("turns") or []) if isinstance(t, dict)],
+        [
+            t
+            for t in (delta_task.get("turns") or [])
+            if isinstance(t, dict)
+            and int(t.get("sequence_order") or 0) > g0_sequence_order
+        ],
         key=lambda item: int(item.get("sequence_order") or 0),
     )
     rng = random.Random(args.seed + int(sha256_text(task_uid)[:8], 16))
     output_turns: list[dict[str, Any]] = []
+    task_carryover_seen = seed_carryover_seen_keys(eval_prompt=eval_prompt, output_turns=[])
     warnings: list[str] = []
     errors: list[str] = []
     introduce_generations: list[dict[str, Any]] = []
@@ -1273,16 +1535,23 @@ def process_task(
         forbidden = forbidden_constraint_texts(delta_turn)
         carryover_count = plan_carryover_count(rng, args)
         introduce_generations[-1]["carryover_planned"] = carryover_count
-        carryover_contents = generate_carryover_block(
+        if args.skip_carryover:
+            continue
+        carryover_entries = generate_carryover_block_from_pool(
+            domain=domain,
+            visible_actions=visible_actions,
+            action_pool=action_pool,
             eval_prompt=eval_prompt,
-            field_slots=carryover_field_slots,
             eval_grounding=eval_grounding,
             forbidden=forbidden,
             carryover_count=carryover_count,
             rng=rng,
+            seen_keys=task_carryover_seen,
         )
-        generated_carryover = len(carryover_contents)
-        for content in carryover_contents:
+        generated_carryover = len(carryover_entries)
+        for entry in carryover_entries:
+            content = str(entry.get("content") or "")
+            source_action = str(entry.get("source_action") or "")
             output_turns.append(
                 {
                     "role": "user",
@@ -1290,17 +1559,19 @@ def process_task(
                     "kind": "carryover",
                     "content": content,
                     "scope_expression": (
-                        "Synthetic user-task filler with randomized field values; "
-                        "no constraint restatement."
+                        f"Synthetic `{source_action}` customer request filler with randomized "
+                        "field values; no constraint restatement."
                     ),
                     "mentions_constraint": False,
                     "source_introduce_turn_index": introduce_index,
                     "source_delta_local_id": local_id,
+                    "source_action": source_action,
                 }
             )
         if generated_carryover < carryover_count:
             warnings.append(
-                f"carryover under-filled for {local_id}: {generated_carryover}/{carryover_count}"
+                f"carryover under-filled for {local_id}: {generated_carryover}/{carryover_count} "
+                f"(eligible_actions={len(eligible_carryover_actions(domain=domain, visible_actions=visible_actions, action_pool=action_pool))})"
             )
 
     has_eval = append_actual_evaluation_turn(eval_prompt=eval_prompt, output_turns=output_turns)
@@ -1331,7 +1602,13 @@ def process_task(
             "cache": dict(cache_counts),
             "warmup_planned": warmup_count,
             "introduce_generations": introduce_generations,
-            "carryover_policy": "entity_variation_pool with eval-grounding scrub; no greetings/filler",
+            "carryover_policy": CARRYOVER_POLICY,
+            "carryover_eligible_actions": eligible_carryover_actions(
+                domain=domain,
+                visible_actions=visible_actions,
+                action_pool=action_pool,
+            ),
+            "carryover_unique_count": len(task_carryover_seen),
             "warnings": warnings,
             "errors": errors,
         },
@@ -1342,14 +1619,18 @@ def repair_task_history(
     history: dict[str, Any],
     *,
     step2_task: dict[str, Any],
+    action_pool: ActionRequestPool,
     seed: int,
 ) -> tuple[dict[str, Any], list[str]]:
     warnings: list[str] = []
     task_uid = str(history.get("mac_task_uid") or step2_task.get("mac_task_uid") or "")
     eval_prompt = str(step2_task.get("mac_task_summary") or "").strip()
-    carryover_field_slots, eval_grounding = collect_eval_field_slots(eval_prompt, step2_task)
+    _, eval_grounding = collect_eval_field_slots(eval_prompt, step2_task)
+    domain = str(step2_task.get("domain") or "")
+    visible_actions = visible_tool_actions(step2_task)
     g0 = collect_g0_baseline(step2_task)
     rng = random.Random(seed + int(sha256_text(task_uid)[:8], 16))
+    task_carryover_seen = seed_carryover_seen_keys(eval_prompt=eval_prompt, output_turns=[])
 
     turns = history.get("turns") or []
     warmup_turns: list[dict[str, Any]] = []
@@ -1412,27 +1693,38 @@ def repair_task_history(
             if text:
                 forbidden.add(text)
 
-        carryover_contents = generate_carryover_block(
+        carryover_entries = generate_carryover_block_from_pool(
+            domain=domain,
+            visible_actions=visible_actions,
+            action_pool=action_pool,
             eval_prompt=eval_prompt,
-            field_slots=carryover_field_slots,
             eval_grounding=eval_grounding,
             forbidden=forbidden,
             carryover_count=carryover_count,
             rng=rng,
+            seen_keys=task_carryover_seen,
         )
-        if len(carryover_contents) < carryover_count:
+        if len(carryover_entries) < carryover_count:
             warnings.append(
-                f"carryover repair under-filled for {local_id}: {len(carryover_contents)}/{carryover_count}"
+                f"carryover repair under-filled for {local_id}: {len(carryover_entries)}/{carryover_count}"
             )
         for carry_index, old_turn in enumerate(carryover_block):
-            content = (
-                carryover_contents[carry_index]
-                if carry_index < len(carryover_contents)
-                else old_turn.get("content", "")
+            entry = (
+                carryover_entries[carry_index]
+                if carry_index < len(carryover_entries)
+                else {"content": old_turn.get("content", ""), "source_action": old_turn.get("source_action", "")}
             )
+            content = str(entry.get("content") or "")
+            source_action = str(entry.get("source_action") or old_turn.get("source_action") or "")
             updated = copy.deepcopy(old_turn)
             updated["content"] = content
             updated["source_introduce_turn_index"] = introduce_index
+            if source_action:
+                updated["source_action"] = source_action
+                updated["scope_expression"] = (
+                    f"Synthetic `{source_action}` customer request filler with randomized "
+                    "field values; no constraint restatement."
+                )
             output_turns.append(updated)
 
     reindex_turns(output_turns)
@@ -1442,16 +1734,152 @@ def repair_task_history(
     repaired["warmup_turn_count"] = sum(1 for item in output_turns if item.get("phase") == "warmup")
     repaired["normal_turn_count"] = sum(1 for item in output_turns if item.get("phase") == "normal")
     generation = dict(repaired.get("generation") or {})
-    generation["carryover_policy"] = "entity_variation_pool with eval-grounding scrub; no greetings/filler"
+    generation["carryover_policy"] = CARRYOVER_POLICY
+    generation["carryover_eligible_actions"] = eligible_carryover_actions(
+        domain=domain,
+        visible_actions=visible_actions,
+        action_pool=action_pool,
+    )
+    generation["carryover_unique_count"] = len(task_carryover_seen)
     generation["repair_warnings"] = warnings
     repaired["generation"] = generation
     return repaired, warnings
+
+
+def process_carryover_only(
+    job: TaskJob,
+    existing_history: dict[str, Any],
+    *,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    step2_task = job.step2_task
+    task_uid = str(existing_history.get("mac_task_uid") or step2_task.get("mac_task_uid") or "")
+    print(f"populating carryover {job.ordinal}/{job.total} task={task_uid}", flush=True)
+
+    eval_prompt = str(step2_task.get("mac_task_summary") or "").strip()
+    _, eval_grounding = collect_eval_field_slots(eval_prompt, step2_task)
+    domain = str(step2_task.get("domain") or "")
+    visible_actions = visible_tool_actions(step2_task)
+    action_pool: ActionRequestPool = args.action_pool
+    rng = random.Random(args.seed + int(sha256_text(task_uid)[:8], 16))
+    task_carryover_seen = seed_carryover_seen_keys(eval_prompt=eval_prompt, output_turns=[])
+    warnings: list[str] = []
+
+    output_turns: list[dict[str, Any]] = []
+    introduce_generations: list[dict[str, Any]] = []
+    index = 0
+    source_turns = existing_history.get("turns") or []
+    while index < len(source_turns):
+        turn = source_turns[index]
+        if not isinstance(turn, dict):
+            index += 1
+            continue
+        kind = str(turn.get("kind") or "")
+        if kind == "carryover":
+            index += 1
+            continue
+        output_turns.append(copy.deepcopy(turn))
+        if kind != "introduce":
+            index += 1
+            continue
+
+        introduce_turn = output_turns[-1]
+        introduce_index = len(output_turns) - 1
+        local_id = str(introduce_turn.get("source_delta_local_id") or "")
+        index += 1
+
+        carryover_count = plan_carryover_count(rng, args)
+        introduce_generations.append(
+            {
+                "source_delta_local_id": local_id,
+                "carryover_planned": carryover_count,
+            }
+        )
+
+        forbidden: set[str] = set()
+        diff = introduce_turn.get("constraint_diff") or {}
+        for item in (diff.get("added") or []) + (diff.get("removed") or []):
+            text = str(item).strip()
+            if text:
+                forbidden.add(text)
+
+        carryover_entries = generate_carryover_block_from_pool(
+            domain=domain,
+            visible_actions=visible_actions,
+            action_pool=action_pool,
+            eval_prompt=eval_prompt,
+            eval_grounding=eval_grounding,
+            forbidden=forbidden,
+            carryover_count=carryover_count,
+            rng=rng,
+            seen_keys=task_carryover_seen,
+        )
+        if len(carryover_entries) < carryover_count:
+            warnings.append(
+                f"carryover under-filled for {local_id}: {len(carryover_entries)}/{carryover_count} "
+                f"(eligible_actions={len(eligible_carryover_actions(domain=domain, visible_actions=visible_actions, action_pool=action_pool))})"
+            )
+        for entry in carryover_entries:
+            content = str(entry.get("content") or "")
+            source_action = str(entry.get("source_action") or "")
+            output_turns.append(
+                {
+                    "role": "user",
+                    "phase": "normal",
+                    "kind": "carryover",
+                    "content": content,
+                    "scope_expression": (
+                        f"Synthetic `{source_action}` customer request filler with randomized "
+                        "field values; no constraint restatement."
+                    ),
+                    "mentions_constraint": False,
+                    "source_introduce_turn_index": introduce_index,
+                    "source_delta_local_id": local_id,
+                    "source_action": source_action,
+                }
+            )
+
+    reindex_turns(output_turns)
+    has_eval = any(turn.get("kind") == "actual_evaluation" for turn in output_turns)
+    if not has_eval:
+        append_actual_evaluation_turn(eval_prompt=eval_prompt, output_turns=output_turns)
+        reindex_turns(output_turns)
+
+    generation = dict(existing_history.get("generation") or {})
+    generation["carryover_policy"] = CARRYOVER_POLICY
+    generation["carryover_eligible_actions"] = eligible_carryover_actions(
+        domain=domain,
+        visible_actions=visible_actions,
+        action_pool=action_pool,
+    )
+    generation["carryover_unique_count"] = len(task_carryover_seen)
+    generation["introduce_generations"] = introduce_generations
+    if warnings:
+        prior = list(generation.get("warnings") or [])
+        generation["warnings"] = prior + warnings
+
+    warmup_turn_count = sum(1 for t in output_turns if t.get("phase") == "warmup")
+    normal_turn_count = sum(1 for t in output_turns if t.get("phase") == "normal")
+    expected_normal = sum(1 + int(e.get("carryover_planned", 0)) for e in introduce_generations)
+
+    return {
+        **copy.deepcopy(existing_history),
+        "mac_task_uid": task_uid,
+        "warmup_turn_count": warmup_turn_count,
+        "normal_turn_count": normal_turn_count,
+        "expected_normal_turn_count": expected_normal,
+        "evaluation_user_turn_count": 1 if has_eval or eval_prompt else 0,
+        "actual_user_turn_count": len(output_turns),
+        "turns": output_turns,
+        "generation": generation,
+    }
 
 
 def repair_output_histories(
     histories: list[dict[str, Any]],
     *,
     step2_by_uid: dict[str, dict[str, Any]],
+    action_pool: ActionRequestPool,
     seed: int,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     repaired_histories: list[dict[str, Any]] = []
@@ -1465,7 +1893,12 @@ def repair_output_histories(
             repaired_histories.append(history)
             all_warnings.append({"mac_task_uid": uid, "warning": "missing step2 task"})
             continue
-        repaired, warnings = repair_task_history(history, step2_task=step2_task, seed=seed)
+        repaired, warnings = repair_task_history(
+            history,
+            step2_task=step2_task,
+            action_pool=action_pool,
+            seed=seed,
+        )
         repaired_histories.append(repaired)
         if warnings:
             all_warnings.append({"mac_task_uid": uid, "warnings": warnings})
@@ -1520,8 +1953,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=13)
     parser.add_argument("--warmup-min", type=int, default=3)
     parser.add_argument("--warmup-max", type=int, default=4)
-    parser.add_argument("--carryover-min", type=int, default=1)
-    parser.add_argument("--carryover-max", type=int, default=5)
+    parser.add_argument("--carryover-min", type=int, default=DEFAULT_CARRYOVER_MIN)
+    parser.add_argument("--carryover-max", type=int, default=DEFAULT_CARRYOVER_MAX)
+    parser.add_argument("--carryover-mean", type=float, default=DEFAULT_CARRYOVER_MEAN)
+    parser.add_argument("--carryover-std", type=float, default=DEFAULT_CARRYOVER_STD)
+    parser.add_argument(
+        "--pool-source",
+        type=Path,
+        default=DEFAULT_POOL_SOURCE,
+        help="SOPBench domain task JSON directory used to build action request pools.",
+    )
+    parser.add_argument(
+        "--skip-carryover",
+        action="store_true",
+        help="Generate warmup + introduce turns only; defer carryover filler to a later pass.",
+    )
+    parser.add_argument(
+        "--carryover-only",
+        action="store_true",
+        help="Keep existing warmup/introduce turns and only (re)generate carryover blocks.",
+    )
+    parser.add_argument(
+        "--carryover-input",
+        type=Path,
+        default=None,
+        help="Existing step5 JSON to read when --carryover-only is set (defaults to --output).",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--allow-placeholder", action="store_true")
     parser.add_argument("--save-cache-every", type=int, default=10)
@@ -1578,10 +2035,106 @@ def merge_histories(existing: list[dict[str, Any]], updates: list[dict[str, Any]
 
 def main() -> int:
     args = parse_args()
+    if args.skip_carryover and args.carryover_only:
+        raise ValueError("Use only one of --skip-carryover or --carryover-only")
     load_env(args.env_file)
     resolve_llm_config(args)
 
+    action_pool = ActionRequestPool.from_sopbench_data(args.pool_source)
+    args.action_pool = action_pool
+
     step2_by_uid = index_step2_tasks(load_json(args.step2_input))
+
+    if args.carryover_only:
+        carryover_input = args.carryover_input or args.output
+        payload = load_json(carryover_input)
+        existing_histories = payload.get("task_histories") if isinstance(payload, dict) else None
+        if not isinstance(existing_histories, list):
+            raise ValueError(f"--carryover-only requires task_histories[] in {carryover_input}")
+        existing_by_uid = {
+            str(item.get("mac_task_uid")): item
+            for item in existing_histories
+            if isinstance(item, dict) and item.get("mac_task_uid")
+        }
+        delta_payload = load_json(args.delta_input)
+        delta_tasks = delta_payload.get("tasks") if isinstance(delta_payload, dict) else None
+        if not isinstance(delta_tasks, list):
+            raise ValueError("delta input must contain tasks[]")
+        only_task = {str(uid) for uid in args.only_task}
+        selected = selected_delta_tasks(
+            delta_tasks,
+            offset=args.offset,
+            limit=args.limit,
+            only_task=only_task,
+        )
+        jobs = [
+            TaskJob(
+                ordinal=index,
+                total=len(selected),
+                delta_task=delta_task,
+                step2_task=step2_by_uid[str(delta_task.get("mac_task_uid") or "")],
+            )
+            for index, delta_task in enumerate(selected, start=1)
+            if step2_by_uid.get(str(delta_task.get("mac_task_uid") or ""))
+            and existing_by_uid.get(str(delta_task.get("mac_task_uid") or ""))
+        ]
+        if not jobs:
+            raise ValueError("no tasks matched delta + step2 + carryover-input histories")
+
+        results: list[dict[str, Any]] = []
+        if args.workers <= 1:
+            for job in jobs:
+                existing = existing_by_uid[str(job.step2_task.get("mac_task_uid") or "")]
+                results.append(process_carryover_only(job, existing, args=args))
+        else:
+            with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                futures = [
+                    executor.submit(
+                        process_carryover_only,
+                        job,
+                        existing_by_uid[str(job.step2_task.get("mac_task_uid") or "")],
+                        args=args,
+                    )
+                    for job in jobs
+                ]
+                for future in as_completed(futures):
+                    results.append(future.result())
+
+        results.sort(key=lambda item: str(item.get("mac_task_uid") or ""))
+        histories = merge_histories(existing_histories, results)
+        payload = {
+            "schema_version": "MACConstructStep5SOPUserTurnsV2",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "sources": {
+                "delta": str(resolve_path(args.delta_input)),
+                "step2": str(resolve_path(args.step2_input)),
+                "carryover_input": str(resolve_path(carryover_input)),
+            },
+            "generation_config": {
+                "warmup": "existing",
+                "introduce": "existing",
+                "carryover": "heuristic_action_pool",
+                "carryover_range": [args.carryover_min, args.carryover_max],
+                "carryover_distribution": {
+                    "type": "truncated_normal",
+                    "mean": args.carryover_mean,
+                    "std": args.carryover_std,
+                },
+                "carryover_pool_source": str(resolve_path(args.pool_source)),
+                "carryover_pool_summary": action_pool.summary(),
+                "seed": args.seed,
+            },
+            "summary": summarize_histories(histories),
+            "task_histories": histories,
+        }
+        write_json(args.output, payload)
+        meta_path = resolve_path(args.output).with_suffix(resolve_path(args.output).suffix + ".meta.json")
+        write_json(meta_path, {"summary": payload["summary"], "tasks_output": str(resolve_path(args.output))})
+        print(
+            f"wrote carryover for {len(results)} task histor(ies) to {resolve_path(args.output)}; "
+            f"total_user_turns={payload['summary']['total_user_turns']}"
+        )
+        return 0
 
     if args.repair_output:
         payload = load_json(args.output)
@@ -1591,6 +2144,7 @@ def main() -> int:
         repaired_histories, report = repair_output_histories(
             histories,
             step2_by_uid=step2_by_uid,
+            action_pool=action_pool,
             seed=args.seed,
         )
         payload["task_histories"] = repaired_histories
@@ -1675,8 +2229,15 @@ def main() -> int:
             "warmup": "llm",
             "warmup_range": [args.warmup_min, args.warmup_max],
             "introduce": "llm",
-            "carryover": "heuristic",
+            "carryover": "skipped" if args.skip_carryover else "heuristic_action_pool",
             "carryover_range": [args.carryover_min, args.carryover_max],
+            "carryover_distribution": {
+                "type": "truncated_normal",
+                "mean": args.carryover_mean,
+                "std": args.carryover_std,
+            },
+            "carryover_pool_source": str(resolve_path(args.pool_source)),
+            "carryover_pool_summary": action_pool.summary(),
             "model": None if args.dry_run else args.model,
             "dry_run": args.dry_run,
             "seed": args.seed,

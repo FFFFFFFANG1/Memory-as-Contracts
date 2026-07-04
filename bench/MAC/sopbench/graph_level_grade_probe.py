@@ -290,14 +290,12 @@ def summarize_oracle(*, mode: OracleMode, per_task: list[dict[str, Any]], detail
         "scores": {
             "ACC": task_acc,
             "RSP": task_rsp,
-            "correct_follow_rate": graph_scores["correct_follow_rate"],
-            "wrong_follow_rate": graph_scores["wrong_follow_rate"],
+            "noise_follow_rate": graph_scores["noise_follow_rate"],
             "support": {
                 "constraint_count": graph_scores["constraint_count"],
                 "active_constraint_count": graph_scores["active_constraint_count"],
                 "history_constraint_count": graph_scores["history_constraint_count"],
-                "correctly_followed": graph_scores["correctly_followed"],
-                "wrongly_followed": graph_scores["wrongly_followed"],
+                "noise_followed": graph_scores["noise_followed"],
             },
         },
         "trace_buckets": dict(sorted(trace_buckets.items())),

@@ -12,16 +12,17 @@ MAIN_METRIC_ORDER = (
 )
 
 MAIN_METRIC_DESCRIPTIONS: dict[str, str] = {
-    "joint pass": "Task-level full success: SOPBench native success, or CCTU answer plus process constraints.",
+    "joint pass": "Task-level full success: answer pass and task-level active constraint pass.",
     "answer pass": (
         "SOPBench user-goal correctness (action_called_correctly), or CCTU final answer text match."
     ),
     "constraint pass": (
-        "Process only: CCTU satisfies every constraints_list rule over the full trajectory, "
-        "or all SOPBench process fields pass (no_tool_call_error, constraint_not_violated, "
-        "database_match, dirgraph_satisfied)."
+        "Task-level all-or-nothing active constraint success: CCTU constraints_list, "
+        "or SOPBench active user-goal graph_action constraints."
     ),
-    "constraint violation rate": "Lower is better: violated constraints divided by total constraints.",
+    "constraint violation rate": (
+        "Lower is better: violated active constraints divided by total active constraints."
+    ),
 }
 
 CCTU_LEGACY_METRIC_DESCRIPTIONS: dict[str, str] = {

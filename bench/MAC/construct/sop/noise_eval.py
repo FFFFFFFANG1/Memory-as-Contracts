@@ -137,6 +137,19 @@ def anchor_sopbench_task(step2_task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def patched_sopbench_task(
+    step2_task: dict[str, Any],
+    *,
+    user_goal_dep: Any,
+    directed_action_graph: dict[str, Any],
+) -> dict[str, Any]:
+    patched = anchor_sopbench_task(step2_task)
+    patched["constraints"] = copy.deepcopy(user_goal_dep)
+    patched["constraints_original"] = copy.deepcopy(user_goal_dep)
+    patched["directed_action_graph"] = copy.deepcopy(directed_action_graph)
+    return patched
+
+
 def cumulative_user_goal_graph(
     step2_task: dict[str, Any],
     action_deps: dict[str, Any],
@@ -271,6 +284,46 @@ def final_user_goal_graph(
         raise
 
 
+def replay_final_action_deps(sequence: list[dict[str, Any]]) -> dict[str, Any]:
+    action_deps: dict[str, Any] = {}
+    for step in sequence:
+        if not isinstance(step, dict):
+            continue
+        if str(step.get("kind") or "") == "anchor_alignment":
+            for action, dependency in (step.get("action_patches") or {}).items():
+                action_key = str(action or "").strip()
+                if action_key and dependency is not None:
+                    action_deps[action_key] = copy.deepcopy(dependency)
+            continue
+        action = str(step.get("action") or "").strip()
+        dependency = step.get("dependency")
+        if action and dependency is not None:
+            action_deps[action] = copy.deepcopy(dependency)
+    return action_deps
+
+
+def replay_final_state(
+    step2_task: dict[str, Any],
+    sequence: list[dict[str, Any]],
+) -> tuple[dict[str, Any], Any, dict[str, Any]]:
+    action_deps = replay_final_action_deps(sequence)
+    dep_full = build_patched_dep_full(step2_task, action_deps)
+    user_goal = str(step2_task.get("user_goal") or "").strip()
+    user_goal_dep = dep_full.get(user_goal)
+    if user_goal_dep is None:
+        raise ValueError(f"user_goal {user_goal} missing from final dep_full")
+    from temporal_noise import normalize_dep_tree  # noqa: WPS433
+
+    normalized_dep = normalize_dep_tree(user_goal_dep)
+    directed_graph = final_user_goal_graph(
+        step2_task,
+        user_goal_dep=normalized_dep,
+        dep_full=dep_full,
+        sequence=sequence,
+    )
+    return action_deps, normalized_dep, directed_graph
+
+
 def task_dep_params(step2_task: dict[str, Any]) -> dict[str, Any]:
     original = step2_task.get("original_sopbench") or {}
     params = copy.deepcopy(step2_task.get("constraint_parameters") or {})
@@ -363,11 +416,17 @@ def collect_eval_units(
     for step in sequence:
         if not isinstance(step, dict):
             continue
-        mutated_action = str(step.get("action") or "").strip()
-        dependency = step.get("dependency")
         order = int(step.get("sequence_order") or 0)
-        if mutated_action and dependency is not None:
-            action_deps[mutated_action] = copy.deepcopy(dependency)
+        if str(step.get("kind") or "") == "anchor_alignment":
+            for action, dependency in (step.get("action_patches") or {}).items():
+                action_key = str(action or "").strip()
+                if action_key and dependency is not None:
+                    action_deps[action_key] = copy.deepcopy(dependency)
+        else:
+            mutated_action = str(step.get("action") or "").strip()
+            dependency = step.get("dependency")
+            if mutated_action and dependency is not None:
+                action_deps[mutated_action] = copy.deepcopy(dependency)
         record_dep_state(order, user_goal_dependency(step2_task, action_deps))
         record_graph_state(
             order,
@@ -763,13 +822,10 @@ def contract_metrics(details: list[dict[str, Any]]) -> dict[str, Any]:
     active_constraint_count = active_followed + active_missed
     history_constraint_count = history_followed + history_ignored
     constraint_count = active_constraint_count + history_constraint_count
-    correctly_followed = active_followed + history_ignored
-    wrongly_followed = active_missed + history_followed
+    noise_followed = history_followed
     return {
-        "correct_follow_rate": correctly_followed / constraint_count if constraint_count else None,
-        "wrong_follow_rate": wrongly_followed / constraint_count if constraint_count else None,
-        "correctly_followed": correctly_followed,
-        "wrongly_followed": wrongly_followed,
+        "noise_follow_rate": noise_followed / history_constraint_count if history_constraint_count else None,
+        "noise_followed": noise_followed,
         "active_constraint_count": active_constraint_count,
         "history_constraint_count": history_constraint_count,
         "constraint_count": constraint_count,
@@ -791,35 +847,28 @@ def follow_outcome(anchor_matched: bool, history_matched: bool) -> str:
 
 
 def follow_taxonomy_metrics(details: list[dict[str, Any]]) -> dict[str, Any]:
-    counts = Counter(str(row.get("follow_outcome") or row.get("outcome")) for row in details)
-    correct = counts["correct_follow"]
-    wrong = counts["wrong_follow"]
-    neither = counts["neither_followed"]
+    per_unit = any(
+        str(row.get("outcome") or "")
+        in {"anchor_followed", "anchor_missed", "noise_followed", "noise_ignored"}
+        for row in details
+    )
+    if per_unit:
+        unit_metrics = contract_metrics(details)
+        noise_followed = unit_metrics["noise_followed"]
+        history_count = unit_metrics["history_constraint_count"]
+        active_count = unit_metrics["active_constraint_count"]
+    else:
+        noise_followed = sum(int(row.get("history_hit_count") or 0) for row in details)
+        history_count = sum(int(row.get("history_constraint_count") or 0) for row in details)
+        active_count = sum(int(row.get("active_constraint_count") or 0) for row in details)
 
-    # Backwards-compatible fallback for legacy per-unit rows.
-    if not (correct or wrong or neither):
-        correct = counts["anchor_followed"] + counts["noise_ignored"]
-        wrong = counts["anchor_missed"] + counts["noise_followed"]
-
-    total = correct + wrong + neither
-    active_count = sum(int(row.get("active_constraint_count") or 0) for row in details)
-    history_count = sum(int(row.get("history_constraint_count") or 0) for row in details)
     return {
-        "correct_follow_rate": correct / total if total else None,
-        "wrong_follow_rate": wrong / total if total else None,
-        "neither_follow_rate": neither / total if total else None,
-        "correctly_followed": correct,
-        "wrongly_followed": wrong,
-        "neither_followed": neither,
-        "comparison_count": total,
+        "noise_follow_rate": noise_followed / history_count if history_count else None,
+        "noise_followed": noise_followed,
+        "comparison_count": len(details),
         "active_constraint_count": active_count,
         "history_constraint_count": history_count,
         "constraint_count": active_count + history_count,
-        "outcome_counts": {
-            "correct_follow": correct,
-            "wrong_follow": wrong,
-            "neither_followed": neither,
-        },
     }
 
 

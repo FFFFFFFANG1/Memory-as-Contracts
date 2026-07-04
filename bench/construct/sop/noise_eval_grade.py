@@ -250,18 +250,14 @@ def build_contract_diagnostics(details: list[dict[str, Any]]) -> dict[str, Any]:
     contract = follow_taxonomy_metrics(details)
     return {
         "constraint_follow_scores": {
-            "correct_follow_rate": contract["correct_follow_rate"],
-            "wrong_follow_rate": contract["wrong_follow_rate"],
-            "neither_follow_rate": contract["neither_follow_rate"],
+            "noise_follow_rate": contract["noise_follow_rate"],
         },
         "support": {
             "comparison_count": contract["comparison_count"],
             "constraint_count": contract["constraint_count"],
             "active_constraint_count": contract["active_constraint_count"],
             "history_constraint_count": contract["history_constraint_count"],
-            "correctly_followed": contract["correctly_followed"],
-            "wrongly_followed": contract["wrongly_followed"],
-            "neither_followed": contract["neither_followed"],
+            "noise_followed": contract["noise_followed"],
         },
     }
 
@@ -286,6 +282,32 @@ def apply_native_process_constraint_scores(
         score["joint pass"] = joint_pass
 
 
+def apply_active_constraint_scores(
+    task_scores: dict[str, Any],
+    *,
+    details_by_task: dict[str, list[dict[str, Any]]],
+) -> None:
+    """Set main process metrics from active user-goal graph-action constraints."""
+    for task_uid, score in task_scores.items():
+        rows = details_by_task.get(task_uid, [])
+        row_contract = contract_metrics(rows)
+        row_outcome = row_contract["outcome_counts"]
+        active_total = row_contract["active_constraint_count"]
+        active_missed = row_outcome["active_missed"]
+        active_followed = row_outcome["active_followed"]
+        constraint_pass = active_missed == 0
+        answer_pass = score.get("answer pass")
+        score["constraint pass"] = constraint_pass
+        score["constraint_satisfied"] = active_followed
+        score["constraint_total"] = active_total
+        score["constraint violation rate"] = active_missed / active_total if active_total else 0.0
+        score["joint pass"] = (
+            bool(answer_pass and constraint_pass)
+            if answer_pass is not None
+            else None
+        )
+
+
 def with_task_scores(contract: dict[str, Any], task_scores: dict[str, Any]) -> dict[str, Any]:
     answer_values = [
         row.get("answer pass") for row in task_scores.values() if row.get("answer pass") is not None
@@ -307,8 +329,9 @@ def with_task_scores(contract: dict[str, Any], task_scores: dict[str, Any]) -> d
             else None
         ),
         "constraint violation rate": (
-            contract["wrongly_followed"] / contract["constraint_count"]
-            if contract["constraint_count"]
+            contract["outcome_counts"]["active_missed"]
+            / contract["active_constraint_count"]
+            if contract["active_constraint_count"]
             else 0.0
         ),
     }
@@ -504,7 +527,6 @@ def main() -> int:
             )
 
     tool_call_details = [row for row in details if row.get("unit_source") == "graph_action"]
-    apply_native_process_constraint_scores(task_scores, task_evals=task_evals)
     contract = contract_metrics(tool_call_details)
     all_unit_contract = contract_metrics(details)
     tool_behavior_summary = {
@@ -575,13 +597,7 @@ def main() -> int:
     details_by_task: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in tool_call_details:
         details_by_task[str(row.get("task_uid") or "")].append(row)
-    for task_uid, rows in details_by_task.items():
-        row_contract = contract_metrics(rows)
-        task_scores.setdefault(task_uid, {})["constraint violation rate"] = (
-            row_contract["wrongly_followed"] / row_contract["constraint_count"]
-            if row_contract["constraint_count"]
-            else 0.0
-        )
+    apply_active_constraint_scores(task_scores, details_by_task=details_by_task)
     main_scores = with_task_scores(contract, task_scores)
     payload = build_grade_document(
         scores=format_main_scores(main_scores),
@@ -594,11 +610,9 @@ def main() -> int:
         dry_run_empty=args.dry_run_empty,
         contract_metric_scope="graph_action_tool_call_evidence",
         contract_metric_scope_note=(
-            "SOP contract-follow metrics use graph-level task comparisons. correct_follow "
-            "means the final anchor graph and user-goal outcome matched; wrong_follow means "
-            "the anchor did not match but an obsolete history graph did; neither_followed "
-            "means neither matched. Flat graph_action units remain in diagnostic_scores, "
-            "tool_behavior_breakdown, and constraint violation rate."
+            "SOP main process metrics use active graph_action user-goal constraints only. "
+            "SOP contract-follow metrics report noise_follow_rate = obsolete/history "
+            "constraints followed divided by total obsolete/history constraints."
         ),
         run_header={
             "run_id": header.get("run_id"),

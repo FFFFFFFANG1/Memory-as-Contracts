@@ -2169,11 +2169,33 @@ def rulebase_action_temporal_sequence(
     return ordered, warnings, validation
 
 
+STRUCTURAL_MUTATION_KINDS = frozenset(
+    {
+        "add_and",
+        "add_or",
+        "delete_child",
+        "flip_logic",
+        "swap",
+        "unwrap",
+        "rewire",
+        "rollback",
+        "reinstate",
+    }
+)
+
+
+def mutation_is_structural(mutation: DependencyMutation) -> bool:
+    kind = str(mutation.label or "").split(":", 1)[0]
+    return kind in STRUCTURAL_MUTATION_KINDS
+
+
 def rulebase_action_temporal_sequence_sequential(
     job: ActionJob,
     *,
     task_existing_noisy: list[dict[str, Any]] | None = None,
     max_attempts: int = DEFAULT_RULEBASE_MAX_ATTEMPTS,
+    require_first_step_graph_ne_anchor: bool = False,
+    prioritize_structural_mutations: bool = False,
 ) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     """Build a sequential noise chain g0=anchor, g1=mut(g0), g2=mut(g1), ..."""
     warnings: list[str] = []
@@ -2237,7 +2259,14 @@ def rulebase_action_temporal_sequence_sequential(
             )
             break
         rng = random.Random(job.task_seed + len(accepted) * 9973)
-        rng.shuffle(mutations)
+        if prioritize_structural_mutations:
+            structural = [item for item in mutations if mutation_is_structural(item)]
+            non_structural = [item for item in mutations if not mutation_is_structural(item)]
+            rng.shuffle(structural)
+            rng.shuffle(non_structural)
+            mutations = structural + non_structural
+        else:
+            rng.shuffle(mutations)
         step_accepted = False
 
         for mutation in mutations:
@@ -2299,6 +2328,16 @@ def rulebase_action_temporal_sequence_sequential(
                 validation["rejected"] += 1
                 validation["reject_reasons"].append(
                     f"attempt {attempts}: {mutation.label}: compiled graph unchanged from previous step"
+                )
+                continue
+            if (
+                require_first_step_graph_ne_anchor
+                and not accepted
+                and compiled_graph_sig == anchor_graph_sig
+            ):
+                validation["rejected"] += 1
+                validation["reject_reasons"].append(
+                    f"attempt {attempts}: {mutation.label}: first step must change graph away from anchor"
                 )
                 continue
 
