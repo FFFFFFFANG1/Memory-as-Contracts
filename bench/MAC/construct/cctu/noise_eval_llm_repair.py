@@ -20,11 +20,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from bench.construct.cctu.noise_eval_generation import (  # noqa: E402
+from bench.MAC.construct.cctu.noise_eval_generation import (  # noqa: E402
     SYSTEM_PROMPT,
     call_llm,
     load_env,
@@ -38,10 +38,10 @@ from bench.construct.cctu.noise_eval_generation import (  # noqa: E402
     tool_names_for_task,
     verify_package,
 )
-from bench.construct.cctu.noise_eval_repair import (  # noqa: E402
+from bench.MAC.construct.cctu.noise_eval_repair import (  # noqa: E402
     build_python_from_structured,
 )
-from bench.construct.cctu.noise_eval_verify import (  # noqa: E402
+from bench.MAC.construct.cctu.noise_eval_verify import (  # noqa: E402
     VerifyJob,
     code_path_for_artifact,
     iter_artifact_paths,
@@ -52,10 +52,10 @@ from bench.construct.cctu.noise_eval_verify import (  # noqa: E402
 DEFAULT_ARTIFACT_DIR = Path("bench/MAC/cctu/data/noise_check_code")
 DEFAULT_TASKS = Path("bench/MAC/cctu/data/mac-cctu-tasks.json")
 DEFAULT_ENV_FILE = Path("bench/.env")
-DEFAULT_MANUAL_QUEUE = Path("bench/cctu/mid_data/eval_step5_10_noise_eval_manual_queue.json")
-DEFAULT_CACHE = Path("bench/cctu/mid_data/noise_eval_llm_repair_cache.json")
-DEFAULT_OUTPUT = Path("bench/cctu/mid_data/eval_step5_11_noise_eval_llm_repair.json")
-DEFAULT_VERIFY_OUTPUT = Path("bench/cctu/mid_data/eval_step5_5_noise_eval_verify_post_llm.json")
+DEFAULT_MANUAL_QUEUE = Path("bench/MAC/cctu/mid_data/eval_step5_10_noise_eval_manual_queue.json")
+DEFAULT_CACHE = Path("bench/MAC/cctu/mid_data/noise_eval_llm_repair_cache.json")
+DEFAULT_OUTPUT = Path("bench/MAC/cctu/mid_data/eval_step5_11_noise_eval_llm_repair.json")
+DEFAULT_VERIFY_OUTPUT = Path("bench/MAC/cctu/mid_data/eval_step5_5_noise_eval_verify_post_llm.json")
 
 FLAG_GUIDE: dict[str, str] = {
     "coverage_missing:tool_count": "Check tool call counts via trace['tool_calls'] when the constraint requires it.",

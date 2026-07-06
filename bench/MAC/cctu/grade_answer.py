@@ -409,7 +409,7 @@ def output_path(
 
 
 def main() -> None:
-    from bench.construct.cctu.noise_eval_grade import main as grade_main
+    from bench.MAC.construct.cctu.noise_eval_grade import main as grade_main
 
     raise SystemExit(grade_main())
 
