@@ -41,6 +41,7 @@ from bench.MAC.agent.loop.llm_tools import (
 )
 from bench.MAC.agent.loop.runner import ClarificationPolicy, run_agent_loop
 from bench.MAC.agent.loop.tools import HeuristicToolExecutor
+from bench.MAC.agent.loop.openclaw_tools import OpenClawToolExecutor
 from bench.MAC.agent.memory import MemoryRequest, available_memory_systems, get_memory_provider
 from bench.MAC.agent.memory.bm25 import BM25Config, BM25MemoryProvider
 from bench.MAC.agent.memory.embedding import (
@@ -64,6 +65,12 @@ from bench.MAC.agent.memory.mem0 import (
     Mem0MemoryProvider,
 )
 from bench.MAC.agent.memory.rrf import RRFConfig, RRFMemoryProvider
+from bench.MAC.agent.memory.openclaw import (
+    OpenClawConfig,
+    OpenClawMemoryProvider,
+    openclaw_config_from_env,
+    openclaw_memory_tools,
+)
 from bench.MAC.scripts.run_paths import (
     bench_output_path,
     mac_graph_path,
@@ -363,6 +370,22 @@ def memory_provider_from_args(args: argparse.Namespace):
                 embedding_base_url=args.embedding_base_url,
             )
         )
+    if normalized == "openclaw":
+        embedding_config = EmbeddingConfig(
+            top_k=top_k,
+            max_chars=max_chars,
+            model=args.embedding_model,
+            cache_dir=args.embedding_cache_dir,
+            api_key_env=args.embedding_api_key_env,
+            base_url=args.embedding_base_url,
+        )
+        return OpenClawMemoryProvider(
+            OpenClawConfig(
+                top_k=top_k,
+                max_chars=max_chars,
+                embedding=embedding_config,
+            )
+        )
     return get_memory_provider(args.memory_system)
 
 
@@ -605,6 +628,27 @@ async def run_one_task(
                     state=mac_state,
                     inner=executor or HeuristicToolExecutor(agent=loop_input.agent),
                     ask_pass=ask_pass,
+                )
+        openclaw_state = None
+        if memory_result.system_name == "openclaw" and hasattr(memory_provider, "runtime_for_task"):
+            openclaw_state = memory_provider.runtime_for_task(loop_input.task_uid)
+            if openclaw_state is not None:
+                mem_request = memory_request_from_loop_input(loop_input, memory_llm)
+                executor = OpenClawToolExecutor(
+                    state=openclaw_state,
+                    provider=memory_provider,
+                    request=mem_request,
+                    inner=executor or HeuristicToolExecutor(agent=loop_input.agent),
+                    agent=loop_input.agent,
+                )
+                loop_input = loop_input.__class__(
+                    task_uid=loop_input.task_uid,
+                    agent=loop_input.agent,
+                    system_prompt=loop_input.system_prompt,
+                    tools=loop_input.tools + openclaw_memory_tools(),
+                    user_prompt=loop_input.user_prompt,
+                    past_user_turns=loop_input.past_user_turns,
+                    task=loop_input.task,
                 )
         clarification = None
         if args.bench == "sopbench" and args.sop_clarification_reply:

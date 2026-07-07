@@ -9,6 +9,7 @@ from bench.MAC.agent.memory.long_context import LongContextMemoryProvider
 from bench.MAC.agent.memory.mac import MACMemoryProvider
 from bench.MAC.agent.memory.mem0 import Mem0MemoryProvider
 from bench.MAC.agent.memory.no_memory import NoMemoryProvider
+from bench.MAC.agent.memory.openclaw import OpenClawMemoryProvider
 from bench.MAC.agent.memory.oracle import OracleMemoryProvider
 from bench.MAC.agent.memory.rrf import RRFMemoryProvider
 
@@ -29,11 +30,13 @@ def get_memory_provider(name: str) -> MemoryProvider:
         return MACMemoryProvider()
     if normalized == "mem0":
         return Mem0MemoryProvider()
+    if normalized == "openclaw":
+        return OpenClawMemoryProvider()
     if normalized == "oracle":
         return OracleMemoryProvider()
     raise ValueError(f"Unknown memory system: {name}")
 
 
 def available_memory_systems() -> list[str]:
-    return ["no_memory", "long_context", "bm25", "embedding", "rrf", "mac", "mem0", "oracle"]
+    return ["no_memory", "long_context", "bm25", "embedding", "rrf", "mac", "mem0", "openclaw", "oracle"]
 
