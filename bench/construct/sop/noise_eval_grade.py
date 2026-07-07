@@ -47,8 +47,8 @@ from bench.MAC.scripts.run_paths import bench_grade_path, make_run_unique_index 
 
 DEFAULT_MANIFEST = Path("bench/MAC/sopbench/data/mac-sopbench-noise_eval_specs.json")
 DEFAULT_OUTPUT = Path("bench/MAC/sopbench/results/eval_step6_noise_eval_grade.json")
-DEFAULT_STEP2 = Path("bench/MAC/sopbench/mid_data/eval_step2_anchors.json")
-DEFAULT_STEP4 = Path("bench/MAC/sopbench/mid_data/eval_step4_temporal_sequence_v3.json")
+DEFAULT_TASKS = Path("bench/MAC/sopbench/data/mac-sopbench-tasks.json")
+DEFAULT_TEMPORAL_SEQUENCES = Path("bench/MAC/sopbench/data/mac-sopbench-temporal_sequences.json")
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,8 +60,28 @@ def parse_args() -> argparse.Namespace:
         help="JSON output from bench/MAC/scripts/run_memory_eval.py",
     )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--step2", type=Path, default=DEFAULT_STEP2)
-    parser.add_argument("--step4", type=Path, default=DEFAULT_STEP4)
+    parser.add_argument(
+        "--tasks",
+        type=Path,
+        default=DEFAULT_TASKS,
+        help="Runtime anchor tasks export (replaces legacy --step2).",
+    )
+    parser.add_argument(
+        "--temporal-sequences",
+        type=Path,
+        default=DEFAULT_TEMPORAL_SEQUENCES,
+        help="Runtime temporal sequence export (replaces legacy --step4).",
+    )
+    parser.add_argument(
+        "--step2",
+        type=Path,
+        help="Legacy construction anchor file; overrides --tasks when set.",
+    )
+    parser.add_argument(
+        "--step4",
+        type=Path,
+        help="Legacy construction temporal sequence file; overrides --temporal-sequences when set.",
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--bench", choices=["sopbench"], default="sopbench")
@@ -160,6 +180,51 @@ def graph_key(graph: dict[str, Any]) -> str:
 
 def index_by_uid(items: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {str(item["mac_task_uid"]): item for item in items if item.get("mac_task_uid")}
+
+
+def load_anchor_tasks_by_uid(path: Path | None) -> dict[str, dict[str, Any]]:
+    if path is None or not path.exists():
+        return {}
+    payload = load_json(path)
+    if isinstance(payload, dict):
+        rows = payload.get("tasks") or []
+    elif isinstance(payload, list):
+        rows = payload
+    else:
+        return {}
+    if not isinstance(rows, list):
+        return {}
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        uid = str(row.get("mac_task_uid") or row.get("task_uid") or "")
+        if uid:
+            indexed[uid] = row
+    return indexed
+
+
+def load_temporal_sequences_by_uid(path: Path | None) -> dict[str, list[dict[str, Any]]]:
+    if path is None or not path.exists():
+        return {}
+    payload = load_json(path)
+    if isinstance(payload, dict):
+        rows = payload.get("tasks") or []
+    elif isinstance(payload, list):
+        rows = payload
+    else:
+        return {}
+    if not isinstance(rows, list):
+        return {}
+    indexed: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        uid = str(row.get("mac_task_uid") or row.get("task_uid") or "")
+        sequence = row.get("temporal_sequence")
+        if uid and isinstance(sequence, list):
+            indexed[uid] = [item for item in sequence if isinstance(item, dict)]
+    return indexed
 
 
 def collect_history_graphs(step2: dict[str, Any], sequence: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -530,10 +595,20 @@ def main() -> int:
     task_specs = manifest.get("task_specs") if isinstance(manifest, dict) else None
     if not isinstance(units, list) or not isinstance(task_specs, dict):
         raise ValueError("manifest must contain units list and task_specs object")
-    step2_by_uid = index_by_uid(load_json(args.step2))
-    step4_payload = load_json(args.step4)
-    step4_tasks = step4_payload.get("tasks") if isinstance(step4_payload, dict) else step4_payload
-    step4_by_uid = index_by_uid(step4_tasks) if isinstance(step4_tasks, list) else {}
+    anchor_by_uid = (
+        load_anchor_tasks_by_uid(args.step2)
+        if args.step2 is not None
+        else load_anchor_tasks_by_uid(args.tasks)
+    )
+    if args.step4 is not None:
+        step4_payload = load_json(args.step4)
+        step4_tasks = step4_payload.get("tasks") if isinstance(step4_payload, dict) else step4_payload
+        temporal_by_uid = {
+            uid: [item for item in (row.get("temporal_sequence") or []) if isinstance(item, dict)]
+            for uid, row in index_by_uid(step4_tasks if isinstance(step4_tasks, list) else []).items()
+        }
+    else:
+        temporal_by_uid = load_temporal_sequences_by_uid(args.temporal_sequences)
 
     header: dict[str, Any] = {}
     traces: dict[str, dict[str, Any]] = {}
@@ -601,12 +676,11 @@ def main() -> int:
                 str(action) for action in replay_cache.get("order_respecting_actions") or set()
             }
         user_goal = str(task_spec.get("user_goal") or "")
-        step2 = step2_by_uid.get(task_uid)
-        step4 = step4_by_uid.get(task_uid)
+        step2 = anchor_by_uid.get(task_uid)
+        sequence = temporal_by_uid.get(task_uid) or []
         history_graphs: list[dict[str, Any]] = []
         history_hits: list[dict[str, Any]] = []
-        if step2 and step4:
-            sequence = [item for item in (step4.get("temporal_sequence") or []) if isinstance(item, dict)]
+        if step2 and sequence:
             patched_task = copy.deepcopy(task_spec.get("patched_sopbench_task") or {})
             domain = str(task_spec.get("domain") or "")
             try:

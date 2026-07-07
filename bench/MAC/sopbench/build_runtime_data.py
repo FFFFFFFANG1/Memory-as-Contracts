@@ -18,6 +18,7 @@ from bench.MAC.shared.terminal_tools import append_send_message, send_message_to
 
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "bench" / "MAC" / "sopbench" / "data"
 DEFAULT_STEP2 = REPO_ROOT / "bench" / "MAC" / "sopbench" / "mid_data" / "eval_step2_anchors.json"
+DEFAULT_STEP4 = REPO_ROOT / "bench" / "MAC" / "sopbench" / "mid_data" / "eval_step4_temporal_sequence_v3.json"
 DEFAULT_STEP5_HISTORIES = REPO_ROOT / "bench" / "MAC" / "sopbench" / "mid_data" / "eval_step5_task_histories.json"
 DEFAULT_NOISE_MANIFEST = REPO_ROOT / "bench" / "MAC" / "sopbench" / "mid_data" / "eval_step5_noise_eval_specs.json"
 
@@ -25,12 +26,22 @@ MAC_SOPBENCH_TASKS_FILE = "mac-sopbench-tasks.json"
 MAC_SOPBENCH_USER_TURN_FILE = "mac-sopbench-user_turn.json"
 MAC_SOPBENCH_TOOL_REGISTRY_FILE = "mac-sopbench-tool_registry.json"
 MAC_SOPBENCH_NOISE_MANIFEST_FILE = "mac-sopbench-noise_eval_specs.json"
+MAC_SOPBENCH_TEMPORAL_SEQUENCES_FILE = "mac-sopbench-temporal_sequences.json"
+
+# Runtime contract-follow grading only replays action deps + fallback graphs.
+RUNTIME_TEMPORAL_STEP_FIELDS = (
+    "sequence_order",
+    "action",
+    "dependency",
+    "user_goal_action_graph",
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--step2", type=Path, default=DEFAULT_STEP2)
+    parser.add_argument("--step4", type=Path, default=DEFAULT_STEP4)
     parser.add_argument("--step5-histories", type=Path, default=DEFAULT_STEP5_HISTORIES)
     parser.add_argument("--noise-manifest", type=Path, default=DEFAULT_NOISE_MANIFEST)
     parser.add_argument("--limit", type=int, default=0, help="Maximum tasks to export; 0 means all.")
@@ -45,6 +56,27 @@ def load_json(path: Path) -> Any:
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def write_json_compact(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+
+
+def slim_temporal_step(step: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: copy.deepcopy(step[key])
+        for key in RUNTIME_TEMPORAL_STEP_FIELDS
+        if key in step
+    }
+
+
+def slim_temporal_sequence(sequence: list[Any]) -> list[dict[str, Any]]:
+    return [
+        slim_temporal_step(step)
+        for step in sequence
+        if isinstance(step, dict)
+    ]
 
 
 def index_by_uid(payload: Any, *, uid_key: str = "mac_task_uid") -> dict[str, dict[str, Any]]:
@@ -158,6 +190,9 @@ def build_history_record(history: dict[str, Any]) -> dict[str, Any]:
 def main() -> None:
     args = parse_args()
     step2_by_uid = index_by_uid(load_json(args.step2))
+    step4_payload = load_json(args.step4)
+    step4_rows = step4_payload.get("tasks") if isinstance(step4_payload, dict) else step4_payload
+    step4_by_uid = index_by_uid(step4_rows if isinstance(step4_rows, list) else [])
     histories_by_uid = index_by_uid(load_json(args.step5_histories))
     manifest = load_json(args.noise_manifest)
     task_specs = manifest.get("task_specs") if isinstance(manifest, dict) else {}
@@ -174,6 +209,7 @@ def main() -> None:
     tasks: list[dict[str, Any]] = []
     histories: list[dict[str, Any]] = []
     registry_tasks: list[dict[str, Any]] = []
+    temporal_sequences: list[dict[str, Any]] = []
     missing_histories: list[str] = []
     missing_specs: list[str] = []
 
@@ -203,6 +239,15 @@ def main() -> None:
                 "tools": mac_tools,
             }
         )
+        step4_task = step4_by_uid.get(uid)
+        if step4_task is not None:
+            temporal_sequences.append(
+                {
+                    "mac_task_uid": uid,
+                    "task_uid": uid,
+                    "temporal_sequence": slim_temporal_sequence(step4_task.get("temporal_sequence") or []),
+                }
+            )
 
     now = datetime.now(timezone.utc).isoformat()
     output_dir = args.output_dir
@@ -256,11 +301,33 @@ def main() -> None:
     manifest_copy = copy.deepcopy(manifest)
     manifest_copy["runtime_data_dir"] = str(output_dir)
     manifest_copy["generated_at"] = now
+    manifest_copy["runtime_sources"] = {
+        "tasks": str(output_dir / MAC_SOPBENCH_TASKS_FILE),
+        "user_turns": str(output_dir / MAC_SOPBENCH_USER_TURN_FILE),
+        "tool_registry": str(output_dir / MAC_SOPBENCH_TOOL_REGISTRY_FILE),
+        "temporal_sequences": str(output_dir / MAC_SOPBENCH_TEMPORAL_SEQUENCES_FILE),
+    }
     write_json(output_dir / MAC_SOPBENCH_NOISE_MANIFEST_FILE, manifest_copy)
+    write_json_compact(
+        output_dir / MAC_SOPBENCH_TEMPORAL_SEQUENCES_FILE,
+        {
+            "schema_version": "MACSOPBenchTemporalSequencesV1",
+            "generated_at": now,
+            "sources": {
+                "step4": str(args.step4),
+            },
+            "runtime_step_fields": list(RUNTIME_TEMPORAL_STEP_FIELDS),
+            "summary": {
+                "task_count": len(temporal_sequences),
+            },
+            "tasks": temporal_sequences,
+        },
+    )
 
     print(
         f"Wrote {len(tasks)} task(s), {len(histories)} histor(ies), "
-        f"{len(registry_tasks)} tool registry entries -> {output_dir}"
+        f"{len(registry_tasks)} tool registry entries, "
+        f"{len(temporal_sequences)} temporal sequence(s) -> {output_dir}"
     )
     if missing_histories:
         print(f"Missing histories for {len(missing_histories)} task(s).")

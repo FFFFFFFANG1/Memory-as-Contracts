@@ -1,6 +1,6 @@
 {
     "schema_version": "MACSOPBenchUserTurnV1",
-    "generated_at": "2026-07-03T15:28:35.890670+00:00",
+    "generated_at": "2026-07-07T11:45:41.118172+00:00",
     "sources": {
         "step5_histories": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/mid_data/eval_step5_task_histories.json"
     },

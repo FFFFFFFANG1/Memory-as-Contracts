@@ -129986,6 +129986,12 @@
             "last_seen_sequence_order": 20
         }
     ],
-    "generated_at": "2026-07-03T15:28:35.890670+00:00",
-    "runtime_data_dir": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/data"
+    "generated_at": "2026-07-07T11:45:41.118172+00:00",
+    "runtime_data_dir": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/data",
+    "runtime_sources": {
+        "tasks": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/data/mac-sopbench-tasks.json",
+        "user_turns": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/data/mac-sopbench-user_turn.json",
+        "tool_registry": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/data/mac-sopbench-tool_registry.json",
+        "temporal_sequences": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/data/mac-sopbench-temporal_sequences.json"
+    }
 }
