@@ -149,9 +149,7 @@ def grouped_main_scores(
         group_task_scores = {
             task_uid: task_scores[task_uid] for task_uid in task_uids if task_uid in task_scores
         }
-        score_groups[name] = format_main_scores(
-            with_task_scores(contract_metrics(rows), group_task_scores)
-        )
+        score_groups[name] = format_main_scores(with_task_scores(group_task_scores))
     return score_groups
 
 
@@ -246,6 +244,109 @@ def strict_history_graph_hit(
     )
 
 
+def dependency_map(graph: dict[str, Any]) -> dict[int, list[int]]:
+    """Map each node index to its prerequisite child indices (from -> dep)."""
+    deps: dict[int, list[int]] = defaultdict(list)
+    for edge in graph.get("connections") or []:
+        if not isinstance(edge, (list, tuple)) or len(edge) < 2:
+            continue
+        deps[int(edge[0])].append(int(edge[1]))
+    return deps
+
+
+def user_goal_node_index(graph: dict[str, Any], user_goal: str) -> int:
+    for index, node in enumerate(graph.get("nodes") or []):
+        if isinstance(node, (list, tuple)) and node and str(node[0]) == user_goal:
+            return index
+    return 0
+
+
+def _score_process_node(
+    *,
+    nodes: list[Any],
+    deps: dict[int, list[int]],
+    node_index: int,
+    order_respecting_actions: set[str],
+) -> tuple[int, int]:
+    node = nodes[node_index]
+    if isinstance(node, (list, tuple)) and node:
+        action = str(node[0])
+        matched = 1 if action in order_respecting_actions else 0
+        return matched, 1
+
+    logic = str(node).lower()
+    child_indices = deps.get(node_index, [])
+    if not child_indices:
+        return 0, 0
+
+    child_scores = [
+        _score_process_node(
+            nodes=nodes,
+            deps=deps,
+            node_index=child_index,
+            order_respecting_actions=order_respecting_actions,
+        )
+        for child_index in child_indices
+    ]
+    if logic in {"or", "gate"}:
+        return max(
+            child_scores,
+            key=lambda pair: (pair[0] / pair[1] if pair[1] else 0.0, pair[0]),
+        )
+    matched = sum(pair[0] for pair in child_scores)
+    total = sum(pair[1] for pair in child_scores)
+    return matched, total
+
+
+def score_branch_aware_active_process(
+    *,
+    graph: dict[str, Any],
+    order_respecting_actions: set[str],
+    user_goal: str,
+) -> dict[str, Any]:
+    """Branch-aware active user-goal process support for one task."""
+    nodes = graph.get("nodes") or []
+    if not nodes:
+        return {
+            "constraint pass": True,
+            "constraint_satisfied": 0,
+            "constraint_total": 0,
+            "constraint violation rate": 0.0,
+        }
+
+    deps = dependency_map(graph)
+    root_index = user_goal_node_index(graph, user_goal)
+    root_children = deps.get(root_index, [])
+    if not root_children:
+        return {
+            "constraint pass": True,
+            "constraint_satisfied": 0,
+            "constraint_total": 0,
+            "constraint violation rate": 0.0,
+        }
+
+    matched = 0
+    total = 0
+    for child_index in root_children:
+        child_matched, child_total = _score_process_node(
+            nodes=nodes,
+            deps=deps,
+            node_index=child_index,
+            order_respecting_actions=order_respecting_actions,
+        )
+        matched += child_matched
+        total += child_total
+
+    constraint_pass = matched == total
+    violation_rate = (1.0 - matched / total) if total else 0.0
+    return {
+        "constraint pass": constraint_pass,
+        "constraint_satisfied": matched,
+        "constraint_total": total,
+        "constraint violation rate": violation_rate,
+    }
+
+
 def build_contract_diagnostics(details: list[dict[str, Any]]) -> dict[str, Any]:
     contract = follow_taxonomy_metrics(details)
     return {
@@ -282,12 +383,57 @@ def apply_native_process_constraint_scores(
         score["joint pass"] = joint_pass
 
 
+def apply_branch_aware_process_scores(
+    task_scores: dict[str, Any],
+    *,
+    task_specs: dict[str, dict[str, Any]],
+    replay_by_task: dict[str, dict[str, Any] | None],
+    task_evals: dict[str, dict[str, Any]] | None = None,
+) -> None:
+    """Set main process metrics from branch-aware active user-goal directed graphs."""
+    task_evals = task_evals or {}
+    for task_uid, score in task_scores.items():
+        task_spec = task_specs.get(task_uid) or {}
+        patched = task_spec.get("patched_sopbench_task") if isinstance(task_spec.get("patched_sopbench_task"), dict) else {}
+        graph = patched.get("directed_action_graph") if isinstance(patched.get("directed_action_graph"), dict) else {}
+        replay = replay_by_task.get(task_uid) or {}
+        order_respecting_actions = {
+            str(action)
+            for action in (replay.get("order_respecting_actions") or set())
+        }
+        user_goal = str(task_spec.get("user_goal") or patched.get("user_goal") or "")
+        process = score_branch_aware_active_process(
+            graph=graph,
+            order_respecting_actions=order_respecting_actions,
+            user_goal=user_goal,
+        )
+        native_process_pass = task_process_constraint_pass(task_evals.get(task_uid) or {})
+        constraint_pass = (
+            native_process_pass
+            if native_process_pass is not None
+            else process["constraint pass"]
+        )
+        if constraint_pass:
+            process["constraint_satisfied"] = process["constraint_total"]
+            process["constraint violation rate"] = 0.0
+        answer_pass = score.get("answer pass")
+        score["constraint pass"] = constraint_pass
+        score["constraint_satisfied"] = process["constraint_satisfied"]
+        score["constraint_total"] = process["constraint_total"]
+        score["constraint violation rate"] = process["constraint violation rate"]
+        score["joint pass"] = (
+            bool(answer_pass and constraint_pass)
+            if answer_pass is not None
+            else None
+        )
+
+
 def apply_active_constraint_scores(
     task_scores: dict[str, Any],
     *,
     details_by_task: dict[str, list[dict[str, Any]]],
 ) -> None:
-    """Set main process metrics from active user-goal graph-action constraints."""
+    """Set flat graph_action diagnostic process metrics (not main headline scoring)."""
     for task_uid, score in task_scores.items():
         rows = details_by_task.get(task_uid, [])
         row_contract = contract_metrics(rows)
@@ -308,7 +454,7 @@ def apply_active_constraint_scores(
         )
 
 
-def with_task_scores(contract: dict[str, Any], task_scores: dict[str, Any]) -> dict[str, Any]:
+def with_task_scores(task_scores: dict[str, Any]) -> dict[str, Any]:
     answer_values = [
         row.get("answer pass") for row in task_scores.values() if row.get("answer pass") is not None
     ]
@@ -318,6 +464,8 @@ def with_task_scores(contract: dict[str, Any], task_scores: dict[str, Any]) -> d
         if row.get("constraint pass") is not None
     ]
     joint_values = [row.get("joint pass") for row in task_scores.values() if row.get("joint pass") is not None]
+    matched_steps = sum(int(row.get("constraint_satisfied") or 0) for row in task_scores.values())
+    total_steps = sum(int(row.get("constraint_total") or 0) for row in task_scores.values())
     return {
         "joint pass": (sum(1 for value in joint_values if value) / len(joint_values)) if joint_values else None,
         "answer pass": (
@@ -329,12 +477,23 @@ def with_task_scores(contract: dict[str, Any], task_scores: dict[str, Any]) -> d
             else None
         ),
         "constraint violation rate": (
-            contract["outcome_counts"]["active_missed"]
-            / contract["active_constraint_count"]
-            if contract["active_constraint_count"]
-            else 0.0
+            (1.0 - matched_steps / total_steps) if total_steps else 0.0
         ),
     }
+
+
+def with_flat_unit_diagnostic_scores(
+    contract: dict[str, Any],
+    task_scores: dict[str, Any],
+) -> dict[str, Any]:
+    """Diagnostic headline row mixing task answer/constraint pass with flat unit CVR."""
+    scores = with_task_scores(task_scores)
+    scores["constraint violation rate"] = (
+        contract["outcome_counts"]["active_missed"] / contract["active_constraint_count"]
+        if contract["active_constraint_count"]
+        else 0.0
+    )
+    return scores
 
 
 def tool_unit_breakdown(tool_call_details: list[dict[str, Any]]) -> dict[str, Any]:
@@ -395,6 +554,7 @@ def main() -> int:
     details: list[dict[str, Any]] = []
     task_scores: dict[str, Any] = {}
     task_evals: dict[str, dict[str, Any]] = {}
+    replay_by_task: dict[str, dict[str, Any] | None] = {}
     tool_behavior_by_task: dict[str, Any] = {}
     contract_follow_details: list[dict[str, Any]] = []
     missing_tasks = 0
@@ -412,6 +572,7 @@ def main() -> int:
         task_eval = evaluate_task(task_spec=task_spec, trace=trace)
         replay_cache = task_eval.pop("_replay", None)
         task_evals[task_uid] = task_eval
+        replay_by_task[task_uid] = replay_cache
         answer_pass = task_answer_pass(task_eval)
         success = task_acc(task_eval)
         task_scores[task_uid] = {
@@ -527,7 +688,6 @@ def main() -> int:
             )
 
     tool_call_details = [row for row in details if row.get("unit_source") == "graph_action"]
-    contract = contract_metrics(tool_call_details)
     all_unit_contract = contract_metrics(details)
     tool_behavior_summary = {
         "unit_breakdown": tool_unit_breakdown(tool_call_details),
@@ -594,11 +754,14 @@ def main() -> int:
             task_breakdown["tasks_with_no_successful_actions"] / task_total if task_total else None
         ),
     }
-    details_by_task: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in tool_call_details:
-        details_by_task[str(row.get("task_uid") or "")].append(row)
-    apply_active_constraint_scores(task_scores, details_by_task=details_by_task)
-    main_scores = with_task_scores(contract, task_scores)
+
+    apply_branch_aware_process_scores(
+        task_scores,
+        task_specs=task_specs,
+        replay_by_task=replay_by_task,
+        task_evals=task_evals,
+    )
+    main_scores = with_task_scores(task_scores)
     payload = build_grade_document(
         scores=format_main_scores(main_scores),
         schema_version="MACSOPNoiseEvalGradeV5",
@@ -608,11 +771,12 @@ def main() -> int:
         bench=args.bench,
         memory_system=infer_memory_system(args, header),
         dry_run_empty=args.dry_run_empty,
-        contract_metric_scope="graph_action_tool_call_evidence",
+        contract_metric_scope="branch_aware_active_process",
         contract_metric_scope_note=(
-            "SOP main process metrics use active graph_action user-goal constraints only. "
-            "SOP contract-follow metrics report noise_follow_rate = obsolete/history "
-            "constraints followed divided by total obsolete/history constraints."
+            "SOP main process metrics use branch-aware active user-goal directed "
+            "action graph scoring from order_respecting_actions. Flat graph_action "
+            "units remain in tool_behavior_breakdown for diagnostics and "
+            "noise_follow_rate."
         ),
         run_header={
             "run_id": header.get("run_id"),
@@ -623,7 +787,9 @@ def main() -> int:
         graded_tool_call_unit_count=len(tool_call_details),
         missing_task_unit_count=missing_tasks,
         diagnostic_scores={
-            "all_units": format_main_scores(with_task_scores(all_unit_contract, task_scores)),
+            "all_units": format_main_scores(
+                with_flat_unit_diagnostic_scores(all_unit_contract, task_scores)
+            ),
         },
         constraint_follow_analysis=build_contract_diagnostics(contract_follow_details),
         contract_diagnostics=build_contract_diagnostics(contract_follow_details),

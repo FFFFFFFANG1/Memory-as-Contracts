@@ -18,7 +18,7 @@ MAIN_METRIC_DESCRIPTIONS: dict[str, str] = {
     ),
     "constraint pass": (
         "Task-level all-or-nothing active constraint success: CCTU constraints_list, "
-        "or SOPBench active user-goal graph_action constraints."
+        "or SOPBench branch-aware active user-goal process scoring."
     ),
     "constraint violation rate": (
         "Lower is better: violated active constraints divided by total active constraints."

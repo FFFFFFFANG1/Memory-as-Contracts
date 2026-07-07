@@ -3,6 +3,7 @@ from __future__ import annotations
 from bench.MAC.construct.sop.noise_eval import contract_metrics, follow_taxonomy_metrics
 from bench.construct.sop.noise_eval_grade import (
     apply_active_constraint_scores,
+    with_flat_unit_diagnostic_scores,
     with_task_scores,
 )
 
@@ -58,19 +59,42 @@ def test_follow_taxonomy_noise_follow_rate_sums_history_units() -> None:
     assert metrics["noise_follow_rate"] == 0.5
 
 
-def test_sop_main_cvr_ignores_noise_followed() -> None:
+def test_sop_main_cvr_uses_branch_aware_task_support() -> None:
+    task_scores = {
+        "task-a": {
+            "answer pass": True,
+            "constraint pass": True,
+            "constraint_satisfied": 2,
+            "constraint_total": 2,
+            "joint pass": True,
+        },
+        "task-b": {
+            "answer pass": True,
+            "constraint pass": False,
+            "constraint_satisfied": 1,
+            "constraint_total": 2,
+            "joint pass": False,
+        },
+    }
+    metrics = with_task_scores(task_scores)
+
+    assert metrics["constraint pass"] == 0.5
+    assert metrics["constraint violation rate"] == 0.25
+
+
+def test_flat_unit_diagnostic_cvr_still_available() -> None:
     details = [
         {"outcome": "anchor_followed"},
         {"outcome": "anchor_missed"},
         {"outcome": "noise_followed"},
         {"outcome": "noise_ignored"},
     ]
-    metrics = with_task_scores(contract_metrics(details), {})
+    metrics = with_flat_unit_diagnostic_scores(contract_metrics(details), {})
 
     assert metrics["constraint violation rate"] == 0.5
 
 
-def test_sop_task_constraint_pass_uses_active_constraints_only() -> None:
+def test_flat_graph_action_helper_remains_for_diagnostics() -> None:
     task_scores = {
         "task-ok": {"answer pass": True},
         "task-bad": {"answer pass": True},
