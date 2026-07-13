@@ -13,7 +13,10 @@ from bench.MAC.construct.sop.noise_eval import (
     task_joint_pass,
     task_process_constraint_pass,
 )
-from bench.construct.sop.noise_eval_grade import apply_native_process_constraint_scores
+from bench.construct.sop.noise_eval_grade import (
+    apply_branch_aware_process_scores,
+    apply_native_process_constraint_scores,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = REPO_ROOT / "bench" / "MAC" / "sopbench" / "data" / "mac-sopbench-noise_eval_specs.json"
@@ -30,9 +33,20 @@ def _task_spec(task_uid: str) -> dict:
     return manifest["task_specs"][task_uid]
 
 
-def _apply_scores(task_uid: str, evaluation: dict) -> dict:
+def _apply_scores(task_uid: str, evaluation: dict, *, spec: dict | None = None) -> dict:
     task_scores = {task_uid: {"answer pass": task_answer_pass(evaluation)}}
     apply_native_process_constraint_scores(task_scores, task_evals={task_uid: evaluation})
+    return task_scores[task_uid]
+
+
+def _apply_branch_scores(task_uid: str, evaluation: dict, *, spec: dict, replay: dict) -> dict:
+    task_scores = {task_uid: {"answer pass": task_answer_pass(evaluation)}}
+    apply_branch_aware_process_scores(
+        task_scores,
+        task_specs={task_uid: spec},
+        replay_by_task={task_uid: replay},
+        task_evals={task_uid: evaluation},
+    )
     return task_scores[task_uid]
 
 
@@ -47,6 +61,35 @@ def test_empty_trace_answer_pass_is_outcome_only_and_joint_is_success() -> None:
     assert task_joint_pass(evaluation) is True
 
     score = _apply_scores("sopbench:hotel:modify_reservation:70", evaluation)
+
+    assert score["answer pass"] is True
+    assert score["constraint pass"] is True
+    assert score["joint pass"] is True
+
+
+def test_open_account_or_path_passes_branch_aware_process_constraint() -> None:
+    spec = _task_spec("sopbench:bank:open_account:2")
+    trace = {
+        "tool_calls": [
+            {
+                "name": "internal_check_username_exist",
+                "arguments": {"username": "alex_smith"},
+                "result": [True, False],
+            }
+        ],
+        "final_response": "Cannot open account.",
+        "trajectory": [],
+    }
+    evaluation = evaluate_task(task_spec=spec, trace=trace)
+    replay = evaluation.pop("_replay")
+
+    assert evaluation["dirgraph_satisfied"] is True
+    score = _apply_branch_scores(
+        "sopbench:bank:open_account:2",
+        evaluation,
+        spec=spec,
+        replay=replay,
+    )
 
     assert score["answer pass"] is True
     assert score["constraint pass"] is True

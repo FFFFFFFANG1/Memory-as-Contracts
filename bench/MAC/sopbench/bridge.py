@@ -21,6 +21,7 @@ MAC_SOPBENCH_TASKS_FILE = "mac-sopbench-tasks.json"
 MAC_SOPBENCH_USER_TURN_FILE = "mac-sopbench-user_turn.json"
 MAC_SOPBENCH_TOOL_REGISTRY_FILE = "mac-sopbench-tool_registry.json"
 MAC_SOPBENCH_NOISE_MANIFEST_FILE = "mac-sopbench-noise_eval_specs.json"
+MAC_SOPBENCH_TEMPORAL_SEQUENCES_FILE = "mac-sopbench-temporal_sequences.json"
 
 
 def sopbench_root() -> Path:
@@ -47,6 +48,10 @@ def mac_sopbench_tool_registry_path(data_dir: Path | None = None) -> Path:
 
 def mac_sopbench_noise_manifest_path(data_dir: Path | None = None) -> Path:
     return (data_dir or mac_sopbench_data_dir()) / MAC_SOPBENCH_NOISE_MANIFEST_FILE
+
+
+def mac_sopbench_temporal_sequences_path(data_dir: Path | None = None) -> Path:
+    return (data_dir or mac_sopbench_data_dir()) / MAC_SOPBENCH_TEMPORAL_SEQUENCES_FILE
 
 
 def load_json_file(path: Path) -> Any:

@@ -1,0 +1,29 @@
+{
+  "schema_version": "CCTUV2LLMBaselineCorrectedSummaryV1",
+  "model": "glm-5.2",
+  "condition_count": 160,
+  "episode_count": 40,
+  "bm25_top_k": 10,
+  "result_reconstruction": {
+    "unchanged_conditions": 156,
+    "corrected_episode": "pilot-029",
+    "corrected_conditions_rerun": 4,
+    "reason": "The initial generator compiled the source text 'At least 1' as a maximum rather than a minimum. Only pilot-029 used a lower-bound predicate. It was fixed and rerun for all three systems.",
+    "post_fix_result_path": "data/llm_pilot029_post_fix.json"
+  },
+  "systems": {
+    "oracle": {
+      "accuracy": 1.0,
+      "all_conditions_correct_episode_rate": 1.0
+    },
+    "bm25": {
+      "accuracy": 1.0,
+      "all_conditions_correct_episode_rate": 1.0
+    },
+    "long_context": {
+      "accuracy": 1.0,
+      "all_conditions_correct_episode_rate": 1.0
+    }
+  },
+  "interpretation": "The current pilot is structurally valid but too easy and too short to distinguish BM25 from full-history memory. Do not expand it unchanged."
+}

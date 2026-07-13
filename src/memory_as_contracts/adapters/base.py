@@ -566,4 +566,5 @@ def _receipt_summary(result: GateResult) -> dict[str, Any]:
         if result.decision.match_outcome is not None
         else None,
         "ask_id": result.receipt.ask_request_id,
+        "validator_verdicts": result.receipt.validator_verdicts,
     }

@@ -11,11 +11,13 @@ import importlib
 import json
 import re
 import sys
+import types
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from bench.MAC.shared.terminal_tools import append_send_message, ensure_terminal_tool_instruction, send_message_tool
+from bench.MAC.shared.terminal_tools import send_message_tool
+from bench.MAC.cctu.runtime_repairs import repaired_answer, repair_tool_codes, repair_tool_schemas
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MAC_CCTU_DIR = REPO_ROOT / "bench" / "MAC" / "cctu"
@@ -30,12 +32,32 @@ MAC_CCTU_TOOL_REGISTRY_FILE = "mac-cctu-tool_registry.json"
 CCTU_EVAL_TOOL_USE_INSTRUCTION = (
     "Please call given tools to answer the question. Please note that all your information "
     "must be obtained by calling tools and not by answering the question directly.\n"
-    "If the call fails, you need to try to correct it and continue until you arrive at an answer."
 )
+
+CCTU_EVIDENCE_STOPPING_POLICY = """# Evidence and Stopping Policy
+Use tools only when they can obtain missing evidence.
+After each tool result, decide whether the current evidence is sufficient to answer the user.
+
+If a tool result contains a successful suggested result, treat that suggestion as usable evidence.
+Do not retry solely because the original query was a miss.
+Retry only when a required fact is still missing or results conflict.
+
+Do not repeat a tool call with materially equivalent arguments after it has failed twice.
+
+If the required answer can be derived from collected evidence, immediately call send_message. You do not need to exhaust every possible tool.
+
+If evidence remains incomplete after a bounded number of attempts, call send_message with the best answer supported by collected tool evidence. Unless a task-specific instruction explicitly requires otherwise, do not keep searching after evidence stops improving."""
 
 CCTU_EVAL_USER_PREFIX_RE = re.compile(
     r"^(?:Please call given tools to answer the question\. Please note that all your information must be obtained by calling tools(?: and not by answering the question directly)?\.(?:\s*If the call fails, you need to try to correct it and continue until you arrive at an answer\.?)?\s*)+",
     re.IGNORECASE,
+)
+
+CCTU_LEGACY_STAGE_LABELS = (
+    "[THOUGHT]",
+    "[ACTION]",
+    "[REFLECTION]",
+    "[FINAL ANSWER]",
 )
 
 
@@ -46,7 +68,7 @@ def cctu_root() -> Path:
         REPO_ROOT / "CCTU",
     ]
     for candidate in candidates:
-        if (candidate / "evaluation.py").exists() and (candidate / "data" / "input_data.jsonl").exists():
+        if (candidate / "evaluation.py").exists() and (candidate / "check_code").exists():
             return candidate
     searched = ", ".join(str(path) for path in candidates)
     raise FileNotFoundError(f"Could not locate CCTU source tree; searched: {searched}")
@@ -57,6 +79,17 @@ def ensure_cctu_on_path() -> Path:
     root_text = str(root)
     if root_text not in sys.path:
         sys.path.insert(0, root_text)
+    utils_dir = root / "utils"
+    if utils_dir.exists():
+        loaded_utils = sys.modules.get("utils")
+        loaded_path = str(getattr(loaded_utils, "__file__", "") or "") if loaded_utils is not None else ""
+        loaded_paths = [str(path) for path in getattr(loaded_utils, "__path__", [])] if loaded_utils is not None else []
+        if loaded_utils is None or not (
+            loaded_path.startswith(root_text) or any(path.startswith(root_text) for path in loaded_paths)
+        ):
+            utils_pkg = types.ModuleType("utils")
+            utils_pkg.__path__ = [str(utils_dir)]  # type: ignore[attr-defined]
+            sys.modules["utils"] = utils_pkg
     return root
 
 
@@ -77,6 +110,8 @@ def cctu_validators_dir() -> Path:
 
 def load_cctu_samples(input_file: Path | None = None) -> list[dict[str, Any]]:
     path = input_file or (cctu_upstream_data_dir() / "input_data.jsonl")
+    if not path.exists():
+        return []
     with path.open("r", encoding="utf-8") as handle:
         return [json.loads(line) for line in handle if line.strip()]
 
@@ -114,6 +149,7 @@ def cctu_call_function(
     code: str,
     *,
     match_mode: str | None = None,
+    schema: dict[str, Any] | None = None,
 ) -> str:
     from bench.MAC.cctu.tool_match import cctu_call_function_with_match_mode
 
@@ -124,6 +160,7 @@ def cctu_call_function(
         code,
         match_mode=match_mode,
         call_function=call_function,
+        schema=schema,
     )
 
 
@@ -238,6 +275,24 @@ def ensure_cctu_eval_tool_use_instruction(system_prompt: str) -> str:
     return f"{prompt}\n\n{CCTU_EVAL_TOOL_USE_INSTRUCTION}"
 
 
+def ensure_cctu_evidence_stopping_policy(system_prompt: str) -> str:
+    """Append the CCTU runtime stopping policy exactly once."""
+    if "Use tools only when they can obtain missing evidence." in system_prompt:
+        return system_prompt
+    prompt = system_prompt.rstrip()
+    if not prompt:
+        return CCTU_EVIDENCE_STOPPING_POLICY
+    return f"{prompt}\n\n{CCTU_EVIDENCE_STOPPING_POLICY}"
+
+
+def strip_cctu_legacy_stage_labels(system_prompt: str) -> str:
+    """Remove CCTU's legacy textual stage labels from the MAC runtime prompt."""
+    prompt = system_prompt
+    for label in CCTU_LEGACY_STAGE_LABELS:
+        prompt = prompt.replace(label, "")
+    return prompt
+
+
 def _iter_task_user_messages(task: dict[str, Any]) -> list[str]:
     messages: list[str] = []
     for key in ("input", "original_input", "messages"):
@@ -285,8 +340,10 @@ def system_prompt_from_task_record(task: dict[str, Any], *, ensure_terminal_inst
     if not prompt:
         domain = task.get("domain_context")
         prompt = domain.strip() if isinstance(domain, str) else ""
+    prompt = strip_cctu_legacy_stage_labels(prompt)
     if task_uses_cctu_eval_tool_instruction(task):
         prompt = ensure_cctu_eval_tool_use_instruction(prompt)
+        prompt = ensure_cctu_evidence_stopping_policy(prompt)
     if ensure_terminal_instruction:
         prompt = ensure_terminal_tool_instruction(prompt)
     return prompt
@@ -378,6 +435,8 @@ def build_cctu_system_config(
         agent = str(task.get("agent_name") or cctu_agent_name(task.get("cctu_id") or cctu_id_from_task_uid(task_uid)))
         registry_entry = registry_by_uid.get(task_uid, {})
         tools_raw = registry_entry.get("tools", [])
+        if isinstance(tools_raw, list):
+            tools_raw = repair_tool_schemas(task_uid, tools_raw)
         tools = mac_tools_from_openai_schemas(tools_raw) if isinstance(tools_raw, list) else []
         system_prompt = system_prompt_from_task_record(
             task,
@@ -439,6 +498,11 @@ def build_cctu_eval_task(
     cctu_id = str(task_meta.get("cctu_id") or cctu_id_from_task_uid(task_uid))
     sample_lookup = samples_by_id if samples_by_id is not None else cctu_samples_by_id()
     sample = sample_lookup.get(cctu_id, {})
+    tools = copy.deepcopy(task_meta.get("tools", []))
+    if not isinstance(tools, list):
+        tools = []
+    tools = repair_tool_schemas(task_uid, tools)
+    codes = repair_tool_codes(task_uid, parse_cctu_codes(sample.get("codes")))
 
     return {
         "task_uid": task_uid,
@@ -449,10 +513,10 @@ def build_cctu_eval_task(
         "original_input": copy.deepcopy(task_meta.get("original_input", [])),
         "constraints": copy.deepcopy(task_meta.get("constraints", [])),
         "constraints_list": copy.deepcopy(task_meta.get("constraints_list", [])),
-        "answer": task_meta.get("answer") or sample.get("answer"),
+        "answer": repaired_answer(task_uid, task_meta.get("answer") or sample.get("answer")),
         "data_source": task_meta.get("data_source") or sample.get("data_source"),
-        "codes": parse_cctu_codes(sample.get("codes")),
-        "tools": copy.deepcopy(task_meta.get("tools", [])),
+        "codes": codes,
+        "tools": tools,
         "task_chain": {
             "turns": turns,
             "turn_count": len(turns),

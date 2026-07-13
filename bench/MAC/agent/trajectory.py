@@ -58,6 +58,18 @@ def _tool_result_payload(event: dict[str, Any]) -> Any:
     return runtime
 
 
+def _is_mac_rejected_tool_result(event: dict[str, Any]) -> bool:
+    payload = event.get("runtime")
+    if not isinstance(payload, dict):
+        payload = event.get("result")
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("ok") is not False:
+        return False
+    message = payload.get("message") or payload.get("error")
+    return isinstance(message, str) and message.startswith("[memory]")
+
+
 def build_raw_history(row: dict[str, Any]) -> dict[str, Any]:
     """Build the compact evaluator-facing trajectory from a MAC task result row."""
     final_response = row.get("final_answer")
@@ -72,6 +84,14 @@ def build_raw_history(row: dict[str, Any]) -> dict[str, Any]:
             "trajectory": trajectory,
         }
 
+    rejected_call_ids = {
+        str(event.get("tool_call_id"))
+        for event in events
+        if isinstance(event, dict)
+        and event.get("event") == "tool_result"
+        and event.get("tool_call_id")
+        and _is_mac_rejected_tool_result(event)
+    }
     for event in events:
         if not isinstance(event, dict):
             continue
@@ -93,14 +113,18 @@ def build_raw_history(row: dict[str, Any]) -> dict[str, Any]:
             "tool_calls": [],
         }
         for call in _event_tool_calls(event):
-            step["tool_calls"].append(call)
             call_id = call.get("id")
+            if isinstance(call_id, str) and call_id in rejected_call_ids:
+                continue
+            step["tool_calls"].append(call)
             if isinstance(call_id, str) and call_id:
                 calls_by_id[call_id] = call
         trajectory.append(step)
 
     for event in events:
         if not isinstance(event, dict) or event.get("event") != "tool_result":
+            continue
+        if str(event.get("tool_call_id") or "") in rejected_call_ids:
             continue
         call_id = event.get("tool_call_id")
         target = calls_by_id.get(call_id) if isinstance(call_id, str) else None

@@ -617,8 +617,8 @@ before label fixes:
 
 **Golden-answer patches applied**
 
-Nine tasks were patched in upstream CCTU data to keep the original gold while
-also accepting the tool-default / separately reported answer. The `answer`
+Ten tasks have MAC-side answer repairs that keep the original gold while also
+accepting the repaired / tool-default / separately reported answer. The `answer`
 field uses **` or `** (case-insensitive) between alternatives; `answer_verify`
 passes if **any** alternative matches. Within one alternative, `, ` still means
 **all** substrings must appear (existing CCTU multi-part answers such as
@@ -632,14 +632,15 @@ passes if **any** alternative matches. Within one alternative, `, ` still means
 | 135 | `30,002` | `30,002 or 2, 30,000` | Question asks for opera-half count **and** deportation count; constraint uses `###` separator, not a sum. |
 | 145 | `5` | `5 or 3, 2` | Question asks for laptop and smartphone brand counts **separately**; constraint requires `### Laptops:` / `### Smartphones:`. |
 | 113 | `The start of Billy Graham's Los Angeles Crusade` | `The start of Billy Graham's Los Angeles Crusade or Billy Graham` | Oracle answered with a correct comparative sentence using `LA Crusade`; substring gold required the full event name. |
+| 111 | `3` | `3 or 33` | The two retrieved dates differ by 33 years; the original gold is retained for backward-compatible grading. |
 | 137 | `6` | `6 or 8` | `anatomy_facts_provider` and `anatomical_info_provider` each return `4`; combined total from tools is 8. |
 | 159 | `no` | `no or false` | Yes/no question; oracle final used JSON `"comparison": false` instead of the literal string `no`. |
 | 191 | `no` | `no or false` | Same JSON-boolean encoding as id 159. |
 
 **Files touched**
 
-- `bench/CCTU/data/input_data.jsonl` — upstream `answer` fields for ids 101, 123, 113, 133, 135, 137, 145, 159, 191.
-- `bench/MAC/cctu/data/mac-cctu-tasks.json` — mirrored `cctu_sample.answer` for the same ids.
+- `bench/MAC/cctu/runtime_repairs.py` — authoritative MAC-side answer aliases.
+- `bench/MAC/cctu/data/mac-cctu-tasks.json` — materialized task-level answers used by the grader.
 - `bench/CCTU/utils/utils.py` — `answer_verify` supports ` or ` alternatives; date-token normalization for prose/ISO mismatches.
 - `tests/test_cctu_answer_verify_dates.py` — regression tests for date matching and OR gold strings.
 

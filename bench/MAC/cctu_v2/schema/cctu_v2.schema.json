@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://memory-use-contracts.local/cctu-v2.schema.json",
+  "title": "CCTU v2 Episode",
+  "type": "object",
+  "required": [
+    "episode_id",
+    "base_task_id",
+    "taxonomy_cell",
+    "current_context",
+    "worlds",
+    "trace_prefixes",
+    "candidate_action",
+    "gold_labels",
+    "rendered_history"
+  ],
+  "properties": {
+    "episode_id": {"type": "string", "minLength": 1},
+    "base_task_id": {"type": "string", "minLength": 1},
+    "source_constraint_uid": {"type": "string"},
+    "counterfactual_group_id": {"type": "string", "minLength": 1},
+    "taxonomy_cell": {
+      "enum": [
+        "static_action_local",
+        "dynamic_action_local",
+        "static_trajectory_conditioned",
+        "dynamic_trajectory_conditioned"
+      ]
+    },
+    "current_context": {
+      "type": "object",
+      "required": ["user", "project", "phase", "task"],
+      "properties": {
+        "user": {"type": "string"},
+        "project": {"type": "string"},
+        "phase": {"type": ["string", "null"]},
+        "task": {"type": "string"},
+        "resource": {"type": ["string", "null"]}
+      }
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["world_id", "directive_events"],
+        "properties": {
+          "world_id": {"type": "string"},
+          "directive_events": {"type": "array", "items": {"$ref": "#/$defs/event"}}
+        }
+      }
+    },
+    "trace_prefixes": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["prefix_id", "actions"],
+        "properties": {
+          "prefix_id": {"type": "string"},
+          "actions": {"type": "array", "items": {"type": "object"}}
+        }
+      }
+    },
+    "candidate_action": {"type": "object"},
+    "gold_labels": {"type": "object", "additionalProperties": {"type": "boolean"}},
+    "rendered_history": {"type": "array", "items": {"type": "object"}}
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "required": ["event_index", "event_type", "directive_id"],
+      "properties": {
+        "event_index": {"type": "integer", "minimum": 0},
+        "event_type": {
+          "enum": [
+            "introduce",
+            "amend",
+            "revoke",
+            "expire",
+            "supersede",
+            "reactivate",
+            "override",
+            "consume_exception"
+          ]
+        },
+        "directive_id": {"type": "string"},
+        "version": {"type": "integer", "minimum": 1},
+        "directive": {"type": "object"}
+      }
+    }
+  }
+}

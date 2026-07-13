@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import os
+import traceback
 from datetime import datetime, timezone
 
 try:
@@ -119,6 +120,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--turn-index", type=int, default=-1)
     parser.add_argument("--max-iterations", type=int, default=25)
+    parser.add_argument(
+        "--replay-reasoning-content",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Replay model reasoning fields into subsequent agent calls. Disabled by default: "
+            "raw traces retain reasoning for audit, while model context keeps visible "
+            "content, tool calls, and tool results."
+        ),
+    )
     parser.add_argument(
         "--sop-clarification-reply",
         action=argparse.BooleanOptionalAction,
@@ -234,6 +245,18 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Enable live validator LLM generation during MAC contract installation.",
     )
+    parser.add_argument(
+        "--mac-unified-ops-extraction",
+        action=argparse.BooleanOptionalAction,
+        default=os.getenv("MAC_UNIFIED_OPS_EXTRACTION", "").lower() in {"1", "true", "yes", "on"},
+        help="Use per-turn BM25 candidate retrieval plus LLM add/update/remove ops for MAC extraction.",
+    )
+    parser.add_argument(
+        "--mac-unified-ops-top-k",
+        type=int,
+        default=int(os.getenv("MAC_UNIFIED_OPS_TOP_K", "5")),
+        help="Candidate active constraints passed to unified ops extraction.",
+    )
     parser.add_argument("--mem0-user-id-prefix", default=os.getenv("MAC_MEM0_USER_ID_PREFIX", "mac-bench"))
     parser.add_argument(
         "--mem0-ingest-cache-dir",
@@ -247,10 +270,27 @@ def parse_args() -> argparse.Namespace:
         default=Path(os.getenv("MAC_MEM0_FAISS_DIR", str(DEFAULT_MEM0_FAISS_DIR))),
         help="Local FAISS index directory for Mem0 OSS.",
     )
-    parser.add_argument("--mem-llm-model", default=os.getenv("MEM_LLM_MODEL", ""))
-    parser.add_argument("--mem-api-key-env", default=os.getenv("MAC_MEM_API_KEY_ENV", "MEM_API_KEY"))
-    parser.add_argument("--mem-base-url", default=os.getenv("MEM_BASE_URL"))
+    parser.add_argument("--mem-llm-model", default=os.getenv("MEM_LLM_MODEL") or os.getenv("LLM_MODEL", ""))
+    parser.add_argument("--mem-api-key-env", default=os.getenv("MAC_MEM_API_KEY_ENV") or "LLM_API_KEY")
+    parser.add_argument("--mem-base-url", default=os.getenv("MEM_BASE_URL") or os.getenv("LLM_BASE_URL"))
     parser.add_argument("--mem-llm-max-tokens", type=int, default=int(os.getenv("MEM_LLM_MAX_TOKENS", "4096")))
+    parser.add_argument(
+        "--mac-extract-batch-size",
+        type=int,
+        default=int(os.getenv("MAC_EXTRACT_BATCH_SIZE", "1")),
+        help="User-turn batch size for MAC IR extraction. Clamped to 10.",
+    )
+    parser.add_argument(
+        "--mac-extract-max-worker",
+        type=int,
+        default=int(os.getenv("MAC_EXTRACT_MAX_WORKER", "8")),
+        help="Maximum parallel MAC IR extraction batches. Clamped to 8.",
+    )
+    parser.add_argument(
+        "--mem-llm-timeout-seconds",
+        type=float,
+        default=float(os.getenv("MEM_LLM_TIMEOUT_SECONDS", "120")),
+    )
     parser.add_argument("--mem0-infer", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--mem0-rerank", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--mem0-threshold", type=float)
@@ -341,6 +381,11 @@ def memory_provider_from_args(args: argparse.Namespace):
                 mem_api_key_env=args.mem_api_key_env,
                 mem_base_url=args.mem_base_url,
                 mem_llm_max_tokens=max(1, args.mem_llm_max_tokens),
+                mem_llm_timeout_seconds=max(1.0, args.mem_llm_timeout_seconds),
+                extract_batch_size=max(1, min(10, args.mac_extract_batch_size)),
+                extract_max_worker=max(1, min(8, args.mac_extract_max_worker)),
+                unified_ops_extraction=bool(args.mac_unified_ops_extraction),
+                unified_ops_top_k=max(1, args.mac_unified_ops_top_k),
             )
         )
     if normalized == "mem0":
@@ -627,6 +672,7 @@ async def run_one_task(
             executor=executor,
             max_iterations=args.max_iterations,
             clarification=clarification,
+            replay_reasoning_content=args.replay_reasoning_content,
         )
         mac_graph_output = None
         if mac_state is not None:
@@ -683,6 +729,7 @@ async def run_one_task(
             "difficulty": task_difficulty(task, args.bench),
             "memory_system": args.memory_system,
             "error": f"{type(exc).__name__}: {exc}",
+            "traceback": traceback.format_exc(limit=12),
         }
         cause = exc.__cause__
         if cause is not None:
@@ -745,6 +792,7 @@ async def run(args: argparse.Namespace) -> None:
         "turn_index": args.turn_index,
         "task_count": total_task_count if not merge_into else (base_header or {}).get("task_count", total_task_count),
         "max_worker": max(1, args.max_worker),
+        "replay_reasoning_content": args.replay_reasoning_content,
         "checkpoint_interval": args.checkpoint_interval,
         "agent_llm": agent_llm.to_metadata(),
         "memory_llm": memory_llm.to_metadata(),
@@ -762,6 +810,11 @@ async def run(args: argparse.Namespace) -> None:
         "mac_mem_api_key_env": args.mem_api_key_env if args.memory_system == "mac" else None,
         "mac_mem_base_url": args.mem_base_url if args.memory_system == "mac" else None,
         "mac_mem_llm_max_tokens": max(1, args.mem_llm_max_tokens) if args.memory_system == "mac" else None,
+        "mac_extract_batch_size": max(1, min(10, args.mac_extract_batch_size)) if args.memory_system == "mac" else None,
+        "mac_extract_max_worker": max(1, min(8, args.mac_extract_max_worker)) if args.memory_system == "mac" else None,
+        "mac_unified_ops_extraction": args.mac_unified_ops_extraction if args.memory_system == "mac" else None,
+        "mac_unified_ops_top_k": max(1, args.mac_unified_ops_top_k) if args.memory_system == "mac" else None,
+        "mac_mem_llm_timeout_seconds": max(1.0, args.mem_llm_timeout_seconds) if args.memory_system == "mac" else None,
         "mem0_user_id_prefix": args.mem0_user_id_prefix if args.memory_system == "mem0" else None,
         "mem0_ingest_cache_dir": str(args.mem0_ingest_cache_dir) if args.memory_system == "mem0" else None,
         "mem0_faiss_dir": str(args.mem0_faiss_dir) if args.memory_system == "mem0" else None,
@@ -876,4 +929,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

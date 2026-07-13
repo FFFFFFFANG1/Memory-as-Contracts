@@ -17,6 +17,7 @@ from memory_as_contracts.models import (
     ScopeLevel,
     Strength,
 )
+from memory_as_contracts.policy_ir import policy_ir_safety
 from memory_as_contracts.store import ContractStore
 
 
@@ -88,6 +89,9 @@ class PromptContractPacket:
     scope_label: str
     lifecycle_label: str
     inclusion_reason: str
+    trigger_label: str
+    requirement_label: str
+    effect_label: str
     conflict_status: str | None = None
 
 
@@ -117,6 +121,7 @@ class PromptIntakeRetriever:
         preferences: list[Contract] = []
         global_rules: list[Contract] = []
         local_rules: list[Contract] = []
+        final_response_rules: list[Contract] = []
         for contract in contracts:
             if not _lifecycle_matches(contract, prompt_context):
                 continue
@@ -127,6 +132,14 @@ class PromptIntakeRetriever:
                     query_text,
                 ):
                     preferences.append(contract)
+                continue
+            if _is_response_stage_contract(contract):
+                if _prompt_scope_matches(
+                    contract.scope,
+                    prompt_context,
+                    query_text,
+                ):
+                    final_response_rules.append(contract)
                 continue
             if contract.scope.level in {ScopeLevel.GLOBAL, ScopeLevel.SESSION, ScopeLevel.WORKSPACE}:
                 if _prompt_scope_matches(
@@ -144,8 +157,9 @@ class PromptIntakeRetriever:
                 local_rules.append(contract)
 
         preferences.sort(key=_default_rank, reverse=True)
-        global_rules.sort(key=_default_rank, reverse=True)
+        global_rules.sort(key=lambda item: (_text_score(item, query_text), _default_rank(item)), reverse=True)
         local_rules.sort(key=lambda item: (_text_score(item, query_text), _default_rank(item)), reverse=True)
+        final_response_rules.sort(key=lambda item: (_text_score(item, query_text), _default_rank(item)), reverse=True)
 
         packets = [
             self._packet(contract, "preference", "ambient scope match")
@@ -154,6 +168,10 @@ class PromptIntakeRetriever:
         packets.extend(
             self._packet(contract, "global-rule", "ambient scope match")
             for contract in global_rules[:global_limit]
+        )
+        packets.extend(
+            self._packet(contract, "final-checklist", "response-stage active contract")
+            for contract in final_response_rules[:global_limit]
         )
         packets.extend(
             self._packet(
@@ -190,9 +208,12 @@ class PromptIntakeRetriever:
             status=contract.status.value,
             source_kind=contract.source.kind.value,
             channel=channel,
-            scope_label=_scope_label(contract.scope),
+            scope_label=_operational_scope_label(contract),
             lifecycle_label=_lifecycle_label(contract),
             inclusion_reason=reason,
+            trigger_label=_trigger_label(contract),
+            requirement_label=_requirement_label(contract),
+            effect_label=_effect_label(contract),
             conflict_status="pending_conflict"
             if contract.status == ContractStatus.PENDING_CONFLICT
             else None,
@@ -307,6 +328,12 @@ def _prompt_scope_matches(
     return False
 
 
+def _is_response_stage_contract(contract: Contract) -> bool:
+    if not isinstance(contract.policy_ir, dict):
+        return False
+    return policy_ir_safety(contract).effective_phase == "response"
+
+
 def _is_global_prompt_scope(scope: Scope) -> bool:
     return scope.level in {ScopeLevel.GLOBAL, ScopeLevel.SESSION}
 
@@ -389,7 +416,6 @@ def _path_matches(target: str, glob: str) -> bool:
     if glob_prefix and (
         target_clean == glob_prefix
         or target_clean.startswith(glob_prefix + "/")
-        or glob_prefix.startswith(target_clean + "/")
     ):
         return True
     return False
@@ -451,18 +477,224 @@ def _channel_header(channel: str) -> str:
     labels = {
         "preference": "Preferences:",
         "global-rule": "Global rules:",
+        "final-checklist": "Before final response:",
         "local-reminder": "Local reminders:",
     }
     return labels.get(channel, f"{channel}:")
 
 
 def _packet_line(packet: PromptContractPacket) -> str:
-    conflict = ";conflict=pending" if packet.conflict_status else ""
-    return (
-        f"- {packet.id} [{packet.source_kind};{packet.status};"
-        f"{packet.scope_label};{packet.lifecycle_label}{conflict}] "
-        f"{packet.text} ({packet.inclusion_reason})"
-    )
+    lines = [f"- {packet.id}: {packet.text}"]
+    lines.append(f"  scope: {packet.scope_label}")
+    lines.append(f"  trigger: {packet.trigger_label}")
+    lines.append(f"  requirement: {packet.requirement_label}")
+    effect = packet.effect_label
+    if packet.conflict_status:
+        effect = f"{effect}; conflict pending"
+    lines.append(f"  effect: {effect}")
+    return "\n".join(lines)
+
+
+def _policy_dict(contract: Contract) -> dict | None:
+    return contract.policy_ir if isinstance(contract.policy_ir, dict) else None
+
+
+def _operational_scope_label(contract: Contract) -> str:
+    policy = _policy_dict(contract) or {}
+    policy_scope = policy.get("scope") if isinstance(policy.get("scope"), dict) else {}
+    path = policy_scope.get("path") or contract.scope.path
+    if path:
+        return f"path={path}"
+    level = str(policy_scope.get("level") or contract.scope.level.value)
+    if level == ScopeLevel.WORKSPACE.value:
+        return f"workspace={contract.scope.workspace}" if contract.scope.workspace else "workspace"
+    if level == ScopeLevel.SESSION.value:
+        return "session"
+    if level == ScopeLevel.GLOBAL.value:
+        return "global"
+    if level == ScopeLevel.PATH.value:
+        return "path"
+    return _scope_label(contract.scope)
+
+
+def _trigger_label(contract: Contract) -> str:
+    policy = _policy_dict(contract) or {}
+    target = policy.get("target") if isinstance(policy.get("target"), dict) else {}
+    phase = str(target.get("phase") or "pre")
+    tools = _as_text_list(target.get("tools"))
+    if target.get("tool"):
+        tools.insert(0, str(target["tool"]))
+    action_families = _as_text_list(target.get("action_families"))
+    if target.get("action_family"):
+        action_families.insert(0, str(target["action_family"]))
+    tools = _dedupe_preserve_order(tools)
+    action_families = _dedupe_preserve_order(action_families)
+
+    if phase == "response":
+        return "before final response"
+    if tools:
+        prefix = "after" if phase == "post" else "before"
+        return f"{prefix} tool {_join_limited(tools)}"
+    if action_families:
+        prefix = "after" if phase == "post" else "before"
+        return f"{prefix} action {_join_limited(action_families)}"
+    if contract.semantics.actions:
+        return f"before action {_join_limited(list(contract.semantics.actions))}"
+    if contract.semantics.tags:
+        return f"before action tagged {_join_limited(list(contract.semantics.tags))}"
+    return "before matching action"
+
+
+def _requirement_label(contract: Contract) -> str:
+    policy = _policy_dict(contract) or {}
+    obligation = policy.get("obligation") if isinstance(policy.get("obligation"), dict) else {}
+    kind = str(obligation.get("kind") or "").strip()
+    monitor = obligation.get("monitor") if isinstance(obligation.get("monitor"), dict) else None
+    predicate = obligation.get("predicate") if isinstance(obligation.get("predicate"), dict) else None
+    if kind in {"prior_action", "required_tool_usage", "required_tool_evidence"}:
+        return f"prior action matching {_monitor_label(monitor)}"
+    if kind in {"action_count", "specific_tool_count", "tool_count", "interaction_turn_count"}:
+        op = str(obligation.get("op") or _predicate_op(predicate) or "count")
+        value = obligation.get("value")
+        if value is None and isinstance(predicate, dict):
+            value = predicate.get("value")
+        return f"action count {op} {value} for {_monitor_label(monitor)}"
+    if kind == "same_step":
+        op = str(obligation.get("op") or "gte")
+        value = obligation.get("value")
+        return f"same-step actions {op} {value} matching {_monitor_label(monitor)}"
+    if kind in {"response", "response_format", "response_content", "response_length"}:
+        return _response_requirement_label(predicate)
+    if kind in {"current_action", "path_access"}:
+        return f"current action matches {_predicate_label(predicate)}"
+    if kind == "sequence":
+        return f"action sequence includes {_monitor_label(monitor)}"
+    if kind:
+        return f"{kind} obligation"
+    if contract.semantics.actions or contract.semantics.tags:
+        return _target_reason(contract.semantics, [], [], set())
+    return "satisfy constraint text"
+
+
+def _effect_label(contract: Contract) -> str:
+    policy = _policy_dict(contract) or {}
+    effect = str(policy.get("effect") or contract.effect.value)
+    if effect == "deny":
+        return "block matching action"
+    if effect == "allow":
+        return "allow when matched"
+    return "block until satisfied"
+
+
+def _monitor_label(monitor: dict | None) -> str:
+    if not isinstance(monitor, dict):
+        return "action log"
+    where = monitor.get("where") if isinstance(monitor.get("where"), dict) else None
+    aggregate = monitor.get("aggregate")
+    base = _predicate_label(where) if where else str(monitor.get("source") or "action log")
+    extras: list[str] = []
+    if aggregate and aggregate != "exists":
+        extras.append(f"aggregate={aggregate}")
+    if monitor.get("distinct_by"):
+        extras.append(f"distinct_by={monitor['distinct_by']}")
+    if monitor.get("group_by"):
+        extras.append(f"group_by={monitor['group_by']}")
+    if extras:
+        return f"{base}; " + "; ".join(extras)
+    return base
+
+
+def _response_requirement_label(predicate: dict | None) -> str:
+    if not isinstance(predicate, dict):
+        return "final response satisfies constraint text"
+    op = str(predicate.get("op") or "")
+    value = predicate.get("value")
+    if op == "json_object":
+        keys = value.get("required_keys") if isinstance(value, dict) else None
+        if keys:
+            return f"final response is JSON with keys {_join_limited(_as_text_list(keys))}"
+        return "final response is a JSON object"
+    if op in {"word_count_lte", "word_count_gte", "word_count_between", "char_count_lte", "char_count_gte", "char_count_between"}:
+        return f"final response {op} {value}"
+    if op in {"startswith", "endswith", "contains", "not_contains"}:
+        return f"final response {op} {_short_value(value)}"
+    if op == "regex":
+        return "final response satisfies response-pattern constraint"
+    if op == "not_regex":
+        return "final response avoids forbidden response pattern"
+    return f"final response matches {_predicate_label(predicate)}"
+
+
+def _predicate_label(predicate: dict | None) -> str:
+    if not isinstance(predicate, dict):
+        return "predicate"
+    op = str(predicate.get("op") or "")
+    if op in {"all", "any"}:
+        children = predicate.get(op)
+        if isinstance(children, list) and children:
+            return f"{op}(" + "; ".join(_predicate_label(item) for item in children[:3]) + ")"
+        return op
+    if op == "not":
+        return "not(" + _predicate_label(predicate.get("not")) + ")"
+    field = predicate.get("field")
+    value = predicate.get("value")
+    if field:
+        value_text = _short_value(value)
+        return f"{field} {op}" + (f" {value_text}" if value_text else "")
+    value_text = _short_value(value)
+    return f"{op}" + (f" {value_text}" if value_text else "")
+
+
+def _predicate_op(predicate: dict | None) -> str | None:
+    if not isinstance(predicate, dict):
+        return None
+    op = predicate.get("op")
+    return str(op) if op else None
+
+
+def _short_value(value: object, *, max_chars: int = 96) -> str:
+    if isinstance(value, list):
+        text = "[" + ", ".join(str(item) for item in value[:5])
+        if len(value) > 5:
+            text += ", ..."
+        text += "]"
+    elif isinstance(value, dict):
+        text = ", ".join(f"{key}={value[key]}" for key in list(value)[:5])
+        if len(value) > 5:
+            text += ", ..."
+        text = "{" + text + "}"
+    else:
+        text = "" if value is None else str(value)
+    text = " ".join(text.split())
+    if len(text) > max_chars:
+        return text[: max_chars - 3] + "..."
+    return text
+
+
+def _as_text_list(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item)]
+    if value is None:
+        return []
+    return [str(value)]
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def _join_limited(values: list[str], *, limit: int = 4) -> str:
+    values = _dedupe_preserve_order(values)
+    if len(values) <= limit:
+        return ", ".join(values)
+    return ", ".join(values[:limit]) + ", ..."
 
 
 def _default_rank(contract: Contract) -> tuple[int, int]:

@@ -17,6 +17,7 @@ from memory_as_contracts.models import (
     MatchOutcome,
     RuleEffect,
 )
+from memory_as_contracts.policy_ir import PolicyIREvaluator, policy_target_matches
 from memory_as_contracts.rule_surface import (
     bind_contract_check_patterns,
     bind_check_patterns,
@@ -78,6 +79,31 @@ class RuleEvaluator:
             )
         if self._has_active_exception(signature, contract):
             return self._ignored(contract, "exception_applied")
+
+        if contract.policy_ir is not None:
+            policy_result = PolicyIREvaluator(self.store).evaluate(contract, signature)
+            if not policy_result.matched:
+                return self._ignored(contract, "policy_ir_not_matched")
+            verdict = {
+                "contract_id": contract.id,
+                "policy_ir": True,
+                "decision": (
+                    policy_result.decision.value
+                    if policy_result.decision is not None
+                    else GateDecisionType.ALLOW.value
+                ),
+                "reason": policy_result.reason or "policy ir satisfied",
+                "evidence": policy_result.evidence or {},
+                "confidence": float((policy_result.evidence or {}).get("confidence", 1.0)),
+            }
+            return RuleEvaluation(
+                contract_id=contract.id,
+                decision=policy_result.decision,
+                reason=policy_result.reason,
+                match_outcome=MatchOutcome.MATCHED,
+                used=True,
+                validator_verdicts=(verdict,),
+            )
 
         validator_version = self.store.get_active_validator_version(contract.id)
         if validator_version is not None:
@@ -275,17 +301,21 @@ class RuleEvaluator:
                 continue
             if not contract_applies_to_signature(exception_contract, signature):
                 continue
-            exception_pattern_version = self._active_pattern_version(
-                exception_contract
-            )
-            if exception_pattern_version is None:
-                continue
-            if not bind_check_patterns(
-                exception_contract,
-                signature,
-                exception_pattern_version.check_patterns,
-            ).matched:
-                continue
+            if exception_contract.policy_ir is not None:
+                if not policy_target_matches(exception_contract, signature):
+                    continue
+            else:
+                exception_pattern_version = self._active_pattern_version(
+                    exception_contract
+                )
+                if exception_pattern_version is None:
+                    continue
+                if not bind_check_patterns(
+                    exception_contract,
+                    signature,
+                    exception_pattern_version.check_patterns,
+                ).matched:
+                    continue
             if _exception_can_cover_contract(exception_contract, contract):
                 return True
         return False

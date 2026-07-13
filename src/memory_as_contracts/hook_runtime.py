@@ -28,7 +28,6 @@ from memory_as_contracts.resolver import ConflictResolver
 from memory_as_contracts.retrieval import PromptIntakeRetriever
 from memory_as_contracts.store import ContractStore
 from memory_as_contracts.validator_installation import ValidatorProvisioner
-from memory_as_contracts.validators import ValidatorRuntime
 
 
 PERIODIC_USER_TURN_BATCH_SIZE = 10
@@ -342,7 +341,9 @@ class MacHookRuntime:
             risk=signature.risk,
             side_effect=signature.side_effect,
         )
-        stored = ValidatorRuntime(store).record_committed_action(entry)
+        # PolicyIR uses the action log as the source of truth. Legacy validator
+        # state updates are intentionally not part of the default runtime path.
+        stored = store.add_action_log_entry(entry)
         log_event(
             LOGGER,
             "action.committed",
@@ -379,6 +380,9 @@ class MacHookRuntime:
         resolved: list[Contract] = []
         for result in resolver.insert_batch(contracts):
             contract = result.contract
+            if contract.policy_ir is not None:
+                resolved.append(contract)
+                continue
             if contract.status in {
                 ContractStatus.ACTIVE,
                 ContractStatus.CANDIDATE,
@@ -409,6 +413,8 @@ class MacHookRuntime:
 
         for contract in resolved:
             if contract.status != ContractStatus.ACTIVE:
+                continue
+            if contract.policy_ir is not None:
                 continue
             factory = (
                 self.adapter._validator_generator_factory

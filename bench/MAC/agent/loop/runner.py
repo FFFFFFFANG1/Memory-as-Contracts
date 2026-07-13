@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
@@ -128,6 +129,28 @@ def prompt_hash(messages: list[dict[str, Any]]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def model_context_from_trace(
+    messages: list[dict[str, Any]],
+    *,
+    replay_reasoning_content: bool,
+) -> list[dict[str, Any]]:
+    """Return the model-facing copy of a complete, auditable execution trace.
+
+    The raw trace retains provider reasoning for post-hoc analysis and optional
+    result serialization.  Replaying that hidden reasoning to the next model
+    call is unnecessary for tool execution and can dominate a long trajectory's
+    context.  Visible assistant content, tool calls, and tool results are kept
+    so each call remains a valid OpenAI-compatible tool conversation.
+    """
+    context = deepcopy(messages)
+    if replay_reasoning_content:
+        return context
+    for message in context:
+        for key in ("reasoning_content", "reasoning", "thinking_blocks"):
+            message.pop(key, None)
+    return context
+
+
 async def _call_model(
     model_client: ModelClient,
     *,
@@ -180,8 +203,14 @@ async def run_agent_loop(
     strict_terminal: bool = True,
     max_terminal_repairs: int = 1,
     clarification: ClarificationPolicy | None = None,
+    replay_reasoning_content: bool = False,
 ) -> LoopResult:
-    """Run prompt -> model -> tool result replay until terminal `send_message`."""
+    """Run prompt -> model -> tool result replay until terminal `send_message`.
+
+    The returned ``messages`` is the raw trace.  By default, model calls use a
+    copy with hidden reasoning fields removed, mirroring production runtimes
+    that separate audit persistence from model-facing context.
+    """
     messages = build_prompt_messages(
         agent=agent,
         system_prompt=system_prompt,
@@ -193,13 +222,22 @@ async def run_agent_loop(
     tool_executor = executor or HeuristicToolExecutor(agent=agent)
     initial_prompt_hash = prompt_hash(messages)
     events: list[dict[str, Any]] = [
-        {"event": "prompt_built", "agent": agent, "prompt_hash": initial_prompt_hash}
+        {
+            "event": "prompt_built",
+            "agent": agent,
+            "prompt_hash": initial_prompt_hash,
+            "replay_reasoning_content": replay_reasoning_content,
+        }
     ]
     terminal_repairs_used = 0
     clarification_rounds = 0
 
     for iteration in range(max_iterations):
-        response = await _call_model(model_client, messages=messages, tools=tool_definitions)
+        model_messages = model_context_from_trace(
+            messages,
+            replay_reasoning_content=replay_reasoning_content,
+        )
+        response = await _call_model(model_client, messages=model_messages, tools=tool_definitions)
         content = parse_response_content(response)
         reasoning = parse_reasoning_content(response)
         tool_calls = parse_tool_calls(response)
@@ -285,7 +323,7 @@ async def run_agent_loop(
             else:
                 tool_content = execution.content
                 tool_runtime = execution.result if isinstance(execution.result, dict) else {}
-                terminal = is_send_message
+                terminal = is_send_message and not bool(tool_runtime.get("memory_rejected"))
 
             tool_message = {
                 "role": "tool",
@@ -322,7 +360,7 @@ async def run_agent_loop(
                 deferred_clarification = True
                 continue
 
-            if is_send_message:
+            if is_send_message and not bool(tool_runtime.get("memory_rejected")):
                 final_answer = response_text
                 return LoopResult(
                     final_answer=final_answer,
@@ -347,4 +385,3 @@ async def run_agent_loop(
         error="Loop reached max_iterations before send_message.",
         clarification_rounds=clarification_rounds,
     )
-

@@ -5,7 +5,7 @@ import asyncio
 from bench.MAC.agent.trajectory import build_raw_history
 from bench.MAC.agent.loop.prompt import build_prompt_messages, openai_tool_definitions
 from bench.MAC.agent.loop.llm_tools import LLMToolExecutor, LLMToolReturnConfig
-from bench.MAC.agent.loop.runner import run_agent_loop
+from bench.MAC.agent.loop.runner import model_context_from_trace, run_agent_loop
 from bench.MAC.agent.loop.tools import HeuristicToolExecutor, default_heuristic_result, route_tool
 
 
@@ -33,7 +33,7 @@ TOOL_SCHEMAS = [
 ]
 
 
-def test_prompt_builder_emits_system_tools_memory_user_order() -> None:
+def test_prompt_builder_emits_compact_tool_protocol_and_memory_user_order() -> None:
     messages = build_prompt_messages(
         agent="TestAgent",
         system_prompt="system text",
@@ -44,8 +44,9 @@ def test_prompt_builder_emits_system_tools_memory_user_order() -> None:
 
     assert [message["role"] for message in messages] == ["system", "system", "user"]
     assert messages[0]["content"] == "system text\n\n<memory>\nremember this\n</memory>"
-    assert "<tool_schema>" in messages[1]["content"]
+    assert "<tool_protocol>" in messages[1]["content"]
     assert "send_message" in messages[1]["content"]
+    assert "read_file" not in messages[1]["content"]
     assert messages[2]["content"] == "answer me"
 
 
@@ -109,6 +110,28 @@ class FakeToolReturnModel:
         return response
 
 
+class FakeMemoryRejectingExecutor:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def execute(self, *, call_id, name, arguments):
+        from bench.MAC.agent.loop.tools import ToolExecution
+
+        self.calls += 1
+        if self.calls == 1:
+            return ToolExecution(
+                name=name,
+                call_id=call_id,
+                arguments=arguments,
+                result={
+                    "ok": False,
+                    "memory_rejected": True,
+                    "message": "[memory] This tool call is not allowed due to \"final format\". Please retry after revise.",
+                },
+            )
+        return ToolExecution(name=name, call_id=call_id, arguments=arguments, result={"ok": True})
+
+
 def test_runner_appends_tool_result_and_continues_to_send_message() -> None:
     model = FakeModel(
         [
@@ -160,6 +183,86 @@ def test_runner_appends_tool_result_and_continues_to_send_message() -> None:
     assert any(message.get("role") == "tool" and message.get("name") == "read_file" for message in result.messages)
     assert any(message.get("role") == "tool" and message.get("name") == "send_message" for message in result.messages)
     assert any(message.get("role") == "tool" and message.get("name") == "read_file" for message in model.calls[1]["messages"])
+    raw_assistant = next(message for message in result.messages if message.get("tool_calls"))
+    model_assistant = next(message for message in model.calls[1]["messages"] if message.get("tool_calls"))
+    assert raw_assistant["reasoning_content"] == "Need to inspect a file."
+    assert "reasoning_content" not in model_assistant
+    assert model.calls[1]["messages"] is not result.messages
+
+
+def test_model_context_can_explicitly_replay_reasoning_for_ablation() -> None:
+    raw_trace = [
+        {"role": "system", "content": "system"},
+        {
+            "role": "assistant",
+            "content": "",
+            "reasoning_content": "private chain of thought",
+            "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "read_file"}}],
+        },
+        {"role": "tool", "tool_call_id": "call_1", "name": "read_file", "content": "file content"},
+    ]
+
+    compact_context = model_context_from_trace(raw_trace, replay_reasoning_content=False)
+    replay_context = model_context_from_trace(raw_trace, replay_reasoning_content=True)
+
+    assert raw_trace[1]["reasoning_content"] == "private chain of thought"
+    assert "reasoning_content" not in compact_context[1]
+    assert replay_context[1]["reasoning_content"] == "private chain of thought"
+    assert compact_context[1]["tool_calls"] == raw_trace[1]["tool_calls"]
+    assert compact_context[2] == raw_trace[2]
+
+
+def test_runner_does_not_treat_memory_rejected_send_message_as_terminal() -> None:
+    model = FakeModel(
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_bad_final",
+                        "type": "function",
+                        "function": {
+                            "name": "send_message",
+                            "arguments": "{\"response\": \"bad\"}",
+                        },
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_good_final",
+                        "type": "function",
+                        "function": {
+                            "name": "send_message",
+                            "arguments": "{\"response\": \"good\"}",
+                        },
+                    }
+                ],
+            },
+        ]
+    )
+    executor = FakeMemoryRejectingExecutor()
+
+    result = asyncio.run(
+        run_agent_loop(
+            agent="TestAgent",
+            system_prompt="system",
+            tools=TOOL_SCHEMAS,
+            memory="contract memory",
+            user_prompt="task",
+            model_client=model,
+            executor=executor,
+        )
+    )
+
+    assert result.final_answer == "good"
+    assert result.stop_reason == "send_message"
+    assert executor.calls == 2
+    tool_events = [event for event in result.events if event["event"] == "tool_result"]
+    assert tool_events[0]["terminal"] is False
+    assert tool_events[1]["terminal"] is True
 
 
 def test_runner_repairs_plain_final_text_with_send_message() -> None:
@@ -396,4 +499,3 @@ def test_llm_tool_executor_reports_runtime_failure_after_retries() -> None:
     assert execution.result["ok"] is False
     assert execution.result["error"] == "tool_return_generation_failed"
     assert execution.result["result"]["tool_name"] == "read_file"
-

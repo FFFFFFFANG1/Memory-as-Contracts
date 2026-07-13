@@ -155,6 +155,49 @@ def test_path_level_matching_accumulates_within_user_turn() -> None:
     assert receipts[-1].targets == ["src/app.py"]
 
 
+def test_path_scope_matching_is_directional() -> None:
+    store = make_store()
+    install_rejecting_validator(
+        store,
+        path_contract("src/sub"),
+        check_patterns=[ToolPattern(tool="Bash")],
+    )
+    adapter = CodexAdapter()
+
+    adapter.handle_pre_tool_use(
+        store,
+        {"tool_name": "Read", "tool_input": {"file_path": "src"}},
+        adapter_context(),
+    )
+    parent_active = adapter.handle_pre_tool_use(
+        store,
+        {"tool_name": "Bash", "tool_input": {"command": "pytest -q"}},
+        adapter_context(),
+    )
+
+    assert parent_active["mac"]["decision"] == "allow"
+
+    store = make_store()
+    install_rejecting_validator(
+        store,
+        path_contract("src"),
+        check_patterns=[ToolPattern(tool="Bash")],
+    )
+    adapter = CodexAdapter()
+    adapter.handle_pre_tool_use(
+        store,
+        {"tool_name": "Read", "tool_input": {"file_path": "src/sub/app.py"}},
+        adapter_context(),
+    )
+    child_active = adapter.handle_pre_tool_use(
+        store,
+        {"tool_name": "Bash", "tool_input": {"command": "pytest -q"}},
+        adapter_context(),
+    )
+
+    assert child_active["mac"]["decision"] == "reject"
+
+
 def test_posthook_keeps_action_log_as_active_posthook() -> None:
     store = make_store()
     result = CodexAdapter().handle_post_tool_use(

@@ -17,11 +17,12 @@ from memory_as_contracts.models import (
     Scope,
     ScopeLevel,
 )
+from memory_as_contracts.policy_ir import policy_target_matches
 from memory_as_contracts.store import ContractStore
 
 
 HookPhase = Literal["pre", "post"]
-HookKind = Literal["validator_check", "validator_missing", "action_log"]
+HookKind = Literal["policy_check", "validator_check", "validator_missing", "action_log"]
 
 
 @dataclass(frozen=True)
@@ -65,12 +66,21 @@ def build_active_hook_plan(
             continue
         if not scope_is_active_for_hook(contract.scope, signature, paths):
             continue
+        if contract.policy_ir is not None and not policy_target_matches(contract, signature):
+            continue
         version = versions.get(contract.id)
         contracts.append(contract)
+        kind: HookKind
+        if contract.policy_ir is not None:
+            kind = "policy_check"
+        elif version is not None:
+            kind = "validator_check"
+        else:
+            kind = "validator_missing"
         prehooks.append(
             ActiveHookEntry(
                 phase="pre",
-                kind="validator_check" if version is not None else "validator_missing",
+                kind=kind,
                 contract_id=contract.id,
                 validator_version_id=version.id if version is not None else None,
                 scope_level=contract.scope.level.value,
@@ -157,7 +167,7 @@ def _project_scope_active(scope: Scope, signature: ActionSignature) -> bool:
 
 
 def _active_path_matches_scope(active_path: str, path_scope: str) -> bool:
-    return path_scope_matches(active_path, path_scope) or path_scope_matches(path_scope, active_path)
+    return path_scope_matches(active_path, path_scope)
 
 
 def _scope_reason(scope: Scope) -> str:

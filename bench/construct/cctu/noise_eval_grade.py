@@ -546,18 +546,14 @@ def build_contract_diagnostics(details: list[dict[str, Any]]) -> dict[str, Any]:
     contract = follow_taxonomy_metrics(details)
     return {
         "constraint_follow_scores": {
-            "correct_follow_rate": contract["correct_follow_rate"],
-            "wrong_follow_rate": contract["wrong_follow_rate"],
-            "neither_follow_rate": contract["neither_follow_rate"],
+            "noise_follow_rate": contract["noise_follow_rate"],
         },
         "support": {
             "comparison_count": contract["comparison_count"],
             "constraint_count": contract["constraint_count"],
             "active_constraint_count": contract["active_constraint_count"],
             "history_constraint_count": contract["history_constraint_count"],
-            "correctly_followed": contract["correctly_followed"],
-            "wrongly_followed": contract["wrongly_followed"],
-            "neither_followed": contract["neither_followed"],
+            "noise_followed": contract["noise_followed"],
         },
     }
 
@@ -611,8 +607,8 @@ def score_rows(
             "constraint_count": contract["constraint_count"],
             "active_constraint_count": contract["active_constraint_count"],
             "history_constraint_count": contract["history_constraint_count"],
-            "correctly_followed": contract["correctly_followed"],
-            "wrongly_followed": contract["wrongly_followed"],
+            "noise_followed": contract["noise_followed"],
+            "outcome_counts": contract["outcome_counts"],
         },
         "support": {
             "task_count": len(task_grades),

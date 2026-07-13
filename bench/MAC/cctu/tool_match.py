@@ -813,14 +813,127 @@ def rank_golden_suggestions(
 
 
 def format_similar_parameter_results(
-    failure: str,
+    original: str,
     entries: list[tuple[str, str]],
 ) -> str:
+    """Append up to two similar-parameter tool results after the original output."""
     if not entries:
-        return failure
-    lines = [failure.rstrip()]
+        return original
+    lines = [original.rstrip()]
     for param_summary, tool_result in entries:
         lines.append(f"Similar parameter result ({param_summary}): {tool_result}")
+    return "\n".join(lines)
+
+
+_MISSING_ONE_RE = re.compile(
+    r"missing 1 required positional argument: '([^']+)'",
+    re.IGNORECASE,
+)
+_MISSING_MANY_RE = re.compile(
+    r"missing \d+ required positional arguments: (.+)$",
+    re.IGNORECASE,
+)
+_UNEXPECTED_KW_RE = re.compile(
+    r"got an unexpected keyword argument '([^']+)'",
+    re.IGNORECASE,
+)
+
+
+def _parse_simulator_required_params(code: str) -> list[str]:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        args = node.args
+        defaults_offset = len(args.args) - len(args.defaults)
+        required = [arg.arg for index, arg in enumerate(args.args) if index < defaults_offset]
+        required.extend(
+            arg.arg
+            for index, arg in enumerate(args.kwonlyargs)
+            if args.kw_defaults[index] is None
+        )
+        return required
+    return []
+
+
+def _param_fill_hint(param: str, schema: dict[str, Any] | None) -> str:
+    props = (schema or {}).get("properties") if isinstance(schema, dict) else None
+    prop = props.get(param) if isinstance(props, dict) else None
+    if not isinstance(prop, dict):
+        prop = {}
+
+    enum_values = prop.get("enum")
+    if isinstance(enum_values, list) and enum_values:
+        rendered = ", ".join(json.dumps(value, ensure_ascii=False) for value in enum_values)
+        return f"allowed values: [{rendered}]"
+
+    prop_type = prop.get("type")
+    if param in {"date_range", "time_period", "date"} or prop_type == "object":
+        if param == "time_period":
+            return 'expected object like {"start_year": 1900, "end_year": 2000}'
+        return 'expected object like {"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}'
+    if prop_type == "array":
+        return "expected a non-empty JSON array"
+    if prop_type == "string":
+        description = str(prop.get("description") or "").strip()
+        if description:
+            return f"expected string ({description[:120]})"
+        return "expected a non-empty string"
+    if prop_type:
+        return f"expected type {prop_type}"
+    if param == "date_range":
+        return 'expected object like {"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}'
+    return "required by the tool simulator"
+
+
+def format_cctu_call_error(
+    *,
+    tool_name: str,
+    arguments: dict[str, Any],
+    code: str,
+    exc: BaseException,
+    schema: dict[str, Any] | None = None,
+) -> str:
+    """Turn a simulator exception into an observation that still keeps the original error.
+
+    The first line preserves the historical ``an error occured when call ...`` prefix so
+    existing failure detectors and suggest-mode fallback keep working. Extra lines only
+    disclose how to fill missing/invalid parameters.
+    """
+    message = str(exc).strip() or type(exc).__name__
+    lines = [f"an error occured when call {tool_name}: {message}"]
+
+    missing: list[str] = []
+    one = _MISSING_ONE_RE.search(message)
+    many = _MISSING_MANY_RE.search(message)
+    if one:
+        missing = [one.group(1)]
+    elif many:
+        missing = re.findall(r"'([^']+)'", many.group(1))
+
+    unexpected = _UNEXPECTED_KW_RE.search(message)
+    provided = sorted(str(key) for key in arguments.keys())
+    required = _parse_simulator_required_params(code)
+
+    if missing:
+        lines.append("Missing required parameter(s): " + ", ".join(missing) + ".")
+        for param in missing:
+            lines.append(f"- {param}: {_param_fill_hint(param, schema)}")
+    elif unexpected:
+        lines.append(
+            f"Unexpected parameter: {unexpected.group(1)}. "
+            "Only pass parameters declared by this tool schema."
+        )
+
+    if required:
+        lines.append("Simulator required parameters: " + ", ".join(required) + ".")
+    if provided:
+        lines.append("Provided parameters: " + ", ".join(provided) + ".")
+    else:
+        lines.append("Provided parameters: (none).")
     return "\n".join(lines)
 
 
@@ -851,7 +964,12 @@ def similar_parameter_results(
         try:
             tool_result = call_function(tool_name, merged, code)
         except Exception as exc:  # noqa: BLE001 - mirror tool executor error-as-text behavior
-            tool_result = f"an error occured when call {tool_name}: {exc}"
+            tool_result = format_cctu_call_error(
+                tool_name=tool_name,
+                arguments=merged,
+                code=code,
+                exc=exc,
+            )
         if is_failure_result(str(tool_result)) or is_stub_result(str(tool_result)):
             continue
         entries.append((format_suggestion(golden), tool_result))
@@ -868,6 +986,12 @@ def maybe_append_similar_parameter_results(
     min_score: float | None = None,
     max_suggestions: int = DEFAULT_MAX_SUGGESTIONS,
 ) -> str:
+    """Suggest mode: keep the original CCTU simulator output unless we can append hints.
+
+    Flow: tool call -> direct hit check -> optional similar-parameter retries -> fallback
+    to the original ``result``.  Similar suggestions are appended only when at least one
+    golden candidate re-executes successfully.
+    """
     if is_direct_hit(tool_name=tool_name, arguments=arguments, code=code, result=result):
         return result
     threshold = DEFAULT_MIN_SCORE if min_score is None else min_score
@@ -879,10 +1003,9 @@ def maybe_append_similar_parameter_results(
         min_score=threshold,
         max_suggestions=max_suggestions,
     )
-    failure = non_direct_match_failure(result)
     if not entries:
-        return failure
-    return format_similar_parameter_results(failure, entries)
+        return result
+    return format_similar_parameter_results(result, entries)
 
 
 def cctu_call_function_with_match_mode(
@@ -892,9 +1015,28 @@ def cctu_call_function_with_match_mode(
     *,
     match_mode: str | None = None,
     call_function: Any,
+    schema: dict[str, Any] | None = None,
 ) -> str:
+    """Execute a CCTU simulator, optionally appending similar-parameter hints.
+
+    Flow is always:
+    1. call tool (exceptions become enriched original-error text)
+    2. if direct hit → return original result
+    3. else try similar-parameter suggestions
+    4. if suggestions exist → ``original error/result + Similar parameter result (...)``
+    5. else → original error/result unchanged
+    """
     mode = (match_mode or cctu_tool_match_mode()).strip().lower()
-    result = call_function(name, arguments, code)
+    try:
+        result = call_function(name, arguments, code)
+    except Exception as exc:  # noqa: BLE001 - preserve CCTU error-as-observation behavior
+        result = format_cctu_call_error(
+            tool_name=name,
+            arguments=arguments,
+            code=code,
+            exc=exc,
+            schema=schema,
+        )
     if mode != "suggest":
         return result
     return maybe_append_similar_parameter_results(

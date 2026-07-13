@@ -6,7 +6,6 @@ import argparse
 import copy
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -14,15 +13,14 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from bench.MAC.cctu.bridge import (
+from bench.MAC.cctu.bridge import (  # noqa: E402
     MAC_CCTU_DATA_DIR,
     cctu_id_from_task_uid,
-    cctu_samples_by_id,
     cctu_validators_dir,
     import_cctu_attr,
     load_cctu_eval_tasks,
 )
-from bench.MAC.scripts.run_paths import bench_grade_path, make_run_unique_index
+from bench.MAC.scripts.run_paths import bench_grade_path, make_run_unique_index  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -96,6 +94,18 @@ def openai_tool_call(call: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def is_mac_rejected_tool_result(event: dict[str, Any]) -> bool:
+    payload = event.get("runtime")
+    if not isinstance(payload, dict):
+        payload = event.get("result")
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("ok") is not False:
+        return False
+    message = payload.get("message") or payload.get("error")
+    return isinstance(message, str) and message.startswith("[memory]")
+
+
 def cctu_messages_from_events(row: dict[str, Any], sample: dict[str, Any]) -> list[dict[str, Any]]:
     messages = copy.deepcopy(sample.get("messages") or [])
     events = row.get("events")
@@ -105,13 +115,25 @@ def cctu_messages_from_events(row: dict[str, Any], sample: dict[str, Any]) -> li
             messages.append({"role": "assistant", "content": final})
         return messages
 
+    rejected_call_ids = {
+        str(event.get("tool_call_id"))
+        for event in events
+        if isinstance(event, dict)
+        and event.get("event") == "tool_result"
+        and event.get("tool_call_id")
+        and is_mac_rejected_tool_result(event)
+    }
     appended_final = False
     for event in events:
         if not isinstance(event, dict):
             continue
         if event.get("event") == "model_response":
             raw_calls = event.get("tool_calls")
-            calls = [call for call in raw_calls if isinstance(call, dict)] if isinstance(raw_calls, list) else []
+            calls = [
+                call
+                for call in raw_calls
+                if isinstance(call, dict) and str(call.get("id") or "") not in rejected_call_ids
+            ] if isinstance(raw_calls, list) else []
             send_calls = [call for call in calls if call.get("name") == "send_message"]
             domain_calls = [call for call in calls if call.get("name") != "send_message"]
             content = event.get("content") if isinstance(event.get("content"), str) else ""
@@ -129,6 +151,8 @@ def cctu_messages_from_events(row: dict[str, Any], sample: dict[str, Any]) -> li
             continue
 
         if event.get("event") == "tool_result":
+            if str(event.get("tool_call_id") or "") in rejected_call_ids:
+                continue
             if event.get("name") == "send_message":
                 continue
             call_id = event.get("tool_call_id")
@@ -137,9 +161,10 @@ def cctu_messages_from_events(row: dict[str, Any], sample: dict[str, Any]) -> li
                 content = json.dumps(content, ensure_ascii=False)
             messages.append({"role": "tool", "tool_call_id": str(call_id or ""), "content": content})
 
-    if not appended_final:
-        final = row.get("final_answer")
-        if isinstance(final, str):
+    final = row.get("final_answer")
+    if isinstance(final, str):
+        current_final = final_assistant_response(messages)
+        if not appended_final or current_final.strip() != final.strip():
             messages.append({"role": "assistant", "content": final})
     return messages
 
@@ -303,22 +328,84 @@ def compute_ssr(*, constraint_total: int, violated_indices: set[int]) -> float:
     return max(0.0, min(1.0, satisfied / constraint_total))
 
 
+def sample_from_task(task: dict[str, Any] | None, cctu_id: str) -> dict[str, Any] | None:
+    if not isinstance(task, dict):
+        return None
+    messages = task.get("original_input") or task.get("input")
+    constraints = task.get("constraints_list")
+    if not isinstance(messages, list) or not isinstance(constraints, list):
+        return None
+    return {
+        "id": cctu_id,
+        "messages": copy.deepcopy(messages),
+        "answer": task.get("answer"),
+        "constraints_list": copy.deepcopy(constraints),
+        "tools": json.dumps(cctu_tools_from_task_tools(task.get("tools")), ensure_ascii=False),
+        "unsolved_set": task.get("unsolved_set"),
+    }
+
+
+def cctu_tools_from_task_tools(tools: Any) -> list[dict[str, Any]]:
+    if not isinstance(tools, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+        if tool.get("type") == "function" and isinstance(tool.get("function"), dict):
+            result.append(copy.deepcopy(tool))
+            continue
+        name = tool.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        schema = tool.get("parameters")
+        if not isinstance(schema, dict):
+            schema = tool.get("input_schema")
+        if not isinstance(schema, dict):
+            schema = {"type": "object", "properties": {}, "additionalProperties": True}
+        result.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": str(tool.get("description") or ""),
+                    "parameters": copy.deepcopy(schema),
+                },
+            }
+        )
+    return result
+
+
 def grade_one(row: dict[str, Any], task: dict[str, Any] | None, samples: dict[str, dict[str, Any]]) -> dict[str, Any]:
     task_uid = str(row.get("task_uid") or "")
     cctu_id = str((task or {}).get("cctu_id") or cctu_id_from_task_uid(task_uid))
     sample = copy.deepcopy((task or {}).get("cctu_sample") or samples.get(cctu_id))
+    legacy_unsolved_set_available = True
+    if not isinstance(sample, dict):
+        sample = sample_from_task(task, cctu_id)
+        legacy_unsolved_set_available = False
+    elif isinstance(task, dict):
+        if task.get("answer") is not None:
+            sample["answer"] = task["answer"]
+        if isinstance(task.get("tools"), list):
+            sample["tools"] = json.dumps(cctu_tools_from_task_tools(task["tools"]), ensure_ascii=False)
     if not isinstance(sample, dict):
         return {"task_uid": task_uid, "cctu_id": cctu_id, "SR": False, "PSR": False, "error": "missing_cctu_sample"}
 
     messages = cctu_messages_from_events(row, sample)
-    solve_rate_is_one = import_cctu_attr("evaluation", "solve_rate_is_one")
     compute_if_flags = import_cctu_attr("evaluation", "compute_if_flags")
     answer_verify = import_cctu_attr("utils.utils", "answer_verify")
-    unsolved_set = json.loads(sample.get("unsolved_set"))
-    unsolved_slot_satisfied, unsolved_slot_total = required_tool_slot_counts(messages, unsolved_set)
-    acc = bool(solve_rate_is_one(messages, unsolved_set))
     answer_text_pass = bool(answer_verify(final_assistant_response(messages), sample.get("answer")))
-    answer_data_pass = acc
+    unsolved_set_raw = sample.get("unsolved_set")
+    unsolved_slot_satisfied = 0
+    unsolved_slot_total = 0
+    answer_data_pass: bool | None = None
+    if isinstance(unsolved_set_raw, str) and unsolved_set_raw:
+        solve_rate_is_one = import_cctu_attr("evaluation", "solve_rate_is_one")
+        unsolved_set = json.loads(unsolved_set_raw)
+        unsolved_slot_satisfied, unsolved_slot_total = required_tool_slot_counts(messages, unsolved_set)
+        answer_data_pass = bool(solve_rate_is_one(messages, unsolved_set))
+    acc = answer_data_pass if answer_data_pass is not None else answer_text_pass
     answer_pass = bool(answer_text_pass)
     violations, violated_indices, response_constraint_total = replay_constraint_analysis(messages, sample)
     has_if_error, has_last_if_error = compute_if_flags(messages)
@@ -364,6 +451,7 @@ def grade_one(row: dict[str, Any], task: dict[str, Any] | None, samples: dict[st
         "violation_count": len(violations),
         "final_violation_count": len(final_violations),
         "stop_reason": row.get("stop_reason"),
+        "legacy_unsolved_set_available": legacy_unsolved_set_available,
         "violations": violations[:20],
     }
 

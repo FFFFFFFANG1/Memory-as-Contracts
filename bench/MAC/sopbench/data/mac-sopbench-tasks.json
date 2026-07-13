@@ -1,6 +1,6 @@
 {
     "schema_version": "MACSOPBenchTasksV1",
-    "generated_at": "2026-06-30T11:26:53.215966+00:00",
+    "generated_at": "2026-07-07T11:45:41.118172+00:00",
     "sources": {
         "step2": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/mid_data/eval_step2_anchors.json",
         "noise_manifest": "/data2/junzhou2/Memory-as-Contracts/bench/MAC/sopbench/mid_data/eval_step5_noise_eval_specs.json"
@@ -4615,7 +4615,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:bank:apply_credit_card:4",
@@ -9141,7 +9141,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:bank:apply_credit_card:6",
@@ -13939,7 +13939,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:bank:cancel_credit_card:16",
@@ -18920,7 +18920,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 27
+            "sequence_turn_count": 38
         },
         {
             "mac_task_uid": "sopbench:bank:cancel_credit_card:2",
@@ -23342,7 +23342,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:bank:close_account:0",
@@ -27914,7 +27914,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 33
+            "sequence_turn_count": 46
         },
         {
             "mac_task_uid": "sopbench:bank:close_account:1",
@@ -32486,7 +32486,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 34
+            "sequence_turn_count": 42
         },
         {
             "mac_task_uid": "sopbench:bank:deposit_funds:0",
@@ -37016,7 +37016,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 32
         },
         {
             "mac_task_uid": "sopbench:bank:deposit_funds:1",
@@ -41546,7 +41546,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:bank:exchange_foreign_currency:2",
@@ -46114,7 +46114,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 37
         },
         {
             "mac_task_uid": "sopbench:bank:open_account:2",
@@ -50628,7 +50628,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:bank:open_account:3",
@@ -55172,7 +55172,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:bank:pay_bill:1",
@@ -59830,7 +59830,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:bank:pay_bill_with_credit_card:1",
@@ -64570,7 +64570,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 28
+            "sequence_turn_count": 42
         },
         {
             "mac_task_uid": "sopbench:bank:pay_bill_with_credit_card:3",
@@ -69486,7 +69486,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 40
         },
         {
             "mac_task_uid": "sopbench:bank:pay_loan:3",
@@ -74536,7 +74536,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 32
         },
         {
             "mac_task_uid": "sopbench:bank:pay_loan:4",
@@ -79592,7 +79592,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:bank:pay_loan:5",
@@ -84642,7 +84642,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 37
         },
         {
             "mac_task_uid": "sopbench:bank:set_account_information:1",
@@ -89222,7 +89222,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:bank:set_safety_box:1",
@@ -93701,7 +93701,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 40
         },
         {
             "mac_task_uid": "sopbench:bank:set_safety_box:10",
@@ -98348,7 +98348,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:bank:set_safety_box:13",
@@ -103105,7 +103105,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 35
         },
         {
             "mac_task_uid": "sopbench:bank:set_safety_box:15",
@@ -107862,7 +107862,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 28
+            "sequence_turn_count": 37
         },
         {
             "mac_task_uid": "sopbench:bank:set_safety_box:18",
@@ -112741,7 +112741,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 30
+            "sequence_turn_count": 35
         },
         {
             "mac_task_uid": "sopbench:bank:set_safety_box:7",
@@ -117416,7 +117416,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:bank:transfer_funds:10",
@@ -122192,7 +122192,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:bank:transfer_funds:11",
@@ -127064,7 +127064,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 35
         },
         {
             "mac_task_uid": "sopbench:bank:transfer_funds:12",
@@ -131906,7 +131906,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:bank:transfer_funds:18",
@@ -136908,7 +136908,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:bank:transfer_funds:22",
@@ -142138,7 +142138,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:bank:transfer_funds:3",
@@ -146596,7 +146596,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 27
+            "sequence_turn_count": 40
         },
         {
             "mac_task_uid": "sopbench:bank:transfer_funds:7",
@@ -151250,7 +151250,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:dmv:cancel_test:0",
@@ -155843,7 +155843,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:dmv:change_dl_address:0",
@@ -160288,7 +160288,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:dmv:change_dl_address:6",
@@ -165003,7 +165003,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:dmv:change_dl_address:7",
@@ -169916,7 +169916,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:dmv:change_dl_address:8",
@@ -174829,7 +174829,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:dmv:change_vehicle_address:0",
@@ -179288,7 +179288,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 32
         },
         {
             "mac_task_uid": "sopbench:dmv:change_vehicle_address:4",
@@ -183940,7 +183940,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 37
         },
         {
             "mac_task_uid": "sopbench:dmv:change_vehicle_address:5",
@@ -188699,7 +188699,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:dmv:register_vehicle:2",
@@ -193350,7 +193350,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:dmv:renew_dl:2",
@@ -198275,7 +198275,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:dmv:renew_dl:4",
@@ -203200,7 +203200,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 28
+            "sequence_turn_count": 39
         },
         {
             "mac_task_uid": "sopbench:dmv:renew_vehicle:12",
@@ -208120,7 +208120,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:dmv:renew_vehicle:7",
@@ -212958,7 +212958,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:dmv:renew_vehicle:8",
@@ -217796,7 +217796,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:dmv:renew_vehicle:9",
@@ -222634,7 +222634,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:dmv:schedule_test:1",
@@ -226718,7 +226718,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:dmv:schedule_test:15",
@@ -233315,7 +233315,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:dmv:schedule_test:5",
@@ -239222,7 +239222,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 32
         },
         {
             "mac_task_uid": "sopbench:dmv:transfer_title:6",
@@ -244213,7 +244213,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:dmv:update_test_status:0",
@@ -249090,7 +249090,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 27
+            "sequence_turn_count": 37
         },
         {
             "mac_task_uid": "sopbench:dmv:validate_vehicle_insurance:10",
@@ -254230,7 +254230,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:dmv:validate_vehicle_insurance:3",
@@ -258858,7 +258858,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:dmv:validate_vehicle_insurance:5",
@@ -263745,7 +263745,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:healthcare:add_authorized_provider:5",
@@ -267881,7 +267881,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:healthcare:appeal_claim:2",
@@ -271945,7 +271945,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:healthcare:appeal_claim:4",
@@ -276417,7 +276417,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:healthcare:appeal_claim:6",
@@ -280889,7 +280889,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:healthcare:get_policy_details:2",
@@ -284779,7 +284779,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:healthcare:reactivate_policy:2",
@@ -288754,7 +288754,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:healthcare:reactivate_policy:4",
@@ -292886,7 +292886,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:healthcare:schedule_appointment:1",
@@ -296719,7 +296719,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 32
         },
         {
             "mac_task_uid": "sopbench:healthcare:schedule_appointment:17",
@@ -301382,7 +301382,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:healthcare:schedule_appointment:18",
@@ -306049,7 +306049,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:healthcare:schedule_appointment:19",
@@ -310716,7 +310716,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:healthcare:schedule_appointment:20",
@@ -315812,7 +315812,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:healthcare:schedule_appointment:7",
@@ -319894,7 +319894,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:healthcare:schedule_appointment:9",
@@ -323972,7 +323972,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:healthcare:submit_claim:15",
@@ -328584,7 +328584,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:healthcare:submit_claim:18",
@@ -333744,7 +333744,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:healthcare:submit_claim:3",
@@ -337452,7 +337452,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:0",
@@ -341447,7 +341447,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 35
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:1",
@@ -345442,7 +345442,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:11",
@@ -349790,7 +349790,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:19",
@@ -353838,7 +353838,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:2",
@@ -357699,7 +357699,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 19
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:27",
@@ -362300,7 +362300,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 36
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:29",
@@ -366733,7 +366733,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:31",
@@ -371166,7 +371166,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:34",
@@ -375751,7 +375751,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:36",
@@ -380148,7 +380148,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:42",
@@ -384980,7 +384980,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:44",
@@ -389818,7 +389818,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:healthcare:update_policy:5",
@@ -393667,7 +393667,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:hotel:book_room:14",
@@ -399241,7 +399241,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:hotel:book_room:16",
@@ -405379,7 +405379,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 10
+            "sequence_turn_count": 15
         },
         {
             "mac_task_uid": "sopbench:hotel:book_room:18",
@@ -411551,7 +411551,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:hotel:book_room:35",
@@ -418046,7 +418046,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:hotel:book_room:36",
@@ -424563,7 +424563,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:hotel:book_room:41",
@@ -431088,7 +431088,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 13
+            "sequence_turn_count": 16
         },
         {
             "mac_task_uid": "sopbench:hotel:book_room:8",
@@ -436783,7 +436783,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:hotel:cancel_reservation:1",
@@ -442070,7 +442070,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 13
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:11",
@@ -447520,7 +447520,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:15",
@@ -453179,7 +453179,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:16",
@@ -458862,7 +458862,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:20",
@@ -464531,7 +464531,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:21",
@@ -470739,7 +470739,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:22",
@@ -477019,7 +477019,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:33",
@@ -482883,7 +482883,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:36",
@@ -488737,7 +488737,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:45",
@@ -494605,7 +494605,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:50",
@@ -500589,7 +500589,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:54",
@@ -507309,7 +507309,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:55",
@@ -514053,7 +514053,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:62",
@@ -520773,7 +520773,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:7",
@@ -525779,7 +525779,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:70",
@@ -532469,7 +532469,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:71",
@@ -539185,7 +539185,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:80",
@@ -545319,7 +545319,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:89",
@@ -552409,7 +552409,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:9",
@@ -557419,7 +557419,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:90",
@@ -564601,7 +564601,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:95",
@@ -571735,7 +571735,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:96",
@@ -578901,7 +578901,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:hotel:modify_reservation:98",
@@ -586035,7 +586035,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:hotel:place_room_service_order:12",
@@ -591547,7 +591547,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:hotel:place_room_service_order:16",
@@ -597470,7 +597470,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:hotel:place_room_service_order:3",
@@ -602765,7 +602765,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:hotel:place_room_service_order:6",
@@ -608060,7 +608060,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:hotel:place_room_service_order:9",
@@ -613751,7 +613751,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkin:0",
@@ -619210,7 +619210,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 11
+            "sequence_turn_count": 19
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkin:2",
@@ -624649,7 +624649,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkin:3",
@@ -630088,7 +630088,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkin:6",
@@ -635701,7 +635701,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkout:0",
@@ -640957,7 +640957,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkout:1",
@@ -646213,7 +646213,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkout:4",
@@ -651643,7 +651643,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 11
+            "sequence_turn_count": 19
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkout:5",
@@ -657073,7 +657073,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 13
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:hotel:process_guest_checkout:6",
@@ -662656,7 +662656,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:hotel:register_loyalty_member:0",
@@ -667961,7 +667961,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:hotel:request_room_change:12",
@@ -673480,7 +673480,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:library:add_book:3",
@@ -677001,7 +677001,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:0",
@@ -680071,7 +680071,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 13
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:1",
@@ -683139,7 +683139,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:13",
@@ -687461,7 +687461,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:23",
@@ -691635,7 +691635,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:24",
@@ -695811,7 +695811,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 35
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:3",
@@ -698883,7 +698883,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:5",
@@ -702354,7 +702354,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:library:borrow_book:6",
@@ -705825,7 +705825,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:library:check_return_date:2",
@@ -709302,7 +709302,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:library:pay_late_fee:0",
@@ -712791,7 +712791,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 25
         },
         {
             "mac_task_uid": "sopbench:library:remove_book:1",
@@ -716494,7 +716494,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:library:reserve_room:11",
@@ -720569,7 +720569,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:library:reserve_room:4",
@@ -724228,7 +724228,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:library:reserve_room:6",
@@ -728303,7 +728303,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:library:show_available_rooms:2",
@@ -731598,7 +731598,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 11
+            "sequence_turn_count": 18
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:0",
@@ -735785,7 +735785,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:14",
@@ -740505,7 +740505,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 36
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:2",
@@ -744704,7 +744704,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:20",
@@ -749328,7 +749328,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:27",
@@ -754092,7 +754092,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 13
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:28",
@@ -758880,7 +758880,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:29",
@@ -763644,7 +763644,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:39",
@@ -768608,7 +768608,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:4",
@@ -772948,7 +772948,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:40",
@@ -777926,7 +777926,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 27
+            "sequence_turn_count": 36
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:41",
@@ -782890,7 +782890,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 16
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:45",
@@ -788084,7 +788084,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:online_market:add_review:50",
@@ -793532,7 +793532,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:1",
@@ -797877,7 +797877,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:15",
@@ -802948,7 +802948,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 12
+            "sequence_turn_count": 19
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:16",
@@ -808051,7 +808051,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:18",
@@ -814321,7 +814321,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:22",
@@ -820591,7 +820591,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:27",
@@ -826895,7 +826895,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 24
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:32",
@@ -833199,7 +833199,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 27
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:35",
@@ -840067,7 +840067,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:37",
@@ -846935,7 +846935,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:38",
@@ -853803,7 +853803,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 27
+            "sequence_turn_count": 36
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:4",
@@ -858162,7 +858162,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 28
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:7",
@@ -862837,7 +862837,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:online_market:exchange_product:8",
@@ -867535,7 +867535,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 24
         },
         {
             "mac_task_uid": "sopbench:online_market:place_order:2",
@@ -872341,7 +872341,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 33
         },
         {
             "mac_task_uid": "sopbench:online_market:return_order:1",
@@ -877095,7 +877095,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 32
         },
         {
             "mac_task_uid": "sopbench:online_market:return_order:4",
@@ -882301,7 +882301,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:0",
@@ -887081,7 +887081,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:10",
@@ -892222,7 +892222,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 30
+            "sequence_turn_count": 41
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:12",
@@ -897339,7 +897339,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 23
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:13",
@@ -902456,7 +902456,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 25
+            "sequence_turn_count": 35
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:16",
@@ -907614,7 +907614,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:25",
@@ -912560,7 +912560,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 13
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:27",
@@ -918090,7 +918090,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:29",
@@ -923620,7 +923620,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 34
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:3",
@@ -928259,7 +928259,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:34",
@@ -933804,7 +933804,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 31
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:4",
@@ -938389,7 +938389,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 19
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:42",
@@ -944401,7 +944401,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 26
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:online_market:use_coupon:8",
@@ -949542,7 +949542,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 22
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:university:apply_financial_aid:4",
@@ -955490,7 +955490,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:university:apply_financial_aid:5",
@@ -961438,7 +961438,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 21
         },
         {
             "mac_task_uid": "sopbench:university:change_major:1",
@@ -967059,7 +967059,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 26
         },
         {
             "mac_task_uid": "sopbench:university:change_major:3",
@@ -972680,7 +972680,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 20
+            "sequence_turn_count": 29
         },
         {
             "mac_task_uid": "sopbench:university:declare_minor:3",
@@ -978591,7 +978591,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 18
+            "sequence_turn_count": 22
         },
         {
             "mac_task_uid": "sopbench:university:enroll_course:3",
@@ -985427,7 +985427,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 21
+            "sequence_turn_count": 27
         },
         {
             "mac_task_uid": "sopbench:university:enroll_course:6",
@@ -992301,7 +992301,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 23
+            "sequence_turn_count": 30
         },
         {
             "mac_task_uid": "sopbench:university:enroll_course:7",
@@ -999139,7 +999139,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 14
+            "sequence_turn_count": 18
         },
         {
             "mac_task_uid": "sopbench:university:request_graduation:0",
@@ -1005761,7 +1005761,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 17
+            "sequence_turn_count": 20
         },
         {
             "mac_task_uid": "sopbench:university:request_graduation:3",
@@ -1012391,7 +1012391,7 @@
                     "type": "function"
                 }
             ],
-            "sequence_turn_count": 15
+            "sequence_turn_count": 20
         }
     ]
 }

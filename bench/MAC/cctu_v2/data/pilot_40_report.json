@@ -1,0 +1,22 @@
+{
+  "schema_version": "CCTUV2PilotReportV1",
+  "generated_at": "2026-07-11T07:47:30.183936+00:00",
+  "episode_count": 40,
+  "condition_count": 160,
+  "taxonomy_distribution": {
+    "static_action_local": 10,
+    "dynamic_action_local": 10,
+    "static_trajectory_conditioned": 10,
+    "dynamic_trajectory_conditioned": 10
+  },
+  "positive_label_rate": 0.625,
+  "always_allow_accuracy": 0.625,
+  "counterfactual_groups_with_label_flip": 40,
+  "counterfactual_flip_rate": 1.0,
+  "oracle_accuracy": 1.0,
+  "validation_errors": [],
+  "expansion_decision": {
+    "status": "hold_for_memory_system_pilot",
+    "reason": "Structural pilot passes; expansion still requires real memory-system runs and human review."
+  }
+}

@@ -1,0 +1,369 @@
+{
+  "schema_version": "CCTUV2LLMBaselinesV1",
+  "generated_at": "2026-07-11T07:51:22.012046+00:00",
+  "model": "glm-5.2",
+  "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+  "bm25_top_k": 10,
+  "systems": {
+    "oracle": {
+      "summary": {
+        "condition_count": 4,
+        "accuracy": 1.0,
+        "accuracy_by_taxonomy": {
+          "static_trajectory_conditioned": 1.0
+        },
+        "all_conditions_correct_episode_rate": 1.0
+      },
+      "rows": [
+        {
+          "condition_id": "pilot-029::active_current_scope::below_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": false,
+          "prediction": false,
+          "correct": true,
+          "usage": {
+            "completion_tokens": 903,
+            "prompt_tokens": 553,
+            "total_tokens": 1456,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": null,
+              "audio_tokens": null,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": null
+            },
+            "prompt_tokens_details": {
+              "audio_tokens": null,
+              "cached_tokens": 0
+            }
+          }
+        },
+        {
+          "condition_id": "pilot-029::active_current_scope::at_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        },
+        {
+          "condition_id": "pilot-029::same_rule_out_of_scope::below_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        },
+        {
+          "condition_id": "pilot-029::same_rule_out_of_scope::at_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        }
+      ]
+    },
+    "bm25": {
+      "summary": {
+        "condition_count": 4,
+        "accuracy": 1.0,
+        "accuracy_by_taxonomy": {
+          "static_trajectory_conditioned": 1.0
+        },
+        "all_conditions_correct_episode_rate": 1.0
+      },
+      "rows": [
+        {
+          "condition_id": "pilot-029::active_current_scope::below_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": false,
+          "prediction": false,
+          "correct": true,
+          "usage": {
+            "completion_tokens": 706,
+            "prompt_tokens": 806,
+            "total_tokens": 1512,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": null,
+              "audio_tokens": null,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": null
+            },
+            "prompt_tokens_details": {
+              "audio_tokens": null,
+              "cached_tokens": 0
+            }
+          }
+        },
+        {
+          "condition_id": "pilot-029::active_current_scope::at_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        },
+        {
+          "condition_id": "pilot-029::same_rule_out_of_scope::below_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        },
+        {
+          "condition_id": "pilot-029::same_rule_out_of_scope::at_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        }
+      ]
+    },
+    "long_context": {
+      "summary": {
+        "condition_count": 4,
+        "accuracy": 1.0,
+        "accuracy_by_taxonomy": {
+          "static_trajectory_conditioned": 1.0
+        },
+        "all_conditions_correct_episode_rate": 1.0
+      },
+      "rows": [
+        {
+          "condition_id": "pilot-029::active_current_scope::below_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": false,
+          "prediction": false,
+          "correct": true,
+          "usage": {
+            "completion_tokens": 1571,
+            "prompt_tokens": 822,
+            "total_tokens": 2393,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": null,
+              "audio_tokens": null,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": null
+            },
+            "prompt_tokens_details": {
+              "audio_tokens": null,
+              "cached_tokens": 0
+            }
+          }
+        },
+        {
+          "condition_id": "pilot-029::active_current_scope::at_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        },
+        {
+          "condition_id": "pilot-029::same_rule_out_of_scope::below_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        },
+        {
+          "condition_id": "pilot-029::same_rule_out_of_scope::at_boundary",
+          "taxonomy_cell": "static_trajectory_conditioned",
+          "memory": null,
+          "current_context": {
+            "user": "user-01",
+            "project": "Project-029",
+            "phase": "verification",
+            "task": "mac-cctu-t-00014",
+            "resource": null
+          },
+          "trajectory_so_far": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ],
+          "candidate_next_action": {
+            "kind": "final_response",
+            "complies": true
+          },
+          "gold": true,
+          "prediction": true,
+          "correct": true,
+          "usage": null
+        }
+      ]
+    }
+  }
+}

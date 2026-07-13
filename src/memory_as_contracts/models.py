@@ -392,6 +392,7 @@ class Contract(StrictModel):
     check_patterns: list[ToolPattern] = Field(default_factory=list)
     update_patterns: list[ToolPattern] = Field(default_factory=list)
     state_fields: list[str] = Field(default_factory=list)
+    policy_ir: dict[str, Any] | None = None
 
     kind: ContractKind = ContractKind.PREFERENCE
     modality: Modality = Modality.SHOULD

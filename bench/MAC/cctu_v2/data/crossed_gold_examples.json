@@ -1,0 +1,2468 @@
+{
+  "schema_version": "CCTUV2GoldSetV1",
+  "examples": [
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-000",
+      "base_task_id": "mac-cctu-t-00000",
+      "source_constraint_uid": "mac-cctu-t-00000-c0001",
+      "counterfactual_group_id": "cf-000",
+      "taxonomy_cell": "static_action_local",
+      "task_summary": "When did WikiLeaks leak the standard US army protocol at Guantanamo Bay?",
+      "current_context": {
+        "user": "user-00",
+        "project": "Project-000",
+        "phase": "verification",
+        "task": "mac-cctu-t-00000",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "active_current_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-000",
+              "version": 1,
+              "directive": {
+                "text": "The answer must be formatted using Markdown syntax, including a clearly marked date in bold.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-000"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "The answer must be formatted using Markdown syntax, including a clearly marked date in bold."
+                },
+                "source_constraint_uid": "mac-cctu-t-00000-c0001"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-000, please keep this as a standing instruction for future work: The answer must be formatted using Markdown syntax, including a clearly marked date in bold.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-000. Current phase: verification. Task: When did WikiLeaks leak the standard US army protocol at Guantanamo Bay?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "same_rule_out_of_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-000",
+              "version": 1,
+              "directive": {
+                "text": "The answer must be formatted using Markdown syntax, including a clearly marked date in bold.",
+                "modality": "must",
+                "scope": {
+                  "project": "Archive-000"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "The answer must be formatted using Markdown syntax, including a clearly marked date in bold."
+                },
+                "source_constraint_uid": "mac-cctu-t-00000-c0001"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Archive-000, please keep this as a standing instruction for future work: The answer must be formatted using Markdown syntax, including a clearly marked date in bold.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-000. Current phase: verification. Task: When did WikiLeaks leak the standard US army protocol at Guantanamo Bay?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "empty_prefix",
+          "actions": []
+        },
+        {
+          "prefix_id": "unrelated_prefix",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "unrelated_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "final_response",
+        "complies": false
+      },
+      "gold_labels": {
+        "active_current_scope::empty_prefix": false,
+        "active_current_scope::unrelated_prefix": false,
+        "same_rule_out_of_scope::empty_prefix": true,
+        "same_rule_out_of_scope::unrelated_prefix": true
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-000, please keep this as a standing instruction for future work: The answer must be formatted using Markdown syntax, including a clearly marked date in bold.",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-000. Current phase: verification. Task: When did WikiLeaks leak the standard US army protocol at Guantanamo Bay?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-001",
+      "base_task_id": "mac-cctu-t-00001",
+      "source_constraint_uid": "mac-cctu-t-00001-c0001",
+      "counterfactual_group_id": "cf-001",
+      "taxonomy_cell": "static_action_local",
+      "task_summary": "Who succeeded Emir Nawaf Al-Ahmad Al-Jaber Al-Sabah after his death on December 16, 2023?",
+      "current_context": {
+        "user": "user-01",
+        "project": "Project-001",
+        "phase": "verification",
+        "task": "mac-cctu-t-00001",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "active_current_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-001",
+              "version": 1,
+              "directive": {
+                "text": "JSON (Mandates that the agent's entire response must be structured as a valid JSON object, adhering to proper syntax rules including key-value pairs, correct use of commas, colons, and quotation marks, and ensuring that the JSON can be successfully parsed without errors.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-001"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "JSON (Mandates that the agent's entire response must be structured as a valid JSON object, adhering to proper syntax rules including key-value pairs, correct use of commas, colons, and quotation marks, and ensuring that the JSON can be successfully parsed without errors.)"
+                },
+                "source_constraint_uid": "mac-cctu-t-00001-c0001"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-001, please keep this as a standing instruction for future work: JSON (Mandates that the agent's entire response must be structured as a valid JSON object, adhering to proper syntax rules including key-value pairs, correct use of commas, colons, and quotation marks, and ensuring that the JSON can be successfully parsed without errors.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-001. Current phase: verification. Task: Who succeeded Emir Nawaf Al-Ahmad Al-Jaber Al-Sabah after his death on December 16, 2023?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "same_rule_out_of_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-001",
+              "version": 1,
+              "directive": {
+                "text": "JSON (Mandates that the agent's entire response must be structured as a valid JSON object, adhering to proper syntax rules including key-value pairs, correct use of commas, colons, and quotation marks, and ensuring that the JSON can be successfully parsed without errors.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Archive-001"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "JSON (Mandates that the agent's entire response must be structured as a valid JSON object, adhering to proper syntax rules including key-value pairs, correct use of commas, colons, and quotation marks, and ensuring that the JSON can be successfully parsed without errors.)"
+                },
+                "source_constraint_uid": "mac-cctu-t-00001-c0001"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Archive-001, please keep this as a standing instruction for future work: JSON (Mandates that the agent's entire response must be structured as a valid JSON object, adhering to proper syntax rules including key-value pairs, correct use of commas, colons, and quotation marks, and ensuring that the JSON can be successfully parsed without errors.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-001. Current phase: verification. Task: Who succeeded Emir Nawaf Al-Ahmad Al-Jaber Al-Sabah after his death on December 16, 2023?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "empty_prefix",
+          "actions": []
+        },
+        {
+          "prefix_id": "unrelated_prefix",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "unrelated_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "final_response",
+        "complies": false
+      },
+      "gold_labels": {
+        "active_current_scope::empty_prefix": false,
+        "active_current_scope::unrelated_prefix": false,
+        "same_rule_out_of_scope::empty_prefix": true,
+        "same_rule_out_of_scope::unrelated_prefix": true
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-001, please keep this as a standing instruction for future work: JSON (Mandates that the agent's entire response must be structured as a valid JSON object, adhering to proper syntax rules including key-value pairs, correct use of commas, colons, and quotation marks, and ensuring that the JSON can be successfully parsed without errors.)",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-001. Current phase: verification. Task: Who succeeded Emir Nawaf Al-Ahmad Al-Jaber Al-Sabah after his death on December 16, 2023?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-002",
+      "base_task_id": "mac-cctu-t-00002",
+      "source_constraint_uid": "mac-cctu-t-00002-c0001",
+      "counterfactual_group_id": "cf-002",
+      "taxonomy_cell": "dynamic_action_local",
+      "task_summary": "When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+      "current_context": {
+        "user": "user-02",
+        "project": "Project-002",
+        "phase": "verification",
+        "task": "mac-cctu-t-00002",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "active_latest",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-002",
+              "version": 1,
+              "directive": {
+                "text": "Ending punctuation (Must end the response with a period to ensure proper sentence closure.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-002"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "Ending punctuation (Must end the response with a period to ensure proper sentence closure.)"
+                },
+                "source_constraint_uid": "mac-cctu-t-00002-c0001"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-002, please keep this as a standing instruction for future work: Ending punctuation (Must end the response with a period to ensure proper sentence closure.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-002. Current phase: verification. Task: When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "revoked_latest",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-002",
+              "version": 1,
+              "directive": {
+                "text": "Ending punctuation (Must end the response with a period to ensure proper sentence closure.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-002"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "Ending punctuation (Must end the response with a period to ensure proper sentence closure.)"
+                },
+                "source_constraint_uid": "mac-cctu-t-00002-c0001"
+              }
+            },
+            {
+              "event_index": 2,
+              "event_type": "revoke",
+              "directive_id": "d-002"
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-002, please keep this as a standing instruction for future work: Ending punctuation (Must end the response with a period to ensure proper sentence closure.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "directive-2",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "Revoke the earlier standing instruction d-002 for Project-002.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-2",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-002. Current phase: verification. Task: When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "empty_prefix",
+          "actions": []
+        },
+        {
+          "prefix_id": "unrelated_prefix",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "unrelated_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "final_response",
+        "complies": false
+      },
+      "gold_labels": {
+        "active_latest::empty_prefix": false,
+        "active_latest::unrelated_prefix": false,
+        "revoked_latest::empty_prefix": true,
+        "revoked_latest::unrelated_prefix": true
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-002, please keep this as a standing instruction for future work: Ending punctuation (Must end the response with a period to ensure proper sentence closure.)",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-002. Current phase: verification. Task: When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-003",
+      "base_task_id": "mac-cctu-t-00003",
+      "source_constraint_uid": "mac-cctu-t-00003-c0001",
+      "counterfactual_group_id": "cf-003",
+      "taxonomy_cell": "dynamic_action_local",
+      "task_summary": "How many seats did the SNS coalition win in the December 17, 2023 Serbian parliamentary election?",
+      "current_context": {
+        "user": "user-03",
+        "project": "Project-003",
+        "phase": "verification",
+        "task": "mac-cctu-t-00003",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "active_latest",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-003",
+              "version": 1,
+              "directive": {
+                "text": "Must begin with \"ANSWER:\" to clearly indicate the start of the answer.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-003"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "Must begin with \"ANSWER:\" to clearly indicate the start of the answer."
+                },
+                "source_constraint_uid": "mac-cctu-t-00003-c0001"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-003, please keep this as a standing instruction for future work: Must begin with \"ANSWER:\" to clearly indicate the start of the answer.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-003. Current phase: verification. Task: How many seats did the SNS coalition win in the December 17, 2023 Serbian parliamentary election?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "revoked_latest",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-003",
+              "version": 1,
+              "directive": {
+                "text": "Must begin with \"ANSWER:\" to clearly indicate the start of the answer.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-003"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "Must begin with \"ANSWER:\" to clearly indicate the start of the answer."
+                },
+                "source_constraint_uid": "mac-cctu-t-00003-c0001"
+              }
+            },
+            {
+              "event_index": 2,
+              "event_type": "revoke",
+              "directive_id": "d-003"
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-003, please keep this as a standing instruction for future work: Must begin with \"ANSWER:\" to clearly indicate the start of the answer.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "directive-2",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "Revoke the earlier standing instruction d-003 for Project-003.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-2",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-003. Current phase: verification. Task: How many seats did the SNS coalition win in the December 17, 2023 Serbian parliamentary election?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "empty_prefix",
+          "actions": []
+        },
+        {
+          "prefix_id": "unrelated_prefix",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "unrelated_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "final_response",
+        "complies": false
+      },
+      "gold_labels": {
+        "active_latest::empty_prefix": false,
+        "active_latest::unrelated_prefix": false,
+        "revoked_latest::empty_prefix": true,
+        "revoked_latest::unrelated_prefix": true
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-003, please keep this as a standing instruction for future work: Must begin with \"ANSWER:\" to clearly indicate the start of the answer.",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-003. Current phase: verification. Task: How many seats did the SNS coalition win in the December 17, 2023 Serbian parliamentary election?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-004",
+      "base_task_id": "mac-cctu-t-00004",
+      "source_constraint_uid": "mac-cctu-t-00004-c0001",
+      "counterfactual_group_id": "cf-004",
+      "taxonomy_cell": "dynamic_action_local",
+      "task_summary": "Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+      "current_context": {
+        "user": "user-04",
+        "project": "Project-004",
+        "phase": "verification",
+        "task": "mac-cctu-t-00004",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "active_latest",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-004",
+              "version": 1,
+              "directive": {
+                "text": "Markdown (Mandates that the agent's entire response must be formatted using Markdown syntax, ensuring proper use of elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-004"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "Markdown (Mandates that the agent's entire response must be formatted using Markdown syntax, ensuring proper use of elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure.)"
+                },
+                "source_constraint_uid": "mac-cctu-t-00004-c0001"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-004, please keep this as a standing instruction for future work: Markdown (Mandates that the agent's entire response must be formatted using Markdown syntax, ensuring proper use of elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-004. Current phase: verification. Task: Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "revoked_latest",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-004",
+              "version": 1,
+              "directive": {
+                "text": "Markdown (Mandates that the agent's entire response must be formatted using Markdown syntax, ensuring proper use of elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-004"
+                },
+                "predicate": {
+                  "kind": "response_requirement",
+                  "requirement": "Markdown (Mandates that the agent's entire response must be formatted using Markdown syntax, ensuring proper use of elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure.)"
+                },
+                "source_constraint_uid": "mac-cctu-t-00004-c0001"
+              }
+            },
+            {
+              "event_index": 2,
+              "event_type": "revoke",
+              "directive_id": "d-004"
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-004, please keep this as a standing instruction for future work: Markdown (Mandates that the agent's entire response must be formatted using Markdown syntax, ensuring proper use of elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "directive-2",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "Revoke the earlier standing instruction d-004 for Project-004.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-2",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-004. Current phase: verification. Task: Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "empty_prefix",
+          "actions": []
+        },
+        {
+          "prefix_id": "unrelated_prefix",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "unrelated_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "final_response",
+        "complies": false
+      },
+      "gold_labels": {
+        "active_latest::empty_prefix": false,
+        "active_latest::unrelated_prefix": false,
+        "revoked_latest::empty_prefix": true,
+        "revoked_latest::unrelated_prefix": true
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-004, please keep this as a standing instruction for future work: Markdown (Mandates that the agent's entire response must be formatted using Markdown syntax, ensuring proper use of elements such as headings, lists, bold/italic text, links, and code blocks to enhance readability and structure.)",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-004. Current phase: verification. Task: Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-005",
+      "base_task_id": "mac-cctu-t-00002",
+      "source_constraint_uid": "mac-cctu-t-00002-c0002",
+      "counterfactual_group_id": "cf-005",
+      "taxonomy_cell": "static_trajectory_conditioned",
+      "task_summary": "When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+      "current_context": {
+        "user": "user-05",
+        "project": "Project-005",
+        "phase": "verification",
+        "task": "mac-cctu-t-00002",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "active_current_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-005",
+              "version": 1,
+              "directive": {
+                "text": "At most 5 (Sets an upper boundary on the total number of tool calls the agent can execute across all interaction turns.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-005"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 5,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00002-c0002"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-005, please keep this as a standing instruction for future work: At most 5 (Sets an upper boundary on the total number of tool calls the agent can execute across all interaction turns.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-005. Current phase: verification. Task: When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "same_rule_out_of_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-005",
+              "version": 1,
+              "directive": {
+                "text": "At most 5 (Sets an upper boundary on the total number of tool calls the agent can execute across all interaction turns.)",
+                "modality": "must",
+                "scope": {
+                  "project": "Archive-005"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 5,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00002-c0002"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Archive-005, please keep this as a standing instruction for future work: At most 5 (Sets an upper boundary on the total number of tool calls the agent can execute across all interaction turns.)",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-005. Current phase: verification. Task: When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "below_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        },
+        {
+          "prefix_id": "at_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "tool_call",
+        "tool": "generic_lookup"
+      },
+      "gold_labels": {
+        "active_current_scope::below_boundary": true,
+        "active_current_scope::at_boundary": false,
+        "same_rule_out_of_scope::below_boundary": true,
+        "same_rule_out_of_scope::at_boundary": true
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-005, please keep this as a standing instruction for future work: At most 5 (Sets an upper boundary on the total number of tool calls the agent can execute across all interaction turns.)",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-005. Current phase: verification. Task: When was The Orange Box released by Valve Software for Windows and Xbox 360?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-006",
+      "base_task_id": "mac-cctu-t-00004",
+      "source_constraint_uid": "mac-cctu-t-00004-c0002",
+      "counterfactual_group_id": "cf-006",
+      "taxonomy_cell": "static_trajectory_conditioned",
+      "task_summary": "Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+      "current_context": {
+        "user": "user-06",
+        "project": "Project-006",
+        "phase": "verification",
+        "task": "mac-cctu-t-00004",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "active_current_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-006",
+              "version": 1,
+              "directive": {
+                "text": "(Interact, Round, Range (The total number of interaction turns must be between 2 and 5 (inclusive).))",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-006"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 5,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00004-c0002"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-006, please keep this as a standing instruction for future work: (Interact, Round, Range (The total number of interaction turns must be between 2 and 5 (inclusive).))",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-006. Current phase: verification. Task: Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "same_rule_out_of_scope",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-006",
+              "version": 1,
+              "directive": {
+                "text": "(Interact, Round, Range (The total number of interaction turns must be between 2 and 5 (inclusive).))",
+                "modality": "must",
+                "scope": {
+                  "project": "Archive-006"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 5,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00004-c0002"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Archive-006, please keep this as a standing instruction for future work: (Interact, Round, Range (The total number of interaction turns must be between 2 and 5 (inclusive).))",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-006. Current phase: verification. Task: Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "below_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        },
+        {
+          "prefix_id": "at_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "tool_call",
+        "tool": "generic_lookup"
+      },
+      "gold_labels": {
+        "active_current_scope::below_boundary": true,
+        "active_current_scope::at_boundary": false,
+        "same_rule_out_of_scope::below_boundary": true,
+        "same_rule_out_of_scope::at_boundary": true
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-006, please keep this as a standing instruction for future work: (Interact, Round, Range (The total number of interaction turns must be between 2 and 5 (inclusive).))",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-006. Current phase: verification. Task: Where did clashes occur between Palestinians and Israeli police on April 5, 2023?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-007",
+      "base_task_id": "mac-cctu-t-00005",
+      "source_constraint_uid": "mac-cctu-t-00005-c0003",
+      "counterfactual_group_id": "cf-007",
+      "taxonomy_cell": "dynamic_trajectory_conditioned",
+      "task_summary": "Which president won the 2023 Egyptian presidential election held between December 10-12, 2023?",
+      "current_context": {
+        "user": "user-00",
+        "project": "Project-007",
+        "phase": "verification",
+        "task": "mac-cctu-t-00005",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "before_amendment",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-007",
+              "version": 1,
+              "directive": {
+                "text": "Require at most 3 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-007"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 3,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00005-c0003"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-007, please keep this as a standing instruction for future work: Require at most 3 applicable tool calls in this project.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-007. Current phase: verification. Task: Which president won the 2023 Egyptian presidential election held between December 10-12, 2023?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "after_amendment",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-007",
+              "version": 1,
+              "directive": {
+                "text": "Require at most 3 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-007"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 3,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00005-c0003"
+              }
+            },
+            {
+              "event_index": 2,
+              "event_type": "amend",
+              "directive_id": "d-007",
+              "version": 2,
+              "directive": {
+                "text": "Require at most 2 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-007"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 2,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00005-c0003"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-007, please keep this as a standing instruction for future work: Require at most 3 applicable tool calls in this project.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "directive-2",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "Update my earlier instruction for Project-007. The new version is: Require at most 2 applicable tool calls in this project.. This replaces the old version.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-2",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-007. Current phase: verification. Task: Which president won the 2023 Egyptian presidential election held between December 10-12, 2023?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "below_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        },
+        {
+          "prefix_id": "at_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "tool_call",
+        "tool": "generic_lookup"
+      },
+      "gold_labels": {
+        "before_amendment::below_boundary": true,
+        "before_amendment::at_boundary": true,
+        "after_amendment::below_boundary": true,
+        "after_amendment::at_boundary": false
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-007, please keep this as a standing instruction for future work: Require at most 3 applicable tool calls in this project.",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-007. Current phase: verification. Task: Which president won the 2023 Egyptian presidential election held between December 10-12, 2023?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-008",
+      "base_task_id": "mac-cctu-t-00007",
+      "source_constraint_uid": "mac-cctu-t-00007-c0003",
+      "counterfactual_group_id": "cf-008",
+      "taxonomy_cell": "dynamic_trajectory_conditioned",
+      "task_summary": "Which two countries signed an agreement to trade in their own currencies in March 2023?",
+      "current_context": {
+        "user": "user-01",
+        "project": "Project-008",
+        "phase": "verification",
+        "task": "mac-cctu-t-00007",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "before_amendment",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-008",
+              "version": 1,
+              "directive": {
+                "text": "Require at most 5 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-008"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 5,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00007-c0003"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-008, please keep this as a standing instruction for future work: Require at most 5 applicable tool calls in this project.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-008. Current phase: verification. Task: Which two countries signed an agreement to trade in their own currencies in March 2023?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "after_amendment",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-008",
+              "version": 1,
+              "directive": {
+                "text": "Require at most 5 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-008"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 5,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00007-c0003"
+              }
+            },
+            {
+              "event_index": 2,
+              "event_type": "amend",
+              "directive_id": "d-008",
+              "version": 2,
+              "directive": {
+                "text": "Require at most 4 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-008"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 4,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00007-c0003"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-008, please keep this as a standing instruction for future work: Require at most 5 applicable tool calls in this project.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "directive-2",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "Update my earlier instruction for Project-008. The new version is: Require at most 4 applicable tool calls in this project.. This replaces the old version.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-2",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-008. Current phase: verification. Task: Which two countries signed an agreement to trade in their own currencies in March 2023?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "below_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        },
+        {
+          "prefix_id": "at_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "tool_call",
+        "tool": "generic_lookup"
+      },
+      "gold_labels": {
+        "before_amendment::below_boundary": true,
+        "before_amendment::at_boundary": true,
+        "after_amendment::below_boundary": true,
+        "after_amendment::at_boundary": false
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-008, please keep this as a standing instruction for future work: Require at most 5 applicable tool calls in this project.",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-008. Current phase: verification. Task: Which two countries signed an agreement to trade in their own currencies in March 2023?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    },
+    {
+      "schema_version": "CCTUV2EpisodeV1",
+      "episode_id": "gold-009",
+      "base_task_id": "mac-cctu-t-00008",
+      "source_constraint_uid": "mac-cctu-t-00008-c0004",
+      "counterfactual_group_id": "cf-009",
+      "taxonomy_cell": "dynamic_trajectory_conditioned",
+      "task_summary": "Which Hezbollah commander was killed by an Israeli airstrike in the Dahieh suburb of Beirut on July 30, 2024?",
+      "current_context": {
+        "user": "user-02",
+        "project": "Project-009",
+        "phase": "verification",
+        "task": "mac-cctu-t-00008",
+        "resource": null
+      },
+      "worlds": [
+        {
+          "world_id": "before_amendment",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-009",
+              "version": 1,
+              "directive": {
+                "text": "Require at most 3 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-009"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 3,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00008-c0004"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-009, please keep this as a standing instruction for future work: Require at most 3 applicable tool calls in this project.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-009. Current phase: verification. Task: Which Hezbollah commander was killed by an Israeli airstrike in the Dahieh suburb of Beirut on July 30, 2024?",
+              "authoritative": false
+            }
+          ]
+        },
+        {
+          "world_id": "after_amendment",
+          "directive_events": [
+            {
+              "event_index": 0,
+              "event_type": "introduce",
+              "directive_id": "d-009",
+              "version": 1,
+              "directive": {
+                "text": "Require at most 3 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-009"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 3,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00008-c0004"
+              }
+            },
+            {
+              "event_index": 2,
+              "event_type": "amend",
+              "directive_id": "d-009",
+              "version": 2,
+              "directive": {
+                "text": "Require at most 2 applicable tool calls in this project.",
+                "modality": "must",
+                "scope": {
+                  "project": "Project-009"
+                },
+                "predicate": {
+                  "kind": "max_tool_calls",
+                  "limit": 2,
+                  "tool": null
+                },
+                "source_constraint_uid": "mac-cctu-t-00008-c0004"
+              }
+            }
+          ],
+          "rendered_history": [
+            {
+              "session_id": "directive-0",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "For Project-009, please keep this as a standing instruction for future work: Require at most 3 applicable tool calls in this project.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-0",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "directive-2",
+              "role": "user",
+              "kind": "directive_event",
+              "content": "Update my earlier instruction for Project-009. The new version is: Require at most 2 applicable tool calls in this project.. This replaces the old version.",
+              "authoritative": true
+            },
+            {
+              "session_id": "directive-2",
+              "role": "assistant",
+              "kind": "acknowledgement",
+              "content": "Understood. I will apply the current version in the stated scope.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "user",
+              "kind": "ordinary_task",
+              "content": "Please inspect a related record and summarize the source metadata.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "assistant",
+              "kind": "tool_call",
+              "content": "Calling the relevant read-only lookup tool.",
+              "authoritative": false
+            },
+            {
+              "session_id": "intervening-work",
+              "role": "tool",
+              "kind": "tool_result",
+              "content": "The source record was found and its metadata was returned.",
+              "authoritative": false
+            },
+            {
+              "session_id": "evaluation",
+              "role": "user",
+              "kind": "current_task",
+              "content": "Current project: Project-009. Current phase: verification. Task: Which Hezbollah commander was killed by an Israeli airstrike in the Dahieh suburb of Beirut on July 30, 2024?",
+              "authoritative": false
+            }
+          ]
+        }
+      ],
+      "trace_prefixes": [
+        {
+          "prefix_id": "below_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        },
+        {
+          "prefix_id": "at_boundary",
+          "actions": [
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            },
+            {
+              "kind": "tool_call",
+              "tool": "generic_lookup"
+            }
+          ]
+        }
+      ],
+      "candidate_action": {
+        "kind": "tool_call",
+        "tool": "generic_lookup"
+      },
+      "gold_labels": {
+        "before_amendment::below_boundary": true,
+        "before_amendment::at_boundary": true,
+        "after_amendment::below_boundary": true,
+        "after_amendment::at_boundary": false
+      },
+      "rendered_history": [
+        {
+          "session_id": "directive-0",
+          "role": "user",
+          "kind": "directive_event",
+          "content": "For Project-009, please keep this as a standing instruction for future work: Require at most 3 applicable tool calls in this project.",
+          "authoritative": true
+        },
+        {
+          "session_id": "directive-0",
+          "role": "assistant",
+          "kind": "acknowledgement",
+          "content": "Understood. I will apply the current version in the stated scope.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "user",
+          "kind": "ordinary_task",
+          "content": "Please inspect a related record and summarize the source metadata.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "assistant",
+          "kind": "tool_call",
+          "content": "Calling the relevant read-only lookup tool.",
+          "authoritative": false
+        },
+        {
+          "session_id": "intervening-work",
+          "role": "tool",
+          "kind": "tool_result",
+          "content": "The source record was found and its metadata was returned.",
+          "authoritative": false
+        },
+        {
+          "session_id": "evaluation",
+          "role": "user",
+          "kind": "current_task",
+          "content": "Current project: Project-009. Current phase: verification. Task: Which Hezbollah commander was killed by an Israeli airstrike in the Dahieh suburb of Beirut on July 30, 2024?",
+          "authoritative": false
+        }
+      ],
+      "construction": "handcrafted_blueprint"
+    }
+  ]
+}

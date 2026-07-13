@@ -37,6 +37,13 @@ class MaxCallsPerToolHandler(BaseHandler):
             return
         for call in ctx.tool_calls or []:
             name = call["function"]["name"]
+            # Unknown or parser-polluted tool names are invalid actions, but
+            # they are not instances of any configured per-tool call limit.
+            # ToolArgsChecker reports them as nonexistent tools later in the
+            # replay pipeline; do not let this constraint handler crash the
+            # entire grader before that validation can run.
+            if name not in checker.callTimesPerTool:
+                continue
             checker.callTimesPerTool[name] += 1
             if checker.callTimesPerTool[name] > checker.max_callTimesPerTool[name]:
                 fb.add_tool(

@@ -12,6 +12,7 @@ from memory_as_contracts.models import (
     ContractSource,
     ContractStatus,
     EdgeRelation,
+    GateDecisionType,
     Lifecycle,
     LifecycleType,
     MatchOutcome,
@@ -81,6 +82,33 @@ def push_prohibition(contract_id: str = "MAC-push") -> Contract:
             tags=["external_write", "publish_code"],
         ),
         check_patterns=git_push_tool_patterns(),
+    )
+
+
+def policy_ir_contract(
+    contract_id: str,
+    *,
+    text: str,
+    effect: RuleEffect,
+    policy_ir: dict,
+    scope: Scope | None = None,
+    kind: ContractKind | None = None,
+    modality: Modality | None = None,
+    strength: Strength = Strength.HARD,
+) -> Contract:
+    return Contract(
+        id=contract_id,
+        text=text,
+        effect=effect,
+        kind=kind
+        or (ContractKind.PROHIBITION if effect == RuleEffect.DENY else ContractKind.REQUIREMENT),
+        modality=modality
+        or (Modality.MUST_NOT if effect == RuleEffect.DENY else Modality.MUST),
+        strength=strength,
+        source=source(),
+        scope=scope or project_scope(),
+        lifecycle=Lifecycle(type=LifecycleType.UNTIL_REVOKED, until_revoked=True),
+        policy_ir=policy_ir,
     )
 
 
@@ -1070,11 +1098,11 @@ def test_conflict_resolver_batch_groups_overlapping_retrieval_into_one_llm_call(
     assert "MAC-generated" in prompts[0]
     assert [result.relation for result in results] == [
         EdgeRelation.EXCEPTION_TO,
-        EdgeRelation.DUPLICATE,
+        EdgeRelation.REFINEMENT,
     ]
     assert [edge.relation for edge in store.list_edges()] == [
         EdgeRelation.EXCEPTION_TO,
-        EdgeRelation.DUPLICATE,
+        EdgeRelation.REFINEMENT,
     ]
 
 
@@ -1233,6 +1261,226 @@ def test_conflict_resolver_dedups_matching_operational_surface_without_llm() -> 
     assert result.relation == EdgeRelation.DUPLICATE
     assert store.get_contract("MAC-candidate").status == ContractStatus.REJECTED
     assert store.list_edges()[0].relation == EdgeRelation.DUPLICATE
+
+
+def test_conflict_resolver_dedups_matching_policy_ir_without_text_similarity() -> None:
+    store = make_store()
+    policy_ir = {
+        "text": "Use lookup_tool at most once.",
+        "effect": "require",
+        "scope": {"level": "session"},
+        "target": {"phase": "pre", "tool": "lookup_tool"},
+        "obligation": {
+            "kind": "specific_tool_count",
+            "monitor": {
+                "source": "action_log",
+                "where": {"field": "tool_name", "op": "eq", "value": "lookup_tool"},
+                "aggregate": "count",
+            },
+            "op": "lte",
+            "value": 1,
+        },
+    }
+    store.add_contract(
+        policy_ir_contract(
+            "MAC-existing",
+            text="The political lookup helper is limited to one call.",
+            effect=RuleEffect.REQUIRE,
+            policy_ir=policy_ir,
+        )
+    )
+    candidate = policy_ir_contract(
+        "MAC-candidate",
+        text="Avoid repeatedly invoking the successor finder.",
+        effect=RuleEffect.REQUIRE,
+        policy_ir=policy_ir,
+    )
+
+    result = ConflictResolver(store).insert(candidate)
+
+    assert result.relation == EdgeRelation.DUPLICATE
+    assert store.get_contract("MAC-candidate").status == ContractStatus.REJECTED
+    assert store.list_edges()[0].relation == EdgeRelation.DUPLICATE
+
+
+def test_conflict_resolver_detects_policy_ir_count_range_conflict() -> None:
+    store = make_store()
+    base_policy = {
+        "text": "Use lookup_tool at most once.",
+        "effect": "require",
+        "scope": {"level": "session"},
+        "target": {"phase": "response", "action_family": "message.send"},
+        "obligation": {
+            "kind": "specific_tool_count",
+            "monitor": {
+                "source": "action_log",
+                "where": {"field": "tool_name", "op": "eq", "value": "lookup_tool"},
+                "aggregate": "count",
+            },
+            "op": "lte",
+            "value": 1,
+        },
+    }
+    conflicting_policy = {
+        **base_policy,
+        "text": "Use lookup_tool at least three times.",
+        "obligation": {
+            **base_policy["obligation"],
+            "op": "gte",
+            "value": 3,
+        },
+    }
+    store.add_contract(
+        policy_ir_contract(
+            "MAC-existing",
+            text="Use the lookup tool no more than once.",
+            effect=RuleEffect.REQUIRE,
+            policy_ir=base_policy,
+        )
+    )
+
+    result = ConflictResolver(store).insert(
+        policy_ir_contract(
+            "MAC-candidate",
+            text="Call the lookup tool at least three times.",
+            effect=RuleEffect.REQUIRE,
+            policy_ir=conflicting_policy,
+        )
+    )
+
+    assert result.relation == EdgeRelation.CONFLICTS_WITH
+    assert store.get_contract("MAC-candidate").status == ContractStatus.PENDING_CONFLICT
+    assert store.list_edges()[0].relation == EdgeRelation.CONFLICTS_WITH
+
+
+def test_conflict_resolver_uses_policy_ir_target_subset_for_exception() -> None:
+    store = make_store()
+    broad_deny = {
+        "text": "Do not call tools in generated files.",
+        "effect": "deny",
+        "scope": {"level": "workspace", "workspace": "/workspace/project"},
+        "target": {
+            "phase": "pre",
+            "action_family": "tool.call",
+            "paths": ["generated/**"],
+        },
+        "obligation": {
+            "kind": "current_action",
+            "predicate": {"field": "tool_name", "op": "exists", "value": True},
+        },
+    }
+    narrow_allow = {
+        "text": "For generated/sandbox only, you may call the formatter.",
+        "effect": "allow",
+        "scope": {"level": "workspace", "workspace": "/workspace/project"},
+        "target": {
+            "phase": "pre",
+            "tool": "formatter",
+            "action_family": "tool.call",
+            "paths": ["generated/sandbox/**"],
+        },
+        "obligation": {
+            "kind": "current_action",
+            "predicate": {"field": "tool_name", "op": "eq", "value": "formatter"},
+        },
+    }
+    store.add_contract(
+        policy_ir_contract(
+            "MAC-deny",
+            text="Do not run tools over generated files.",
+            effect=RuleEffect.DENY,
+            policy_ir=broad_deny,
+        )
+    )
+
+    result = ConflictResolver(store).insert(
+        policy_ir_contract(
+            "MAC-allow",
+            text="For generated/sandbox only, formatter is allowed.",
+            effect=RuleEffect.ALLOW,
+            kind=ContractKind.EXCEPTION,
+            modality=Modality.MAY,
+            strength=Strength.SOFT,
+            policy_ir=narrow_allow,
+        )
+    )
+
+    assert result.relation == EdgeRelation.EXCEPTION_TO
+    assert store.get_contract("MAC-deny").status == ContractStatus.ACTIVE
+    assert store.get_contract("MAC-allow").status == ContractStatus.ACTIVE
+    assert store.list_edges()[0].relation == EdgeRelation.EXCEPTION_TO
+
+
+def test_action_gate_applies_policy_ir_only_exception_edge() -> None:
+    store = make_store()
+    broad_deny = {
+        "text": "Do not write generated files.",
+        "effect": "deny",
+        "scope": {"level": "workspace", "workspace": "/workspace/project"},
+        "target": {
+            "phase": "pre",
+            "action_family": "file.write",
+            "paths": ["generated/**"],
+        },
+        "obligation": {
+            "kind": "current_action",
+            "predicate": {"field": "tool_name", "op": "missing", "value": True},
+        },
+    }
+    narrow_allow = {
+        "text": "For generated/sandbox only, file writes are allowed.",
+        "effect": "allow",
+        "scope": {"level": "workspace", "workspace": "/workspace/project"},
+        "target": {
+            "phase": "pre",
+            "tool": "file.write",
+            "action_family": "file.write",
+            "paths": ["generated/sandbox/**"],
+        },
+        "obligation": {
+            "kind": "current_action",
+            "predicate": {"field": "tool_name", "op": "eq", "value": "file.write"},
+        },
+    }
+    store.add_contract(
+        policy_ir_contract(
+            "MAC-deny",
+            text="Do not write generated files.",
+            effect=RuleEffect.DENY,
+            policy_ir=broad_deny,
+        )
+    )
+    ConflictResolver(store).insert(
+        policy_ir_contract(
+            "MAC-allow",
+            text="Generated sandbox writes are allowed.",
+            effect=RuleEffect.ALLOW,
+            kind=ContractKind.EXCEPTION,
+            modality=Modality.MAY,
+            strength=Strength.SOFT,
+            policy_ir=narrow_allow,
+        )
+    )
+
+    result = ActionGate(store).gate(
+        ActionSignatureBuilder().build(
+            tool_name="file.write",
+            raw_arguments={"file_path": "generated/sandbox/output.py", "content": "x = 1"},
+            context=SignatureContext(
+                session_id="sess-1",
+                cwd="/workspace/project",
+                workspace="/workspace/project",
+                repo="project",
+                now=datetime(2026, 5, 23, 10, tzinfo=timezone.utc),
+            ),
+        )
+    )
+
+    assert result.decision.decision == GateDecisionType.ALLOW
+    assert store.list_edges()[0].relation == EdgeRelation.EXCEPTION_TO
+    assert ("MAC-deny", "exception_applied") in {
+        (item.id, item.reason) for item in result.receipt.contracts_ignored
+    }
 
 
 def test_conflict_resolver_does_not_llm_dedup_medium_edit_similarity() -> None:
@@ -1538,3 +1786,56 @@ def test_prompt_intake_render_uses_compact_plain_text_budget() -> None:
     assert "{" not in rendered
     assert "}" not in rendered
     assert len(rendered) // 4 <= DEFAULT_PROMPT_TOKEN_BUDGET
+
+
+def test_prompt_intake_render_uses_policy_ir_operational_summary() -> None:
+    store = make_store()
+    store.add_contract(
+        policy_ir_contract(
+            "MAC-test-before-commit",
+            text="Run tests before committing.",
+            effect=RuleEffect.REQUIRE,
+            scope=Scope(
+                level=ScopeLevel.PATH,
+                workspace="/workspace/project",
+                path="repo/**",
+            ),
+            policy_ir={
+                "text": "Run tests before committing.",
+                "effect": "require",
+                "scope": {"level": "path", "path": "repo/**"},
+                "target": {"phase": "pre", "tool": "git_commit"},
+                "obligation": {
+                    "kind": "prior_action",
+                    "monitor": {
+                        "source": "action_log",
+                        "where": {
+                            "field": "tool_name",
+                            "op": "eq",
+                            "value": "shell_command",
+                        },
+                    },
+                },
+            },
+        )
+    )
+    retriever = PromptIntakeRetriever(store)
+    packets = retriever.retrieve(
+        PromptRetrievalContext(
+            session_id="sess-1",
+            user_id="user-1",
+            workspace="/workspace/project",
+            repo="project",
+            user_turn="Please commit the update in repo/app.py.",
+            target_paths=["repo/app.py"],
+        )
+    )
+
+    rendered = retriever.render_prompt_text(packets)
+
+    assert "MAC reminders" in rendered
+    assert "- MAC-test-before-commit: Run tests before committing." in rendered
+    assert "  scope: path=repo/**" in rendered
+    assert "  trigger: before tool git_commit" in rendered
+    assert "  requirement: prior action matching tool_name eq shell_command" in rendered
+    assert "  effect: block until satisfied" in rendered

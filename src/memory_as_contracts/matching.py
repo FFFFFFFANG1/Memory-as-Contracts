@@ -80,7 +80,7 @@ def path_scope_matches(value: str, path_scope: str) -> bool:
         return False
     if fnmatch(normalized, scope) or fnmatch(normalized, f"{scope}/**"):
         return True
-    return normalized == scope or normalized.startswith(f"{scope}/") or scope in normalized
+    return normalized == scope or normalized.startswith(f"{scope}/")
 
 
 def _path_scope_matches(value: str, path_scope: str) -> bool:

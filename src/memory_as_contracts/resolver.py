@@ -163,6 +163,26 @@ class ConflictResolver:
         )
         result = ResolutionResult(contract=candidate)
 
+        dedup = None
+        for dedup_candidate in (
+            self.find_indexed_dedup_candidate(candidate, existing_contracts),
+            self.find_strict_edit_dedup_candidate(candidate, existing_contracts),
+        ):
+            if dedup_candidate is None:
+                continue
+            if _policy_ir_constraints_conflict(candidate, dedup_candidate.existing):
+                continue
+            dedup = dedup_candidate
+            break
+        if dedup is not None:
+            candidate, edge = self._apply_relation(candidate, dedup.existing, dedup.relation)
+            result.contract = candidate
+            result.relation = dedup.relation
+            result.edges.append(edge)
+            self.store.add_contract(candidate)
+            self.store.add_edge(edge)
+            return result
+
         relation_decisions = self.classify_update_relations(candidate, existing_contracts)
         for decision in relation_decisions:
             if decision.relation == EdgeRelation.INDEPENDENT:
@@ -230,7 +250,18 @@ class ConflictResolver:
             decisions = self._classify_with_llm(candidate, relation_candidates)
             if decisions is not None:
                 return decisions
-        return []
+        return [
+            RelationDecision(
+                candidate=candidate,
+                existing=item.existing,
+                relation=self.classify_relation(candidate, item.existing),
+                similarity=item.similarity,
+                text_score=item.text_score,
+                semantic_score=item.semantic_score,
+                pattern_score=item.pattern_score,
+            )
+            for item in relation_candidates
+        ]
 
     def find_dedup_candidates(
         self,
@@ -475,11 +506,12 @@ class ConflictResolver:
         seen = {decision.existing.id for decision in decisions}
         for item in relation_candidates:
             if item.existing.id not in seen:
+                relation = self.classify_relation(candidate, item.existing)
                 decisions.append(
                     RelationDecision(
                         candidate=candidate,
                         existing=item.existing,
-                        relation=EdgeRelation.INDEPENDENT,
+                        relation=relation,
                         similarity=item.similarity,
                         text_score=item.text_score,
                         semantic_score=item.semantic_score,
@@ -502,12 +534,12 @@ class ConflictResolver:
                 decisions = self._classify_with_llm(candidate, relation_candidates)
                 if decisions is not None:
                     return decisions
-            return []
+            return self._fallback_component_decisions(candidates, relation_candidates_by_new)
         if self.relation_response_provider is not None:
             decisions = self._classify_batch_with_llm(candidates, relation_candidates_by_new)
             if decisions is not None:
                 return decisions
-        return []
+        return self._fallback_component_decisions(candidates, relation_candidates_by_new)
 
     def _classify_batch_with_llm(
         self,
@@ -573,11 +605,12 @@ class ConflictResolver:
             if (candidate_id, existing_id) in seen_pairs:
                 continue
             candidate = candidates_by_id[candidate_id]
+            relation = self.classify_relation(candidate, item.existing)
             decisions.append(
                 RelationDecision(
                     candidate=candidate,
                     existing=item.existing,
-                    relation=EdgeRelation.INDEPENDENT,
+                    relation=relation,
                     similarity=item.similarity,
                     text_score=item.text_score,
                     semantic_score=item.semantic_score,
@@ -594,6 +627,22 @@ class ConflictResolver:
     ) -> EdgeRelation:
         if proposed != EdgeRelation.INDEPENDENT and not _scope_lifecycle_overlaps(candidate, existing):
             return EdgeRelation.INDEPENDENT
+        deterministic = self.classify_relation(candidate, existing)
+        if deterministic in {
+            EdgeRelation.DUPLICATE,
+            EdgeRelation.CONFLICTS_WITH,
+            EdgeRelation.EXCEPTION_TO,
+            EdgeRelation.SUPERSEDES,
+        }:
+            return deterministic
+        if proposed == EdgeRelation.DUPLICATE and not _can_be_duplicate(candidate, existing):
+            return EdgeRelation.INDEPENDENT
+        if proposed == EdgeRelation.EXCEPTION_TO and not _can_be_exception(candidate, existing):
+            return EdgeRelation.INDEPENDENT
+        if proposed == EdgeRelation.SUPERSEDES and not _can_supersede(candidate, existing):
+            return deterministic
+        if proposed == EdgeRelation.REFINEMENT and not _can_be_refinement(candidate, existing):
+            return deterministic
         return proposed
 
     def _fallback_component_decisions(
@@ -833,6 +882,7 @@ def _contract_payload(contract: Contract) -> dict:
         "semantics": contract.semantics.model_dump(mode="json"),
         "check_patterns": [pattern.model_dump(mode="json") for pattern in contract.check_patterns],
         "predicate_pattern": _predicate_pattern_text(contract),
+        "policy_ir": _policy_ir_relation_surface(contract),
     }
 
 
@@ -951,6 +1001,8 @@ def _scope_boundaries_compatible(left: Scope, right: Scope) -> bool:
 
 
 def _semantic_surface_compatible(left: Contract, right: Contract) -> bool:
+    if _policy_ir_targets_overlap(left, right):
+        return True
     left_actions = set(left.semantics.actions)
     right_actions = set(right.semantics.actions)
     if left_actions and right_actions:
@@ -961,6 +1013,8 @@ def _semantic_surface_compatible(left: Contract, right: Contract) -> bool:
 def _contradicts(left: Contract, right: Contract) -> bool:
     if not _overlaps(left, right):
         return False
+    if _policy_ir_constraints_conflict(left, right):
+        return True
     left_allows = left.effect == RuleEffect.ALLOW or left.kind == ContractKind.EXCEPTION
     right_allows = right.effect == RuleEffect.ALLOW or right.kind == ContractKind.EXCEPTION
     left_bans = left.effect == RuleEffect.DENY or left.kind == ContractKind.PROHIBITION or left.modality == Modality.MUST_NOT
@@ -1011,11 +1065,13 @@ def _applicability_contains(broader: Contract, narrower: Contract) -> bool:
     scope_contains, _ = _scope_contains(broader.scope, narrower.scope)
     action_contains, _ = _action_binding_contains(broader, narrower)
     pattern_contains, _ = _operational_binding_contains(broader, narrower)
+    ir_contains, _ = _policy_ir_target_contains(broader, narrower)
     lifecycle_contains, _ = _lifecycle_contains(broader, narrower)
     return (
         scope_contains
         and action_contains
         and pattern_contains
+        and ir_contains
         and lifecycle_contains
     )
 
@@ -1030,10 +1086,13 @@ def _applicability_is_strict_subset(narrower: Contract, broader: Contract) -> bo
     pattern_contains, pattern_strict = _operational_binding_contains(broader, narrower)
     if not pattern_contains:
         return False
+    ir_contains, ir_strict = _policy_ir_target_contains(broader, narrower)
+    if not ir_contains:
+        return False
     lifecycle_contains, lifecycle_strict = _lifecycle_contains(broader, narrower)
     if not lifecycle_contains:
         return False
-    return scope_strict or action_strict or pattern_strict or lifecycle_strict
+    return scope_strict or action_strict or pattern_strict or ir_strict or lifecycle_strict
 
 
 def _scope_contains(broader: Scope, narrower: Scope) -> tuple[bool, bool]:
@@ -1165,6 +1224,10 @@ def _lifecycle_contains(broader: Contract, narrower: Contract) -> tuple[bool, bo
 
 
 def _requires_relation_consideration(candidate: Contract, existing: Contract) -> bool:
+    if _policy_ir_equivalent(candidate, existing):
+        return True
+    if _policy_ir_constraints_conflict(candidate, existing):
+        return True
     if _contradicts(candidate, existing):
         return True
     if (
@@ -1270,6 +1333,12 @@ def _can_be_duplicate(left: Contract, right: Contract) -> bool:
         return False
     if left.scope != right.scope:
         return False
+    if _policy_ir_equivalent(left, right):
+        return _lifecycle_equivalent(left, right)
+    if left.policy_ir is not None and right.policy_ir is not None:
+        return False
+    if (left.policy_ir is not None) != (right.policy_ir is not None):
+        return False
     if set(left.semantics.actions) != set(right.semantics.actions):
         return False
     left_tags = set(left.semantics.tags)
@@ -1287,6 +1356,10 @@ def _can_be_duplicate(left: Contract, right: Contract) -> bool:
     if not _enforcement_equivalent(left, right):
         return False
     if not _lifecycle_equivalent(left, right):
+        return False
+    left_guards = _condition_guard_tags(left.text)
+    right_guards = _condition_guard_tags(right.text)
+    if left_guards and right_guards and not left_guards.intersection(right_guards):
         return False
     return (
         _normalize(left.text) == _normalize(right.text)
@@ -1337,6 +1410,16 @@ def _content_words(text: str) -> set[str]:
     return {word for word in re.findall(r"[a-z0-9_]+", text.lower()) if word not in stop}
 
 
+def _condition_guard_tags(text: str) -> set[str]:
+    words = _content_words(text)
+    tags: set[str] = set()
+    if words.intersection({"ask", "asking", "approve", "approval", "permission", "confirm", "confirmation"}):
+        tags.add("approval")
+    if words.intersection({"test", "tests", "pytest", "pass", "passes", "fail", "fails", "failure"}):
+        tags.add("test_result")
+    return tags
+
+
 def _tokens(text: str) -> list[str]:
     return re.findall(r"[a-z0-9_]+", text.lower())
 
@@ -1384,12 +1467,273 @@ def _bm25_score(query_tokens: list[str], document_tokens: list[str], corpus: lis
 
 def _predicate_pattern_text(contract: Contract) -> str:
     parts: list[str] = []
+    ir_surface = _policy_ir_relation_surface(contract)
+    if ir_surface:
+        parts.append(json.dumps(ir_surface, sort_keys=True, separators=(",", ":")))
     for pattern in contract.check_patterns:
         parts.append(pattern.tool)
         for key, matcher in sorted(pattern.args.items()):
             parts.append(key)
             parts.append(matcher.model_dump_json())
     return " ".join(parts)
+
+
+def _policy_ir_relation_surface(contract: Contract) -> dict | None:
+    if not isinstance(contract.policy_ir, dict):
+        return None
+    target = contract.policy_ir.get("target")
+    obligation = contract.policy_ir.get("obligation")
+    return {
+        "target": _canonical_json(target if isinstance(target, dict) else {}),
+        "obligation": _canonical_json(obligation if isinstance(obligation, dict) else {}),
+    }
+
+
+def _policy_ir_equivalent(left: Contract, right: Contract) -> bool:
+    left_surface = _policy_ir_relation_surface(left)
+    right_surface = _policy_ir_relation_surface(right)
+    if left_surface is None or right_surface is None:
+        return False
+    return left_surface == right_surface
+
+
+def _policy_ir_targets_overlap(left: Contract, right: Contract) -> bool:
+    left_target = _policy_target(left)
+    right_target = _policy_target(right)
+    if left_target is None or right_target is None:
+        return False
+    return _target_overlap(left_target, right_target)
+
+
+def _policy_ir_target_contains(broader: Contract, narrower: Contract) -> tuple[bool, bool]:
+    broad_target = _policy_target(broader)
+    narrow_target = _policy_target(narrower)
+    if broad_target is None or narrow_target is None:
+        return True, False
+    return _target_contains(broad_target, narrow_target)
+
+
+def _policy_ir_constraints_conflict(left: Contract, right: Contract) -> bool:
+    if left.policy_ir is None or right.policy_ir is None:
+        return False
+    if not _policy_ir_targets_overlap(left, right):
+        return False
+    if _opposite_effects(left, right):
+        return True
+    left_obligation = _policy_obligation(left)
+    right_obligation = _policy_obligation(right)
+    if left_obligation is None or right_obligation is None:
+        return False
+    if _obligation_key(left_obligation) != _obligation_key(right_obligation):
+        return False
+    left_range = _obligation_range(left_obligation)
+    right_range = _obligation_range(right_obligation)
+    if left_range is None or right_range is None:
+        return False
+    return not _ranges_overlap(left_range, right_range)
+
+
+def _opposite_effects(left: Contract, right: Contract) -> bool:
+    left_restricts = left.effect == RuleEffect.DENY or left.kind == ContractKind.PROHIBITION
+    right_restricts = right.effect == RuleEffect.DENY or right.kind == ContractKind.PROHIBITION
+    left_allows = left.effect == RuleEffect.ALLOW or left.kind == ContractKind.EXCEPTION
+    right_allows = right.effect == RuleEffect.ALLOW or right.kind == ContractKind.EXCEPTION
+    return (left_restricts and right_allows) or (right_restricts and left_allows)
+
+
+def _policy_target(contract: Contract) -> dict | None:
+    if not isinstance(contract.policy_ir, dict):
+        return None
+    target = contract.policy_ir.get("target")
+    return target if isinstance(target, dict) else {}
+
+
+def _policy_obligation(contract: Contract) -> dict | None:
+    if not isinstance(contract.policy_ir, dict):
+        return None
+    obligation = contract.policy_ir.get("obligation")
+    return obligation if isinstance(obligation, dict) else None
+
+
+def _target_overlap(left: dict, right: dict) -> bool:
+    left_phase = str(left.get("phase") or "")
+    right_phase = str(right.get("phase") or "")
+    if left_phase and right_phase and left_phase != right_phase:
+        return False
+    if not _values_overlap(_target_tools(left), _target_tools(right)):
+        return False
+    if not _values_overlap(_target_families(left), _target_families(right)):
+        return False
+    left_paths = _string_list(left.get("paths"))
+    right_paths = _string_list(right.get("paths"))
+    if left_paths and right_paths and not _path_globs_overlap(left_paths, right_paths):
+        return False
+    return True
+
+
+def _target_contains(broader: dict, narrower: dict) -> tuple[bool, bool]:
+    strict = False
+    broad_phase = str(broader.get("phase") or "")
+    narrow_phase = str(narrower.get("phase") or "")
+    if broad_phase and narrow_phase != broad_phase:
+        return False, False
+    if not broad_phase and narrow_phase:
+        strict = True
+    for broad_values, narrow_values in (
+        (_target_tools(broader), _target_tools(narrower)),
+        (_target_families(broader), _target_families(narrower)),
+    ):
+        if broad_values:
+            if not narrow_values.issubset(broad_values):
+                return False, False
+            strict = strict or narrow_values != broad_values
+        elif narrow_values:
+            strict = True
+    broad_paths = _string_list(broader.get("paths"))
+    narrow_paths = _string_list(narrower.get("paths"))
+    if broad_paths:
+        if not narrow_paths:
+            return False, False
+        for narrow_path in narrow_paths:
+            if not any(_glob_contains(broad_path, narrow_path) for broad_path in broad_paths):
+                return False, False
+        strict = strict or broad_paths != narrow_paths
+    elif narrow_paths:
+        strict = True
+    return True, strict
+
+
+def _target_tools(target: dict) -> set[str]:
+    values = set(_string_list(target.get("tools")))
+    tool = target.get("tool")
+    if isinstance(tool, str) and tool:
+        values.add(tool)
+    return values
+
+
+def _target_families(target: dict) -> set[str]:
+    values = set(_string_list(target.get("action_families")))
+    family = target.get("action_family")
+    if isinstance(family, str) and family:
+        values.add(family)
+    return values
+
+
+def _values_overlap(left: set[str], right: set[str]) -> bool:
+    return not left or not right or bool(left.intersection(right))
+
+
+def _string_list(value) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if isinstance(item, (str, int, float)) and str(item)]
+    if isinstance(value, str) and value:
+        return [value]
+    return []
+
+
+def _obligation_key(obligation: dict) -> str:
+    monitor = obligation.get("monitor")
+    where = monitor.get("where") if isinstance(monitor, dict) else None
+    key = {
+        "kind": obligation.get("kind"),
+        "monitor": {
+            "source": monitor.get("source") if isinstance(monitor, dict) else None,
+            "where": _canonical_json(where if isinstance(where, dict) else {}),
+            "aggregate": monitor.get("aggregate") if isinstance(monitor, dict) else None,
+            "distinct_by": monitor.get("distinct_by") if isinstance(monitor, dict) else None,
+            "group_by": monitor.get("group_by") if isinstance(monitor, dict) else None,
+        },
+        "predicate_field": _predicate_field(obligation),
+        "predicate_op_family": _predicate_op_family(obligation),
+    }
+    return json.dumps(_canonical_json(key), sort_keys=True, separators=(",", ":"))
+
+
+def _predicate_field(obligation: dict) -> str | None:
+    predicate = obligation.get("predicate")
+    if not isinstance(predicate, dict):
+        return None
+    return str(predicate.get("field") or "")
+
+
+def _predicate_op_family(obligation: dict) -> str | None:
+    predicate = obligation.get("predicate")
+    if not isinstance(predicate, dict):
+        return None
+    op = str(predicate.get("op") or "")
+    if op.startswith("char_count"):
+        return "char_count"
+    if op.startswith("word_count"):
+        return "word_count"
+    return op
+
+
+def _obligation_range(obligation: dict) -> tuple[float | None, float | None] | None:
+    predicate = obligation.get("predicate")
+    if isinstance(predicate, dict):
+        op = str(predicate.get("op") or "")
+        value = predicate.get("value")
+    else:
+        op = str(obligation.get("op") or "")
+        value = obligation.get("value")
+    if op in {"lte", "lt", "char_count_lte", "word_count_lte"}:
+        upper = float(value)
+        return None, upper - (1e-9 if op == "lt" else 0.0)
+    if op in {"gte", "gt", "char_count_gte", "word_count_gte"}:
+        lower = float(value)
+        return lower + (1e-9 if op == "gt" else 0.0), None
+    if op in {"eq"}:
+        exact = float(value)
+        return exact, exact
+    if op in {"between", "range", "char_count_between", "word_count_between"}:
+        lower, upper = _range_bounds(value)
+        return (
+            float(lower) if lower is not None else None,
+            float(upper) if upper is not None else None,
+        )
+    return None
+
+
+def _range_bounds(value) -> tuple[float | None, float | None]:
+    if isinstance(value, dict):
+        lower = value.get("min", value.get("gte", value.get("lower")))
+        upper = value.get("max", value.get("lte", value.get("upper")))
+    elif isinstance(value, (list, tuple)):
+        lower = value[0] if len(value) > 0 else None
+        upper = value[1] if len(value) > 1 else None
+    else:
+        lower = None
+        upper = value
+    return (
+        float(lower) if lower is not None else None,
+        float(upper) if upper is not None else None,
+    )
+
+
+def _ranges_overlap(
+    left: tuple[float | None, float | None],
+    right: tuple[float | None, float | None],
+) -> bool:
+    left_low, left_high = left
+    right_low, right_high = right
+    low = max(value for value in (left_low, right_low) if value is not None) if left_low is not None or right_low is not None else None
+    high = min(value for value in (left_high, right_high) if value is not None) if left_high is not None or right_high is not None else None
+    return low is None or high is None or low <= high
+
+
+def _canonical_json(value):
+    if isinstance(value, dict):
+        return {
+            str(key): _canonical_json(item)
+            for key, item in sorted(value.items())
+            if item not in (None, [], {}, "")
+        }
+    if isinstance(value, list):
+        normalized = [_canonical_json(item) for item in value]
+        if all(isinstance(item, (str, int, float, bool, type(None))) for item in normalized):
+            return sorted(normalized, key=lambda item: json.dumps(item, sort_keys=True))
+        return normalized
+    return value
 
 
 def _path_globs_overlap(left_globs: list[str], right_globs: list[str]) -> bool:

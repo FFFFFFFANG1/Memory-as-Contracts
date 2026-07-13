@@ -259,10 +259,135 @@ def test_task46_stub_non_direct_match_returns_hint_not_stub() -> None:
         code,
         match_mode="suggest",
     )
-    assert "retrieved successfully" not in result.lower()
     assert "Similar parameter result" in result
     assert "August 2023" in result
     assert "AdventHealth" in result
+    assert "Similar parameter result" in result.split("retrieved successfully")[-1]
+
+
+def test_format_cctu_call_error_enriches_missing_argument() -> None:
+    from bench.MAC.cctu.tool_match import format_cctu_call_error
+
+    code = (
+        "def historical_event_retriever(country, event_type, event_name, date_range):\n"
+        "    return country\n"
+    )
+    schema = {
+        "type": "object",
+        "properties": {
+            "date_range": {
+                "type": "object",
+                "description": "Date window",
+            }
+        },
+        "required": ["country", "event_type", "event_name", "date_range"],
+    }
+    formatted = format_cctu_call_error(
+        tool_name="historical_event_retriever",
+        arguments={"country": "Kuwait", "event_type": "inauguration", "event_name": "x"},
+        code=code,
+        exc=TypeError(
+            "historical_event_retriever() missing 1 required positional argument: 'date_range'"
+        ),
+        schema=schema,
+    )
+    assert formatted.startswith(
+        "an error occured when call historical_event_retriever: "
+        "historical_event_retriever() missing 1 required positional argument: 'date_range'"
+    )
+    assert "Missing required parameter(s): date_range." in formatted
+    assert 'expected object like {"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}' in formatted
+    assert "Provided parameters: country, event_name, event_type." in formatted
+
+
+def test_suggest_mode_keeps_enriched_typeerror_as_original_error() -> None:
+    """Missing-arg exceptions become enriched original errors (suggest path still receives them)."""
+    codes0 = _load_task_codes("20")
+    code20 = codes0["individual_movement_tracker"]
+    result = cctu_call_function(
+        "individual_movement_tracker",
+        {
+            "individual_name": "Alice",
+            "event_date": "2020-01-01",
+            "event_description": "test",
+        },
+        code20,
+        match_mode="suggest",
+    )
+    assert result.startswith("an error occured when call individual_movement_tracker:")
+    assert "Missing required parameter(s): data_sources." in result
+
+
+def test_task0_soft_missing_date_range_preserves_original_then_can_suggest() -> None:
+    codes = _load_task_codes("0")
+    code = codes["historical_event_retriever"]
+    soft = cctu_call_function(
+        "historical_event_retriever",
+        {
+            "country": "Netherlands",
+            "event_type": "legalization",
+            "event_name": "same-sex marriage",
+        },
+        code,
+        match_mode="exact",
+    )
+    assert soft.startswith("Error: 'date_range' is required.")
+
+    hinted = maybe_append_similar_parameter_results(
+        tool_name="historical_event_retriever",
+        arguments={
+            "country": "Netherlands",
+            "event_type": "legalization",
+            "event_name": "same-sex marriage",
+        },
+        code=code,
+        result=soft,
+        call_function=_load_call_function(),
+        min_score=0.2,
+        max_suggestions=2,
+    )
+    assert hinted.startswith(soft.rstrip())
+    assert "Similar parameter result" in hinted
+    assert "2001-04-01" in hinted
+
+
+def test_suggest_mode_preserves_original_output_when_no_similar_results() -> None:
+    codes = _load_task_codes("0")
+    code = codes["historical_event_finder"]
+    original = cctu_call_function(
+        "historical_event_finder",
+        {"keywords": "totally unrelated query with no golden overlap"},
+        code,
+        match_mode="exact",
+    )
+    suggested = cctu_call_function(
+        "historical_event_finder",
+        {"keywords": "totally unrelated query with no golden overlap"},
+        code,
+        match_mode="suggest",
+    )
+    assert suggested == original
+    assert "No exact match for the given parameters." not in suggested
+
+
+def test_suggest_mode_appends_similar_results_after_original_soft_miss() -> None:
+    codes = _load_task_codes("0")
+    code = codes["historical_event_finder"]
+    original = cctu_call_function(
+        "historical_event_finder",
+        {"keywords": "WikiLeaks Guantanamo"},
+        code,
+        match_mode="exact",
+    )
+    suggested = cctu_call_function(
+        "historical_event_finder",
+        {"keywords": "WikiLeaks Guantanamo"},
+        code,
+        match_mode="suggest",
+    )
+    assert suggested.startswith(original.rstrip())
+    assert "Similar parameter result" in suggested
+    assert "No exact match for the given parameters." not in suggested
 
 
 def test_task0_for_loop_golden() -> None:
@@ -275,3 +400,20 @@ def test_task0_for_loop_golden() -> None:
         "year": "2024",
         "country": "Germany",
     } in goldens
+
+
+def test_task110_merged_event_date_finder_handles_optional_none() -> None:
+    codes = _load_task_codes("110")
+    code = codes["merged_event_date_finder"]
+    result = cctu_call_function(
+        "merged_event_date_finder",
+        {
+            "event_keywords": "Vatican bones apostle Peter announcement",
+            "event_description": "Vatican announcement about the bones of the apostle Peter",
+        },
+        code,
+        match_mode="exact",
+    )
+    assert "NoneType" not in result
+    assert "an error occured" not in result
+    assert "1949-08-21" in result

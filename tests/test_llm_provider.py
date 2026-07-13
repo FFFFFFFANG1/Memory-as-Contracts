@@ -53,6 +53,45 @@ def test_openai_provider_retries_timeouts_and_returns_third_attempt() -> None:
     assert provider("prompt") == "ok"
     assert completions.calls == 3
     assert completions.last_kwargs["max_tokens"] == 4096
+    assert "extra_body" not in completions.last_kwargs
+
+
+def test_openai_provider_disables_thinking_for_ark_coding_endpoint(monkeypatch) -> None:
+    monkeypatch.delenv("MAC_LLM_DISABLE_THINKING", raising=False)
+    provider, completions = provider_with(["ok"])
+    provider.config = MacConfig(
+        openai_api_key="test",
+        openai_base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
+        llm_model="test-model",
+        llm_max_tokens=4096,
+        db_path=Path(":memory:"),
+        llm_timeout_seconds=1.0,
+        log_path=Path("mac.log"),
+        log_level="INFO",
+    )
+
+    assert provider("prompt") == "ok"
+
+    assert completions.last_kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
+
+
+def test_openai_provider_disable_thinking_can_be_overridden(monkeypatch) -> None:
+    monkeypatch.setenv("MAC_LLM_DISABLE_THINKING", "false")
+    provider, completions = provider_with(["ok"])
+    provider.config = MacConfig(
+        openai_api_key="test",
+        openai_base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
+        llm_model="test-model",
+        llm_max_tokens=4096,
+        db_path=Path(":memory:"),
+        llm_timeout_seconds=1.0,
+        log_path=Path("mac.log"),
+        log_level="INFO",
+    )
+
+    assert provider("prompt") == "ok"
+
+    assert "extra_body" not in completions.last_kwargs
 
 
 def test_openai_provider_returns_stable_error_after_three_timeouts() -> None:

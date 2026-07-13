@@ -65,20 +65,28 @@ def openai_tool_definitions(tools: list[dict[str, Any]]) -> list[dict[str, Any]]
     return definitions
 
 
+def render_tool_protocol_message(agent: str) -> str:
+    """Render the small runtime protocol not represented by API tool schemas.
+
+    Tool definitions are already supplied through the OpenAI-compatible
+    ``tools`` request parameter. Repeating their full JSON schemas in a system
+    message wastes context on every turn and caused substantial duplication for
+    CCTU tasks.
+    """
+    return (
+        "<tool_protocol>\n"
+        f"Agent: {agent}\n"
+        "Use only the native function definitions supplied by the runtime. "
+        "Do not invent tool names or arguments. Tool results are simulated by the benchmark runtime.\n"
+        f"{TERMINAL_TOOL_RUNTIME_RULE}\n"
+        "</tool_protocol>"
+    )
+
+
 def render_tool_schema_message(agent: str, tools: list[dict[str, Any]]) -> str:
-    """Render tool schemas and terminal-output rules as a prompt block."""
-    payload = {
-        "agent": agent,
-        "tool_calling_contract": {
-            "all_useful_outputs_must_be_tool_bounded": True,
-            "terminal_tool": "send_message",
-            "plain_assistant_final_text_is_invalid": True,
-            "tool_results_are_simulated_by_benchmark_runtime": True,
-            "runtime_output_rule": TERMINAL_TOOL_RUNTIME_RULE,
-        },
-        "tools": tools,
-    }
-    return "<tool_schema>\n" + json.dumps(payload, indent=2, ensure_ascii=False) + "\n</tool_schema>"
+    """Backward-compatible alias for the compact tool protocol renderer."""
+    del tools
+    return render_tool_protocol_message(agent)
 
 
 def render_memory_message(memory: str) -> str:
@@ -104,6 +112,6 @@ def build_prompt_messages(
     """Build messages in benchmark order: system (+ memory), tools, user."""
     return [
         {"role": "system", "content": append_memory_to_system_prompt(system_prompt, memory)},
-        {"role": "system", "content": render_tool_schema_message(agent, tools)},
+        {"role": "system", "content": render_tool_protocol_message(agent)},
         {"role": "user", "content": user_prompt},
     ]
