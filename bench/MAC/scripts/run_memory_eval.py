@@ -240,15 +240,9 @@ def parse_args() -> argparse.Namespace:
         help="Bench test mode: treat MAC gate ask decisions as allow.",
     )
     parser.add_argument(
-        "--mac-live-validator",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Enable live validator LLM generation during MAC contract installation.",
-    )
-    parser.add_argument(
         "--mac-unified-ops-extraction",
         action=argparse.BooleanOptionalAction,
-        default=os.getenv("MAC_UNIFIED_OPS_EXTRACTION", "").lower() in {"1", "true", "yes", "on"},
+        default=False,
         help="Use per-turn BM25 candidate retrieval plus LLM add/update/remove ops for MAC extraction.",
     )
     parser.add_argument(
@@ -376,7 +370,6 @@ def memory_provider_from_args(args: argparse.Namespace):
                 persist_store=args.mac_persist_store,
                 load_store_dir=args.mac_load_store_dir,
                 ask_pass=args.mac_ask_pass,
-                live_validator=args.mac_live_validator,
                 mem_llm_model=args.mem_llm_model,
                 mem_api_key_env=args.mem_api_key_env,
                 mem_base_url=args.mem_base_url,

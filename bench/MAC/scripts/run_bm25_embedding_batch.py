@@ -116,7 +116,7 @@ def summarize_run(output_path: Path, error_path: Path) -> dict:
 
 def grade_module(bench: str) -> str:
     if bench == "cctu":
-        return "bench.construct.cctu.noise_eval_grade"
+        return "bench.MAC.construct.cctu.noise_eval_grade"
     return "bench.construct.sop.noise_eval_grade"
 
 

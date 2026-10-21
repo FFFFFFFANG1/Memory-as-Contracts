@@ -109,6 +109,51 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _is_deepseek_infer_model(model: str) -> bool:
+    return "deepseek" in model.strip().lower()
+
+
+def _deepseek_enable_thinking() -> bool | None:
+    raw = os.getenv("MEM_ENABLE_THINKING")
+    if raw is None or not raw.strip():
+        disable_raw = os.getenv("MEM_DISABLE_THINKING", "true").strip().lower()
+        if disable_raw in {"1", "true", "yes"}:
+            return False
+        if disable_raw in {"0", "false", "no"}:
+            return True
+        return False
+    return raw.strip().lower() in {"1", "true", "yes"}
+
+
+def _build_mem0_llm_config(*, mem_api_key: str, config: Mem0Config) -> dict[str, Any]:
+    model = config.mem_llm_model
+    max_tokens = int(os.getenv("MEM_LLM_MAX_TOKENS", "4096"))
+    if _is_deepseek_infer_model(model):
+        return {
+            "provider": "deepseek",
+            "config": {
+                "model": model,
+                "api_key": mem_api_key,
+                "deepseek_base_url": config.mem_base_url,
+                "temperature": 0.0,
+                "max_tokens": max_tokens,
+                "enable_thinking": _deepseek_enable_thinking(),
+                "reasoning_effort": os.getenv("MEM_REASONING_EFFORT", "minimal"),
+                "is_reasoning_model": True,
+            },
+        }
+    return {
+        "provider": "openai",
+        "config": {
+            "model": model,
+            "api_key": mem_api_key,
+            "openai_base_url": config.mem_base_url,
+            "temperature": 0.0,
+            "max_tokens": max_tokens,
+        },
+    }
+
+
 class MemoryOssAdapter:
     """Lazy adapter around the Mem0 OSS `Memory` class."""
 
@@ -126,15 +171,7 @@ class MemoryOssAdapter:
         self.config.faiss_dir.mkdir(parents=True, exist_ok=True)
         self.config.history_db_path.parent.mkdir(parents=True, exist_ok=True)
         return {
-            "llm": {
-                "provider": "openai",
-                "config": {
-                    "model": self.config.mem_llm_model,
-                    "api_key": mem_api_key,
-                    "openai_base_url": self.config.mem_base_url,
-                    "temperature": 0.0,
-                },
-            },
+            "llm": _build_mem0_llm_config(mem_api_key=mem_api_key, config=self.config),
             "embedder": {
                 "provider": "openai",
                 "config": {
@@ -162,7 +199,10 @@ class MemoryOssAdapter:
         _ensure_mem0_repo_on_path()
         from mem0 import Memory
 
-        self._memory = Memory.from_config(self._build_config())
+        mem0_config = self._build_config()
+        self._memory = Memory.from_config(mem0_config)
+        if mem0_config["llm"]["provider"] == "deepseek":
+            assert self._memory.llm.__class__.__name__ == "DeepSeekLLM"
         return self._memory
 
     def add(self, messages: Any, **kwargs: Any) -> Any:

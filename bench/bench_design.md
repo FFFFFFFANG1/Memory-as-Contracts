@@ -19,19 +19,18 @@ answer/task-outcome correctness. `constraint pass` keeps the same all-or-nothing
 task granularity for the required process. `constraint violation rate` reports
 the per-constraint error rate so partial process failure is visible.
 
-Constraint-follow behavior for active vs obsolete remembered contracts is
-reported in a secondary table with:
+Constraint-follow behavior for obsolete remembered contracts is reported in a
+secondary table with:
 
 ```text
-correct_follow_rate = correctly_followed / (active_constraint_count + history_constraint_count)
-wrong_follow_rate   = wrongly_followed / (active_constraint_count + history_constraint_count)
+noise_follow_rate = noise_followed / history_constraint_count
 ```
 
-`correctly_followed` counts active constraints followed plus history constraints
-ignored. `wrongly_followed` counts active constraints missed plus history
-constraints followed. Benchmark-specific legacy metrics such as CCTU
-`ACC`/`SR`/`PSR`/`SSR` can remain in detailed JSON outputs or appendix tables,
-but they are not main MAC-Bench comparison metrics.
+`noise_followed` counts obsolete/noise constraints that the agent incorrectly
+followed. The denominator is the total number of noise constraints only, so
+following every active constraint no longer caps this rate below 100%. Benchmark-specific
+legacy metrics such as CCTU `ACC`/`SR`/`PSR`/`SSR` can remain in detailed JSON
+outputs or appendix tables, but they are not main MAC-Bench comparison metrics.
 
 ## What Counts as One Constraint
 
@@ -141,51 +140,39 @@ Interpretation:
 
 ## Contract Follow Rates
 
-Each evaluable contract comparison asks whether the agent matched the current
-active contract, matched an obsolete history/scope contract, or matched neither.
-The core booleans are:
+Each evaluable contract unit is either an active anchor constraint or an
+obsolete noise constraint. The secondary contract-follow metric reports how
+often the agent follows obsolete noise:
 
 ```text
-A = current anchor contract matched
-H = obsolete history/scope contract matched
+noise_follow_rate = noise_followed / history_constraint_count
 ```
 
-MAC-Bench reports three mutually exclusive contract-follow buckets:
+`noise_followed` counts noise constraints that were incorrectly followed.
+`history_constraint_count` is the total number of noise constraints in scope.
+Use zero-division-safe implementations: if `history_constraint_count` is zero,
+emit `null` for the rate and include support counts in the detail output.
+`active_constraint_count` is still reported as support. This score diagnoses
+obsolete-contract confusion; it does not replace the main task/process metrics.
 
-- `correct_follow`: `A` is true. If a broader obsolete contract is also
-  satisfied, the current anchor match wins.
-- `wrong_follow`: `A` is false and `H` is true. This is the intended
-  history/scope-confusion signal.
-- `neither_followed`: `A` is false and `H` is false. The agent followed neither
-  the current contract nor a known obsolete alternative.
-
-```text
-correct_follow_rate = correctly_followed / comparison_count
-wrong_follow_rate   = wrongly_followed / comparison_count
-neither_follow_rate = neither_followed / comparison_count
-```
-
-Use zero-division-safe implementations: if `comparison_count` is zero, emit
-`null` for the rates and include support counts in the detail output.
-`active_constraint_count` and `history_constraint_count` are still reported as
-support, but the taxonomy denominator is the number of comparisons, not the sum
-of flattened active/history segments. These scores diagnose active-vs-obsolete
-contract following; they do not replace the main task/process metrics.
+Per-comparison booleans (`A` = anchor matched, `H` = any obsolete alternative
+matched) remain in detailed follow rows for debugging, but the headline rate is
+always computed over flattened noise units, not over comparison groups.
 
 ## CCTU Mapping
 
-CCTU uses the same three-bucket taxonomy, with emphasis on **scope confusion**.
-Each comparison is a `(task_uid, source_constraint_uid)` group:
+CCTU uses the same noise-unit denominator, with emphasis on **scope confusion**.
+Each comparison group is a `(task_uid, source_constraint_uid)` pair:
 
 ```text
 A = the active/current-scope anchor evaluator for that source constraint passes
 H = any inactive/noise-scope evaluator for that source constraint passes
 ```
 
-The group is `correct_follow` when `A`, `wrong_follow` when `not A and H`, and
-`neither_followed` when `not A and not H`. This keeps CCTU's contract-follow
-diagnostic focused on whether the agent selected the right scope rather than
-whether it merely violated a flattened constraint segment.
+The headline `noise_follow_rate` sums matched noise units
+(`history_hit_count`) over all noise units (`history_constraint_count`) in those
+groups. This keeps CCTU's contract-follow diagnostic focused on obsolete scope
+following rather than mixing active constraints into the denominator.
 
 The CCTU main task/process metrics use upstream CCTU task data:
 
@@ -246,8 +233,8 @@ and segments at the terminology level above.
 
 ### Graph-Level Follow Outcomes
 
-SOPBench uses the same three-bucket taxonomy, with emphasis on **history
-confusion**. Each comparison is one evaluation task:
+SOPBench uses the same noise-unit denominator, with emphasis on **history
+confusion**. Each task contributes one comparison row for debugging:
 
 ```text
 A = the final anchor directed action graph is satisfied, and the user-goal
@@ -257,29 +244,25 @@ H = at least one obsolete history directed action graph is strictly hit:
     is satisfied under replay
 ```
 
-The task is `correct_follow` when `A`, `wrong_follow` when `not A and H`, and
-`neither_followed` when `not A and not H`. The grader intentionally does not
-report a separate `both` bucket because history graphs can be broader than the
-final anchor graph; when the current anchor is matched, the outcome is credited
-as correct.
+The headline `noise_follow_rate` is computed from flattened obsolete
+`graph_action` units: noise constraints followed divided by total noise
+constraints. Per-task `A`/`H` rows remain in detailed outputs only.
 
-Flattened `graph_action` and `dependency_single` segments are retained as
-diagnostics and for `constraint violation rate`, but they are not the
-contract-follow taxonomy denominator.
-
-The SOPBench main task/process metrics use native replay, separate from the
-action-scoped constraint counts above:
+The SOPBench main task/process metrics use a branch-aware active user-goal
+process scorer:
 
 - `answer pass`: SOPBench user-goal outcome correctness
   (`action_called_correctly`; whether the user-goal action should/should not
   succeed).
-- `constraint pass`: all required native process checks pass:
-  `no_tool_call_error`, `constraint_not_violated`, `database_match`, and
-  `dirgraph_satisfied`.
-- `constraint violation rate`: violated action-call segments divided by all
-  action-call segments in the SOP native action graph diagnostics. A missed
-  active action-call segment and a wrongly followed history-only action-call
-  segment both count as violations.
+- `constraint pass`: task-level all-or-nothing success over the active user-goal
+  process tree. `and` / `chain` nodes require all children; `or` / `gate` nodes
+  require one child path.
+- `constraint violation rate`: branch-aware active process miss rate. Each
+  `single` action-call step contributes 1 matched step when it appears in
+  `order_respecting_actions`; `and` / `chain` sum child matched/total counts;
+  `or` / `gate` choose the child path with the highest matched/total ratio.
+  CVR is `1 - sum(matched_steps) / sum(chosen_branch_total_steps)`.
+  Obsolete/history segments are not included in this main metric.
 - `joint pass`: `answer pass` and `constraint pass` are both true.
 
 Dependency-single segments (for example, database predicates such as
@@ -303,8 +286,10 @@ to explain graph-action failures:
 | `off_policy_successful_actions` | Successfully called actions that are neither active nor history constraints for the task, excluding the user-goal action. |
 
 The first four diagnostics decompose flat action-segment outcomes by active vs
-history status. They explain `constraint violation rate` and tool behavior, but
-they are separate from the graph-level contract-follow denominator.
+history status. They are useful error-taxonomy signals, but the main SOP
+`constraint violation rate` is branch-aware rather than an all-node flat miss
+rate. History followed constraints are reported separately through
+`noise_follow_rate`.
 `off_policy_successful_actions` is an error-taxonomy signal for actions that do
 not match either the final SOP or the historical SOP variants.
 Each count is reported with rates: active followed/missed rates use the active
@@ -421,7 +406,7 @@ All MAC memory runs use the same agent-loop shape:
 3. Allow tool use until a terminal response tool call.
 4. Grade task/process success (`joint pass`, `answer pass`,
    `constraint pass`, `constraint violation rate`) and secondary
-   constraint-follow decisions (`correct_follow_rate`, `wrong_follow_rate`).
+   contract-follow metric (`noise_follow_rate`).
 
 Default turn policy is **last user turn**. Historical turns are never shown
 directly to the agent; they are only available through the memory system under
@@ -568,9 +553,70 @@ For a main paper, the most useful MAC-Bench summary is:
    domain.
 3. **Metric table**: `joint pass`, `answer pass`, `constraint pass`,
    `constraint violation rate`.
-4. **Constraint-follow appendix table**: confusion matrix plus
-   `correct_follow_rate`, `wrong_follow_rate`.
+4. **Constraint-follow appendix table**: `noise_follow_rate` with support counts.
 5. **Memory-system table**: rows for each memory baseline listed above.
+
+### Reference memory-system scores (400 tasks)
+
+These are historical scores from the listed July runs, not a validation of the
+current runtime data or the consolidated branch. They must not be presented as
+new evaluation results.
+
+Reference numbers below use existing grade artifacts under
+`bench/MAC/{cctu,sopbench}/results/memory_grade/` — **no full agent re-eval**.
+CCTU traces: oracle run `1782909331-01-07-26`; BM25 / embedding run
+`1782917722-01-07-26`. SOPBench traces (temporal v2 histories, mean 177.7
+history turns / task): oracle run `1783092824-03-07-26`; BM25 run
+`1783103586-04-07-26`; embedding run `1783142010-04-07-26`.
+
+| metric | slice | oracle | bm25 | embedding |
+| --- | --- | ---: | ---: | ---: |
+| **joint pass** | All | 61.5% | 21.2% | 20.0% |
+|  | CCTU | 53.0% | 9.0% | 9.5% |
+|  | SOP | 70.0% | 33.5% | 30.5% |
+| **answer pass** | All | 90.5% | 85.2% | 87.8% |
+|  | CCTU | 86.0% | 76.0% | 81.5% |
+|  | SOP | 95.0% | 94.5% | 94.0% |
+| **constraint pass** | All | 67.0% | 24.2% | 22.2% |
+|  | CCTU | 59.5% | 12.5% | 11.5% |
+|  | SOP | 74.5% | 36.0% | 33.0% |
+| **constraint violation rate ↓** | All | 10.7% | 34.6% | 35.9% |
+|  | CCTU | 12.8% | 38.8% | 42.1% |
+|  | SOP | 8.5% | 30.5% | 29.7% |
+| **noise_follow_rate ↓** | All | 45.8% | 44.8% | 46.1% |
+|  | CCTU | 50.6% | 49.0% | 50.2% |
+|  | SOP | 1.5% | 6.0% | 7.9% |
+| **step pass rate (CCTU only)** | All | — | — | — |
+|  | CCTU | 80.4% | 84.8% | 85.5% |
+|  | SOP | — | — | — |
+
+**How these rows are assembled**
+
+- **CCTU main metrics** (`joint pass`, `answer pass`, `constraint pass`,
+  `constraint violation rate`): read directly from each grade JSON `scores`.
+- **SOP main process metrics** (`constraint pass`, `constraint violation rate`):
+  compute branch-aware active user-goal process scores from the final anchor
+  directed action graph and each trajectory's `order_respecting_actions`.
+  `and` / `chain` nodes sum children; `or` / `gate` nodes use the child path
+  with the highest matched/total ratio. SOP `joint pass` is `answer pass` and
+  this branch-aware `constraint pass`.
+- **CCTU `step pass rate`**: read from `appendix_scores.legacy_cctu_task_metrics`
+  (slot-level micro-average, not the macro mean of per-task `task_scores`).
+- **CCTU `noise_follow_rate`**: grade JSON stores comparison-level support counts
+  but not `noise_followed`. Recompute **contract-follow only** from the grade
+  file's `source_answers` + `source_manifest` (artifact replay over scope groups;
+  skips `grade_one` / native process replay). Example oracle support:
+  `noise_followed=2513`, `history_constraint_count=4967` → 50.6%.
+- **SOP `noise_follow_rate`**: remains action-level and is read from
+  `tool_behavior_breakdown.unit_breakdown`:
+  `history_followed_constraints / history_constraint_count` on flattened
+  `graph_action` diagnostic units (533 history-noise units in the 200-task
+  slice).
+- **All slice**: task-weighted average of CCTU and SOP main metrics (200 tasks
+  each). `noise_follow_rate` pools noise support:
+  `(CCTU noise_followed + SOP noise_followed) / (4967 + 533)`.
+
+Lower is better for `constraint violation rate` and `noise_follow_rate`.
 
 For an appendix, additionally report:
 

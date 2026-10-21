@@ -4,7 +4,7 @@
 
 ## 初始状态（LLM 生成）
 
-- **来源**：`bench/construct/cctu/noise_eval_generation.py` 对 contract graph 每个节点调用 LLM（`glm-5.2`），产出 JSON artifact + Python `evaluate(trace)`。
+- **来源**：`bench/MAC/construct/cctu/noise_eval_generation.py` 对 contract graph 每个节点调用 LLM（`glm-5.2`），产出 JSON artifact + Python `evaluate(trace)`。
 - **规模**：5772 个 evaluator 单元（约 200 个 task × 每 task 多个 constraint 节点）。
 - **生成方式分布**（最终 verify 报告）：
   - `llm`: 3189
@@ -33,13 +33,13 @@
 | Step 5 forbidden_tool | CF 条件收紧 + `forbid_tool_calls` | 5739 | 99.4% | 21 | 1 | 11 |
 | **最终** | 末 14 条 + minimal evaluator | **5772** | **100%** | **0** | **0** | **0** |
 
-最终 verify 报告：`bench/cctu/mid_data/eval_step5_5_noise_eval_verify.json`
+最终 verify 报告：`bench/MAC/cctu/mid_data/eval_step5_5_noise_eval_verify.json`
 
 ---
 
 ## Step 0：建立审计（P0 verify）
 
-**文件**：`bench/construct/cctu/noise_eval_verify.py`
+**文件**：`bench/MAC/construct/cctu/noise_eval_verify.py`
 
 **做什么**：
 - 静态特征 coverage（`expected_features` vs 代码中检测到的特征）
@@ -57,7 +57,7 @@
 
 ## Step 1：规则修复 P1 + Verifier 语义修正
 
-**文件**：`bench/construct/cctu/noise_eval_repair.py`（P1 pass）、`noise_eval_verify.py`
+**文件**：`bench/MAC/construct/cctu/noise_eval_repair.py`（P1 pass）、`noise_eval_verify.py`
 
 **对 evaluator（tool）的修改**：
 - structured evaluator → Python `evaluate(trace)`
@@ -87,7 +87,7 @@
 
 ## Step 3：LLM 重生成（690 条，可选路径）
 
-**文件**：`bench/construct/cctu/noise_eval_llm_repair.py`
+**文件**：`bench/MAC/construct/cctu/noise_eval_llm_repair.py`
 
 **做什么**：
 - 对 Step 2 后仍 non-pass 的 690 条，把 constraint + 当前 code + **verification_audit flags** 发给 LLM 重写
@@ -150,11 +150,11 @@
 
 | 脚本 | 作用 |
 |------|------|
-| `bench/construct/cctu/noise_eval_generation.py` | LLM/heuristic 初生成 |
-| `bench/construct/cctu/noise_eval_verify.py` | 静态 + counterfactual 审计 |
-| `bench/construct/cctu/noise_eval_repair.py` | 规则/SPEC 批量 rewrite |
-| `bench/construct/cctu/noise_eval_llm_repair.py` | LLM 带 audit 反馈重写（Step 3） |
-| `bench/construct/cctu/noise_eval_grade.py` | 对 memory-eval run 打 constraint 分 |
+| `bench/MAC/construct/cctu/noise_eval_generation.py` | LLM/heuristic 初生成 |
+| `bench/MAC/construct/cctu/noise_eval_verify.py` | 静态 + counterfactual 审计 |
+| `bench/MAC/construct/cctu/noise_eval_repair.py` | 规则/SPEC 批量 rewrite |
+| `bench/MAC/construct/cctu/noise_eval_llm_repair.py` | LLM 带 audit 反馈重写（Step 3） |
+| `bench/MAC/construct/cctu/noise_eval_grade.py` | 对 memory-eval run 打 constraint 分 |
 
 ---
 

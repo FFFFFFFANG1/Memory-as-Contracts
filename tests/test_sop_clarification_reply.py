@@ -40,18 +40,34 @@ def test_is_agent_clarification_request_detects_questions() -> None:
     assert not is_agent_clarification_request("Your payment of $500 was processed successfully.")
 
 
-def test_build_clarification_reply_uses_user_known_and_turns() -> None:
+def test_build_clarification_reply_uses_user_known_and_current_prompt() -> None:
     reply = build_clarification_reply(
         user_prompt="Pay $500 for username john_doe.",
-        past_user_turns=[
-            {"kind": "carryover", "content": "Earlier I asked to pay $100 for john_doe."},
-        ],
         user_known={"username": "john_doe", "pay_owed_amount_request": 500.0},
     )
 
     assert reply.startswith("All information I know is ")
     assert "john_doe" in reply
     assert "500" in reply
+    assert "From our conversation" not in reply
+    assert "pay $100" not in reply
+
+
+def test_build_clarification_reply_ignores_history_turns() -> None:
+    context = SOPClarificationContext(
+        user_prompt="Pay $500 for username john_doe.",
+        past_user_turns=[
+            {"kind": "carryover", "content": "Earlier I asked to pay $100 for john_doe."},
+        ],
+        user_known={"username": "john_doe", "pay_owed_amount_request": 500.0},
+    )
+    reply = context.reply_for("Please provide your account number.")
+    assert reply is not None
+    assert reply.startswith("All information I know is ")
+    assert "john_doe" in reply
+    assert "500" in reply
+    assert "pay $100" not in reply
+    assert "From our conversation" not in reply
 
 
 def test_sop_context_reply_for_skips_non_questions() -> None:

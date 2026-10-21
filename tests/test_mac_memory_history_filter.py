@@ -196,7 +196,6 @@ def test_bench_adapter_injects_active_paths_into_prompt_and_actions() -> None:
         agent="bench",
         tools=[{"name": "send_message", "description": "", "input_schema": {}}],
         token_budget=1000,
-        memory_config=MACMemoryConfig(),
         active_paths=[active_path],
     )
     context = AdapterContext(workspace="/workspace", cwd="/workspace", session_id="sess")

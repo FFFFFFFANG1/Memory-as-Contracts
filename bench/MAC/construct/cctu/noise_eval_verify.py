@@ -22,11 +22,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from bench.construct.cctu.noise_eval_generation import (  # noqa: E402
+from bench.MAC.construct.cctu.noise_eval_generation import (  # noqa: E402
     interaction_round_bounds,
     load_env,
     number_after,
@@ -38,10 +38,10 @@ from bench.construct.cctu.noise_eval_generation import (  # noqa: E402
     tool_like_names_from_text,
     verify_package,
 )
-from bench.construct.cctu.noise_eval_grade import evaluate_artifact  # noqa: E402
+from bench.MAC.construct.cctu.noise_eval_grade import evaluate_artifact  # noqa: E402
 
 DEFAULT_ARTIFACT_DIR = Path("bench/MAC/cctu/data/noise_check_code")
-DEFAULT_OUTPUT = Path("bench/cctu/mid_data/eval_step5_5_noise_eval_verify.json")
+DEFAULT_OUTPUT = Path("bench/MAC/cctu/mid_data/eval_step5_5_noise_eval_verify.json")
 
 
 @dataclass(frozen=True)

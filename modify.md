@@ -220,4 +220,3 @@ The parts that remain weak:
      missing satisfied state.
 
 4. Re-run the same 5+5 live evaluation after adapter and monitor fixes.
-

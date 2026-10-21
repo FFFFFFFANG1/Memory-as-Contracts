@@ -12,7 +12,6 @@ from memory_as_contracts.models import (
     Contract,
     ContractKind,
     ContractStatus,
-    PredicateStatus,
     RuleEffect,
     Scope,
     ScopeLevel,
@@ -22,7 +21,7 @@ from memory_as_contracts.store import ContractStore
 
 
 HookPhase = Literal["pre", "post"]
-HookKind = Literal["policy_check", "validator_check", "validator_missing", "action_log"]
+HookKind = Literal["policy_check", "policy_missing", "action_log"]
 
 
 @dataclass(frozen=True)
@@ -30,7 +29,6 @@ class ActiveHookEntry:
     phase: HookPhase
     kind: HookKind
     contract_id: str | None = None
-    validator_version_id: str | None = None
     scope_level: str | None = None
     reason: str = ""
 
@@ -50,10 +48,6 @@ def build_active_hook_plan(
     active_paths: Iterable[str],
 ) -> ActiveHookPlan:
     paths = tuple(_dedupe_paths(active_paths))
-    versions = {
-        version.contract_id: version
-        for version in store.list_validator_versions(status=PredicateStatus.ACTIVE)
-    }
     prehooks: list[ActiveHookEntry] = []
     contracts: list[Contract] = []
     for contract in store.list_contracts(
@@ -68,21 +62,13 @@ def build_active_hook_plan(
             continue
         if contract.policy_ir is not None and not policy_target_matches(contract, signature):
             continue
-        version = versions.get(contract.id)
         contracts.append(contract)
-        kind: HookKind
-        if contract.policy_ir is not None:
-            kind = "policy_check"
-        elif version is not None:
-            kind = "validator_check"
-        else:
-            kind = "validator_missing"
+        kind: HookKind = "policy_check" if contract.policy_ir is not None else "policy_missing"
         prehooks.append(
             ActiveHookEntry(
                 phase="pre",
                 kind=kind,
                 contract_id=contract.id,
-                validator_version_id=version.id if version is not None else None,
                 scope_level=contract.scope.level.value,
                 reason=_scope_reason(contract.scope),
             )

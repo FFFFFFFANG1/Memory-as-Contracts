@@ -15,9 +15,13 @@
 	-> bench/MAC/construct/cctu/graph_validation.py
 	-> bench/MAC/construct/cctu/task_hist_gen.py
 	-> bench/MAC/construct/cctu/export_cctu_data.py
-	-> bench/MAC/scripts/build_mac_data.py
+	-> bench/MAC/construct/cctu/noise_eval_generation.py
+	-> bench/MAC/construct/cctu/noise_eval_verify.py
+	-> bench/MAC/construct/cctu/noise_eval_repair.py
+	-> bench/MAC/construct/cctu/noise_eval_llm_repair.py
 	-> bench/MAC/scripts/build_mac_data.py
 	-> bench/MAC/cctu/grade_answer.py
+	-> bench/MAC/construct/cctu/noise_eval_grade.py
 
 
 ## main pipeline

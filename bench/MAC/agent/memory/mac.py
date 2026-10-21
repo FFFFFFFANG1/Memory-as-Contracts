@@ -31,10 +31,6 @@ from memory_as_contracts.hook_plan import signature_with_active_paths
 from memory_as_contracts.hook_runtime import _render_user_turn_batch
 from memory_as_contracts.extraction_dedup import build_similar_rule_context
 from memory_as_contracts.policy_ir import policy_ir_safety
-from memory_as_contracts.validator_generation import (
-    VALIDATOR_GENERATION_SYSTEM_PROMPT,
-    ValidatorSnippetGenerator,
-)
 from memory_as_contracts.models import (
     ActionOutcome,
     AvailableAction,
@@ -53,7 +49,6 @@ from memory_as_contracts.models import (
 from memory_as_contracts.retrieval import DEFAULT_PROMPT_TOKEN_BUDGET
 from memory_as_contracts.store import ContractStore
 from memory_as_contracts.tool_capsules import ToolCapabilityCapsule
-from memory_as_contracts.validator_generation import ValidatorSnippetPackage
 from bench.MAC.agent.memory.bm25 import BM25Index
 from bench.MAC.agent.memory.retrieval import MemoryDocument
 
@@ -80,7 +75,6 @@ class MACMemoryConfig:
     persist_store: bool = False
     load_store_dir: Path | None = None
     ask_pass: bool = False
-    live_validator: bool = False
     mem_llm_model: str = ""
     mem_api_key_env: str = "MEM_API_KEY"
     mem_base_url: str | None = None
@@ -122,23 +116,11 @@ class BenchMACAdapter(BaseAdapter):
         agent: str,
         tools: list[dict[str, Any]],
         token_budget: int,
-        memory_config: MACMemoryConfig | None = None,
-        live_validator: bool = False,
-        llm_call_stats: dict[str, int] | None = None,
         active_paths: list[str] | None = None,
     ) -> None:
         host_tools = _host_tools(tools)
-        stats = llm_call_stats if llm_call_stats is not None else {}
-        if live_validator:
-            def validator_factory() -> ValidatorSnippetGenerator | _FailValidatorGenerator:
-                return _live_validator_generator(memory_config or MACMemoryConfig(), stats)
-        else:
-            def validator_factory() -> _FailValidatorGenerator:
-                return _FailValidatorGenerator()
-
         super().__init__(
             available_actions=_available_actions_from_host_tools(host_tools),
-            validator_generator_factory=validator_factory,
         )
         self.agent_name = agent
         self.prompt_token_budget = token_budget
@@ -186,9 +168,6 @@ class MACMemoryProvider:
             agent=request.agent,
             tools=_agent_tools(request),
             token_budget=self.config.token_budget,
-            memory_config=self.config,
-            live_validator=self.config.live_validator,
-            llm_call_stats=llm_call_stats,
             active_paths=active_paths,
         )
         store_path = _store_path(self.config, request.task_uid)
@@ -337,7 +316,6 @@ class MACMemoryProvider:
                 "ir_extract_max_worker": self.config.extract_max_worker,
                 "unified_ops_extraction": self.config.unified_ops_extraction,
                 "unified_ops_top_k": self.config.unified_ops_top_k,
-                "live_validator": self.config.live_validator,
                 "llm_call_stats": dict(llm_call_stats),
             }
             state = MACRuntimeState(
@@ -492,15 +470,6 @@ class MACHookedToolExecutor:
         if hasattr(self.inner, "close"):
             self.inner.close()
         self.state.close()
-
-
-class _FailValidatorGenerator:
-    def generate_verified(self, *args: Any, **kwargs: Any) -> ValidatorSnippetPackage:
-        del args, kwargs
-        return ValidatorSnippetPackage(
-            status="fail",
-            notes=["bench MAC runtime does not call a live validator generator by default"],
-        )
 
 
 class _CountingResponseProvider:
@@ -1365,22 +1334,6 @@ def _flush_pending_extractor_batches(
         store.mark_user_turns_extracted(row["seq"] for row in pending)
         extracted.extend(resolved)
     return extracted
-
-
-def _live_validator_generator(
-    config: MACMemoryConfig,
-    stats: dict[str, int],
-) -> ValidatorSnippetGenerator:
-    provider = OpenAIChatResponseProvider(
-        _memory_llm_config(config, purpose="MAC validator generation"),
-        system_prompt=VALIDATOR_GENERATION_SYSTEM_PROMPT,
-    )
-    counting_provider = _CountingResponseProvider(
-        provider,
-        stats,
-        counter_key="validator_calls",
-    )
-    return ValidatorSnippetGenerator(counting_provider)
 
 
 def _live_extractor(config: MACMemoryConfig) -> PolicyIRContractExtractor:

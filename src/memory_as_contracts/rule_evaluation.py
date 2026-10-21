@@ -18,13 +18,7 @@ from memory_as_contracts.models import (
     RuleEffect,
 )
 from memory_as_contracts.policy_ir import PolicyIREvaluator, policy_target_matches
-from memory_as_contracts.rule_surface import (
-    bind_contract_check_patterns,
-    bind_check_patterns,
-    bind_validator_check,
-)
 from memory_as_contracts.store import ContractStore
-from memory_as_contracts.validators import ValidatorRuntime, ValidatorSandboxError
 
 
 @dataclass(frozen=True)
@@ -49,11 +43,9 @@ class RuleEvaluator:
         store: ContractStore,
         *,
         compiler: object | None = None,
-        validator_runtime: ValidatorRuntime | None = None,
     ) -> None:
         del compiler
         self.store = store
-        self.validator_runtime = validator_runtime or ValidatorRuntime(store)
         self.active_edges = store.list_edges([ContractStatus.ACTIVE])
         self._contract_cache: dict[str, Contract | None] = {}
 
@@ -105,116 +97,17 @@ class RuleEvaluator:
                 validator_verdicts=(verdict,),
             )
 
-        validator_version = self.store.get_active_validator_version(contract.id)
-        if validator_version is not None:
-            if not validator_version.check_patterns:
-                return self._ignored(contract, "missing_validator_check_pattern")
-            binding = bind_validator_check(contract, validator_version, signature)
-            if not binding.matched:
-                return self._ignored(contract, "validator_not_matched")
-            response = self._ask_response_evaluation(
-                contract,
-                validator_version.id,
-                binding.outcome,
-                ask_response,
-            )
-            if response is not None:
-                return response
-            try:
-                verdict = self.validator_runtime.check(
-                    validator_version,
-                    signature,
-                    ask_response_flag=False,
-                    ask_request_id=None,
-                )
-            except (ValidatorSandboxError, ValueError) as exc:
-                return RuleEvaluation(
-                    contract_id=contract.id,
-                    decision=GateDecisionType.ASK,
-                    reason=f"Validator for rule {contract.id} could not be evaluated.",
-                    match_outcome=binding.outcome,
-                    used=True,
-                    validator_verdicts=(
-                        {
-                            "contract_id": contract.id,
-                            "validator_version_id": validator_version.id,
-                            "decision": GateDecisionType.ASK.value,
-                            "reason": f"validator unavailable: {exc}",
-                            "evidence_refs": [],
-                            "confidence": 0.0,
-                            "runtime_error": exc.__class__.__name__,
-                        },
-                    ),
-                    ask_rule_ids=(contract.id,),
-                )
-            return RuleEvaluation(
-                contract_id=contract.id,
-                decision=verdict.decision,
-                reason=verdict.reason,
-                match_outcome=binding.outcome,
-                used=True,
-                validator_verdicts=(
-                    {
-                        "contract_id": contract.id,
-                        "validator_version_id": validator_version.id,
-                        "decision": verdict.decision.value,
-                        "reason": verdict.reason,
-                        "evidence_refs": verdict.evidence_refs,
-                        "confidence": verdict.confidence,
-                    },
-                ),
-                ask_rule_ids=(
-                    (contract.id,)
-                    if verdict.decision == GateDecisionType.ASK
-                    else ()
-                ),
-            )
-
-        if not contract.check_patterns:
-            return RuleEvaluation(
-                contract_id=contract.id,
-                decision=GateDecisionType.ASK,
-                reason=f"Rule {contract.id} requires validation hook patterns that are not available.",
-                used=True,
-                validator_verdicts=(
-                    {
-                        "contract_id": contract.id,
-                        "validator_version_id": None,
-                        "decision": GateDecisionType.ASK.value,
-                        "reason": "check patterns are not installed",
-                        "evidence_refs": [],
-                        "confidence": 0.0,
-                    },
-                ),
-                ask_rule_ids=(contract.id,),
-            )
-        binding = bind_contract_check_patterns(contract, signature)
-        if not binding.matched:
-            return self._ignored(contract, "validator_not_matched")
-        response = self._ask_response_evaluation(
-            contract,
-            None,
-            binding.outcome,
-            ask_response,
-        )
-        if response is not None:
-            return response
         return RuleEvaluation(
             contract_id=contract.id,
             decision=GateDecisionType.ASK,
-            reason=f"Rule {contract.id} requires a validator that is not available.",
-            match_outcome=binding.outcome,
+            reason=f"Rule {contract.id} has no PolicyIR; re-extract or migrate it before execution.",
+            match_outcome=MatchOutcome.MATCHED,
             used=True,
-            validator_verdicts=(
-                {
-                    "contract_id": contract.id,
-                    "validator_version_id": None,
-                    "decision": GateDecisionType.ASK.value,
-                    "reason": "validator is not installed",
-                    "evidence_refs": [],
-                    "confidence": 0.0,
-                },
-            ),
+            validator_verdicts=({
+                "contract_id": contract.id,
+                "decision": GateDecisionType.ASK.value,
+                "reason": "policy_ir_migration_required",
+            },),
             ask_rule_ids=(contract.id,),
         )
 
@@ -222,40 +115,6 @@ class RuleEvaluator:
     def _ignored(contract: Contract, reason: str) -> RuleEvaluation:
         return RuleEvaluation(contract_id=contract.id, ignored_reason=reason)
 
-    @staticmethod
-    def _ask_response_evaluation(
-        contract: Contract,
-        validator_version_id: str | None,
-        outcome: MatchOutcome,
-        ask_response: AskRequest | None,
-    ) -> RuleEvaluation | None:
-        if ask_response is None or contract.id not in ask_response.rule_ids:
-            return None
-        return RuleEvaluation(
-            contract_id=contract.id,
-            decision=GateDecisionType.ALLOW,
-            reason="single-use Ask Response Flag applied",
-            match_outcome=outcome,
-            used=True,
-            validator_verdicts=(
-                {
-                    "contract_id": contract.id,
-                    "validator_version_id": validator_version_id,
-                    "decision": GateDecisionType.ALLOW.value,
-                    "reason": "single-use Ask Response Flag applied",
-                    "evidence_refs": [{"ask_request_id": ask_response.id}],
-                    "confidence": 1.0,
-                },
-            ),
-            ask_response_used=True,
-        )
-
-    def _active_pattern_version(
-        self,
-        contract: Contract,
-    ) -> RulePatternVersion | None:
-        current = self.store.get_active_rule_pattern_version(contract.id)
-        return current if current is not None and current.check_patterns else None
 
     def _active_override_edge_id(
         self,
@@ -305,17 +164,7 @@ class RuleEvaluator:
                 if not policy_target_matches(exception_contract, signature):
                     continue
             else:
-                exception_pattern_version = self._active_pattern_version(
-                    exception_contract
-                )
-                if exception_pattern_version is None:
-                    continue
-                if not bind_check_patterns(
-                    exception_contract,
-                    signature,
-                    exception_pattern_version.check_patterns,
-                ).matched:
-                    continue
+                continue
             if _exception_can_cover_contract(exception_contract, contract):
                 return True
         return False

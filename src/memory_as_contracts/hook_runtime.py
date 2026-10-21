@@ -20,14 +20,10 @@ from memory_as_contracts.models import (
     ActionOutcome,
     Contract,
     ContractStatus,
-    ValidatorInstallationRecord,
-    ValidatorInstallationStatus,
 )
-from memory_as_contracts.pattern_validation import PatternInstaller, PatternVerifier
 from memory_as_contracts.resolver import ConflictResolver
 from memory_as_contracts.retrieval import PromptIntakeRetriever
 from memory_as_contracts.store import ContractStore
-from memory_as_contracts.validator_installation import ValidatorProvisioner
 
 
 PERIODIC_USER_TURN_BATCH_SIZE = 10
@@ -341,8 +337,7 @@ class MacHookRuntime:
             risk=signature.risk,
             side_effect=signature.side_effect,
         )
-        # PolicyIR uses the action log as the source of truth. Legacy validator
-        # state updates are intentionally not part of the default runtime path.
+        # PolicyIR monitors read committed events directly from the action log.
         stored = store.add_action_log_entry(entry)
         log_event(
             LOGGER,
@@ -377,88 +372,7 @@ class MacHookRuntime:
             if self.adapter._conflict_resolver_factory is not None
             else ConflictResolver(store)
         )
-        resolved: list[Contract] = []
-        for result in resolver.insert_batch(contracts):
-            contract = result.contract
-            if contract.policy_ir is not None:
-                resolved.append(contract)
-                continue
-            if contract.status in {
-                ContractStatus.ACTIVE,
-                ContractStatus.CANDIDATE,
-                ContractStatus.PENDING_CONFLICT,
-            }:
-                installed = PatternInstaller(
-                    store=store,
-                    verifier=PatternVerifier(self.adapter.tool_capsules()),
-                    response_provider=None,
-                ).install(contract)
-                contract = installed.contract
-                log_event(
-                    LOGGER,
-                    "pattern.verification",
-                    level=(
-                        logging.INFO
-                        if installed.verification.accepted
-                        else logging.WARNING
-                    ),
-                    contract_id=contract.id,
-                    accepted=installed.verification.accepted,
-                    refined=installed.refined,
-                    errors=[
-                        issue.code for issue in installed.verification.issues
-                    ],
-                )
-            resolved.append(contract)
-
-        for contract in resolved:
-            if contract.status != ContractStatus.ACTIVE:
-                continue
-            if contract.policy_ir is not None:
-                continue
-            factory = (
-                self.adapter._validator_generator_factory
-                or _default_validator_generator_factory
-            )
-            try:
-                installation = ValidatorProvisioner(factory()).provision(
-                    contract,
-                    store=store,
-                    session_id=context.session_id,
-                    task_id=context.task_id,
-                    tool_capsules=self.adapter.tool_capsules(),
-                    user_id=context.user_id,
-                    workspace=str(context.workspace_path()),
-                    repo=context.repo,
-                    branch=context.branch,
-                    organization=context.organization,
-                    supports_post_action=self.adapter.capabilities.post_action,
-                )
-            except (LLMCallError, ValueError) as exc:
-                store.add_validator_installation(
-                    ValidatorInstallationRecord(
-                        contract_id=contract.id,
-                        status=ValidatorInstallationStatus.FAILED,
-                        errors=[str(exc)],
-                    )
-                )
-                log_event(
-                    LOGGER,
-                    "validator.installation",
-                    level=logging.ERROR,
-                    contract_id=contract.id,
-                    status=ValidatorInstallationStatus.FAILED.value,
-                    error_type=exc.__class__.__name__,
-                )
-                continue
-            log_event(
-                LOGGER,
-                "validator.installation",
-                contract_id=contract.id,
-                status=installation.status,
-                error_count=len(installation.errors),
-            )
-        return resolved
+        return [result.contract for result in resolver.insert_batch(contracts)]
 
     def should_cold_start_once(self, store: ContractStore, context: Any) -> bool:
         specs = self.adapter.discover_sources(context)
@@ -481,25 +395,11 @@ def _render_user_turn_batch(rows: list[Mapping[str, Any]]) -> str:
 
 def _default_online_extractor_factory():
     from memory_as_contracts.extractor import (
-        CandidateJsonContractExtractor,
+        PolicyIRContractExtractor,
         OpenAIChatResponseProvider,
     )
 
-    return CandidateJsonContractExtractor(OpenAIChatResponseProvider.from_env())
-
-
-def _default_validator_generator_factory():
-    from memory_as_contracts.extractor import OpenAIChatResponseProvider
-    from memory_as_contracts.validator_generation import (
-        VALIDATOR_GENERATION_SYSTEM_PROMPT,
-        ValidatorSnippetGenerator,
-    )
-
-    return ValidatorSnippetGenerator(
-        OpenAIChatResponseProvider.from_env(
-            system_prompt=VALIDATOR_GENERATION_SYSTEM_PROMPT,
-        )
-    )
+    return PolicyIRContractExtractor(OpenAIChatResponseProvider.from_env())
 
 
 def default_pattern_refiner_factory() -> Callable[[str], str]:

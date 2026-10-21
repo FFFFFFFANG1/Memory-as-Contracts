@@ -36,13 +36,7 @@ def test_diagnostic_commands_are_registered() -> None:
     for command in (
         "action-log",
         "search-actions",
-        "validators",
-        "validator-state",
         "asks",
-        "validator-errors",
-        "verify-validator",
-        "install-validator",
-        "replay-validator",
     ):
         assert command in result.stdout
 

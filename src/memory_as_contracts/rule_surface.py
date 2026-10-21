@@ -8,16 +8,13 @@ from fnmatch import fnmatch
 from typing import Any
 
 from memory_as_contracts.models import (
-    ActionLogEntryV1,
     ActionSignature,
     ArgPattern,
     Contract,
     MatchOutcome,
     RuleEffect,
     RulePatternVersion,
-    ScopeLevel,
     ToolPattern,
-    ValidatorVersion,
 )
 
 
@@ -201,48 +198,6 @@ def bind_check_patterns(
     return RuleBinding(outcome=evaluate_patterns(patterns, signature))
 
 
-def bind_validator_check(
-    contract: Contract,
-    version: ValidatorVersion,
-    signature: ActionSignature,
-) -> RuleBinding:
-    outcome = evaluate_patterns(version.check_patterns, signature)
-    return RuleBinding(
-        outcome=outcome,
-        scope_key=validator_scope_key_for_signature(contract, signature)
-        if outcome == MatchOutcome.MATCHED
-        else None,
-    )
-
-
-def bind_contract_check_patterns(
-    contract: Contract,
-    signature: ActionSignature,
-) -> RuleBinding:
-    outcome = evaluate_patterns(contract.check_patterns, signature)
-    return RuleBinding(
-        outcome=outcome,
-        scope_key=validator_scope_key_for_signature(contract, signature)
-        if outcome == MatchOutcome.MATCHED
-        else None,
-    )
-
-
-def bind_validator_update(
-    contract: Contract,
-    version: ValidatorVersion,
-    entry: ActionLogEntryV1,
-    signature: ActionSignature,
-) -> RuleBinding:
-    outcome = evaluate_patterns(version.update_patterns, signature)
-    return RuleBinding(
-        outcome=outcome,
-        scope_key=validator_scope_key_for_entry(contract, entry)
-        if outcome == MatchOutcome.MATCHED
-        else None,
-    )
-
-
 def tool_pattern_matches(pattern: ToolPattern, signature: ActionSignature) -> bool:
     if pattern.tool != "*" and pattern.tool != signature.tool.name:
         return False
@@ -293,86 +248,6 @@ def text_mentions_path_glob(text: str, glob: str) -> bool:
         return True
     candidates = re.findall(r"[A-Za-z0-9_./-]+", text)
     return any(path_value_matches(candidate, glob) for candidate in candidates)
-
-
-def validator_scope_key_for_signature(
-    contract: Contract,
-    signature: ActionSignature,
-) -> str:
-    return validator_scope_key(
-        contract,
-        session_id=signature.session.session_id,
-        workspace=signature.workspace.cwd,
-        repo=signature.workspace.repo,
-        branch=signature.workspace.branch,
-        user_id=signature.session.user_id,
-        turn_id=signature.session.turn_id,
-    )
-
-
-def validator_scope_key_for_entry(
-    contract: Contract,
-    entry: ActionLogEntryV1,
-) -> str:
-    return validator_scope_key(
-        contract,
-        session_id=entry.session_id,
-        workspace=entry.workspace,
-        repo=entry.repo,
-        branch=entry.branch,
-        user_id=entry.user_id,
-        turn_id=entry.turn_id,
-    )
-
-
-def validator_scope_key(
-    contract: Contract,
-    *,
-    session_id: str,
-    workspace: str | None,
-    repo: str | None,
-    branch: str | None = None,
-    user_id: str | None = None,
-    turn_id: str | None = None,
-) -> str:
-    """Scope keys must only use inputs available at install, check, and update time."""
-
-    payload = {
-        "contract_id": contract.id,
-        "scope_level": contract.scope.level.value,
-    }
-    level = contract.scope.level
-    if level == ScopeLevel.SESSION:
-        payload["session_id"] = session_id
-    elif level == ScopeLevel.PATH:
-        payload.update(
-            workspace=contract.scope.workspace or workspace,
-            path=contract.scope.path,
-        )
-    elif level == ScopeLevel.MODULE:
-        payload.update(
-            workspace=contract.scope.workspace or workspace,
-            project=contract.scope.project or repo or workspace,
-            module=contract.scope.module,
-        )
-    elif level == ScopeLevel.PROJECT:
-        payload.update(
-            workspace=contract.scope.workspace or workspace,
-            project=contract.scope.project or repo or workspace,
-        )
-    elif level == ScopeLevel.WORKSPACE:
-        payload["workspace"] = contract.scope.workspace or workspace
-    elif level == ScopeLevel.GLOBAL:
-        payload["user_id"] = contract.scope.user_id or user_id
-    else:
-        payload.update(
-            session_id=session_id,
-            workspace=workspace,
-            repo=repo,
-            branch=branch,
-            user_id=user_id,
-        )
-    return _hash(payload)
 
 
 def _normalized_text_tokens(text: str) -> list[str]:

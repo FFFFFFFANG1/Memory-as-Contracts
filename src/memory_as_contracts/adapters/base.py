@@ -39,7 +39,6 @@ from memory_as_contracts.tool_capsules import (
     ToolCapabilityCapsule,
     render_tool_capsule_system_prompt,
 )
-from memory_as_contracts.validator_generation import ValidatorSnippetGenerator
 
 PERIODIC_USER_TURN_BATCH_SIZE = 10
 LOGGER = logging.getLogger(__name__)
@@ -155,14 +154,12 @@ class BaseAdapter:
         exclude_actions: Sequence[ExcludedActionPattern] | None = None,
         conflict_resolver_factory: Callable[[ContractStore], ConflictResolver] | None = None,
         online_extractor_factory: Callable[[], OnlineTurnExtractor] | None = None,
-        validator_generator_factory: Callable[[], ValidatorSnippetGenerator] | None = None,
         pattern_refiner_factory: Callable[[], Callable[[str], str]] | None = None,
     ) -> None:
         self.signature_builder = signature_builder or ActionSignatureBuilder()
         self._available_actions = list(available_actions) if available_actions is not None else None
         self._conflict_resolver_factory = conflict_resolver_factory
         self._online_extractor_factory = online_extractor_factory
-        self._validator_generator_factory = validator_generator_factory
         self._pattern_refiner_factory = pattern_refiner_factory
         if exclude_actions is not None:
             self.exclude_actions = tuple(exclude_actions)

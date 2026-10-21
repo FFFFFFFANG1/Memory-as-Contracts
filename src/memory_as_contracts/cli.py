@@ -18,12 +18,6 @@ from memory_as_contracts.models import (
     prefixed_id,
 )
 from memory_as_contracts.store import ContractStore
-from memory_as_contracts.validator_generation import ValidatorSnippetPackage
-from memory_as_contracts.validator_installation import (
-    ValidatorInstaller,
-    ValidatorSnippetVerifier,
-)
-from memory_as_contracts.validators import ValidatorRuntime
 
 
 app = typer.Typer(
@@ -97,52 +91,6 @@ def search_actions(
         store.close()
 
 
-@app.command("validators")
-def validators(contract_id: str | None = typer.Option(None)) -> None:
-    """List validator versions and installation status."""
-
-    store = _open_store()
-    try:
-        _echo_json(
-            {
-                "versions": [
-                    version.model_dump(mode="json")
-                    for version in store.list_validator_versions(contract_id=contract_id)
-                ],
-                "installations": [
-                    record.model_dump(mode="json")
-                    for record in store.list_validator_installations(contract_id)
-                ],
-            }
-        )
-    finally:
-        store.close()
-
-
-@app.command("validator-state")
-def validator_state(validator_version_id: str = typer.Argument(...)) -> None:
-    """Show scoped state and transition provenance for a validator."""
-
-    store = _open_store()
-    try:
-        _echo_json(
-            {
-                "states": [
-                    state.model_dump(mode="json")
-                    for state in store.list_validator_states(validator_version_id)
-                ],
-                "transitions": [
-                    transition.model_dump(mode="json")
-                    for transition in store.list_validator_state_transitions(
-                        validator_version_id
-                    )
-                ],
-            }
-        )
-    finally:
-        store.close()
-
-
 @app.command("asks")
 def asks() -> None:
     """List incomplete AskRequest records."""
@@ -155,101 +103,6 @@ def asks() -> None:
             if request.status.value not in {"consumed", "cancelled"}
         ]
         _echo_json(records)
-    finally:
-        store.close()
-
-
-@app.command("validator-errors")
-def validator_errors(
-    validator_version_id: str | None = typer.Option(None),
-) -> None:
-    """List validator runtime errors and replay requirements."""
-
-    store = _open_store()
-    try:
-        _echo_json(
-            [
-                error.model_dump(mode="json")
-                for error in store.list_validator_runtime_errors(validator_version_id)
-            ]
-        )
-    finally:
-        store.close()
-
-
-@app.command("verify-validator")
-def verify_validator(
-    contract_id: str = typer.Argument(...),
-    package_json: str = typer.Option(..., "--package-json"),
-    session_id: str = typer.Option(...),
-    task_id: str | None = typer.Option(None),
-) -> None:
-    """Run validator verification without installing a version."""
-
-    store = _open_store()
-    try:
-        contract = _require_contract(store, contract_id)
-        package = ValidatorSnippetPackage.model_validate_json(package_json)
-        result = ValidatorSnippetVerifier().verify(
-            contract,
-            package,
-            store=store,
-            session_id=session_id,
-            task_id=task_id,
-            committed_examples=store.list_action_log_entries(),
-        )
-        _echo_json(result.model_dump(mode="json"))
-    finally:
-        store.close()
-
-
-@app.command("install-validator")
-def install_validator(
-    contract_id: str = typer.Argument(...),
-    package_json: str = typer.Option(..., "--package-json"),
-    session_id: str = typer.Option(...),
-    task_id: str | None = typer.Option(None),
-) -> None:
-    """Verify and transactionally install a validator version."""
-
-    store = _open_store()
-    try:
-        contract = _require_contract(store, contract_id)
-        package = ValidatorSnippetPackage.model_validate_json(package_json)
-        result = ValidatorInstaller().register(
-            contract,
-            package,
-            store=store,
-            session_id=session_id,
-            task_id=task_id,
-        )
-        _echo_json(
-            {
-                "status": result.status,
-                "errors": result.errors,
-                "validator_version": result.validator_version.model_dump(mode="json")
-                if result.validator_version is not None
-                else None,
-            }
-        )
-    finally:
-        store.close()
-
-
-@app.command("replay-validator")
-def replay_validator(
-    validator_version_id: str = typer.Argument(...),
-    scope_key: str = typer.Option(...),
-) -> None:
-    """Rebuild one scoped validator state from committed Action Log entries."""
-
-    store = _open_store()
-    try:
-        version = store.get_validator_version(validator_version_id)
-        if version is None:
-            raise typer.BadParameter(f"unknown validator version: {validator_version_id}")
-        state = ValidatorRuntime(store).rebuild_state(version, scope_key)
-        _echo_json(state.model_dump(mode="json"))
     finally:
         store.close()
 

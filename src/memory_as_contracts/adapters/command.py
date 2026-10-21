@@ -14,7 +14,7 @@ from memory_as_contracts.adapters.base import (
     adapter_config,
     resolve_workspace_path,
 )
-from memory_as_contracts.extractor import CandidateJsonContractExtractor, OpenAIChatResponseProvider
+from memory_as_contracts.extractor import PolicyIRContractExtractor, OpenAIChatResponseProvider
 from memory_as_contracts.store import ContractStore
 
 
@@ -62,8 +62,8 @@ def _handle_user_prompt(
     user_turn: str,
     context: AdapterContext,
 ) -> dict[str, Any]:
-    def extractor_factory() -> CandidateJsonContractExtractor:
-        return CandidateJsonContractExtractor(OpenAIChatResponseProvider.from_env())
+    def extractor_factory() -> PolicyIRContractExtractor:
+        return PolicyIRContractExtractor(OpenAIChatResponseProvider.from_env())
 
     handler = getattr(adapter, "handle_user_prompt_submit", None)
     if callable(handler):

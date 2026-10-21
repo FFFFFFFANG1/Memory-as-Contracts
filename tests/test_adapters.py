@@ -33,7 +33,6 @@ from memory_as_contracts.models import (
     ValidatorEnforcementShape,
 )
 from memory_as_contracts.store import ContractStore
-from memory_as_contracts.validator_generation import ValidatorSnippetGenerator
 
 
 class RecordingExtractor:
@@ -675,7 +674,7 @@ def test_periodic_extraction_limits_similar_rule_context_to_top_five(
     assert similar_context.count("Do not run git push unless approval rule") == 5
 
 
-def test_periodic_extraction_provisions_validator_for_accepted_contract(
+def test_periodic_extraction_stores_policy_ir_without_generating_code(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -685,37 +684,28 @@ def test_periodic_extraction_provisions_validator_for_accepted_contract(
     codex_home.mkdir()
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     store = make_store()
-    contract = before_push_contract(workspace)
+    contract = before_push_contract(workspace).model_copy(update={"policy_ir": {
+        "text": "Before pushing code, run tests.",
+        "effect": "require",
+        "scope": {"level": "workspace"},
+        "target": {"phase": "pre", "tool": "exec_command", "args": {
+            "field": "args.cmd", "op": "regex", "value": r"^git\s+push(\s|$)",
+        }},
+        "obligation": {"kind": "prior_action", "monitor": {
+            "source": "action_log", "where": {
+                "field": "tool_name", "op": "eq", "value": "run_tests",
+            }, "aggregate": "exists",
+        }},
+    }})
     extractor = RecordingExtractor([contract])
-    prompts: list[str] = []
-
-    def response_provider(prompt: str) -> str:
-        prompts.append(prompt)
-        return (
-            '{"status":"success","shared_states":{},"notes":[],'
-            '"check_code":"def check(action, log, context):\\n'
-            '    command = (action.get(\\\"arguments\\\") or {}).get(\\\"cmd\\\")\\n'
-            '    if not command:\\n'
-            '        return ask(\\\"missing command\\\")\\n'
-            '    return ask(\\\"tests must be observed before push\\\")"}'
-        )
-
-    adapter = CodexAdapter(
-        online_extractor_factory=lambda: extractor,
-        validator_generator_factory=lambda: ValidatorSnippetGenerator(response_provider),
-    )
+    adapter = CodexAdapter(online_extractor_factory=lambda: extractor)
     for index in range(1, 11):
         adapter.handle_user_prompt_submit(
-            store,
-            f"user turn {index}",
-            context(workspace, turn_id=f"turn-{index}"),
+            store, f"user turn {index}", context(workspace, turn_id=f"turn-{index}"),
         )
-
-    installed = store.get_active_validator_version(contract.id)
-    assert installed is not None
-    assert installed.enforcement_shape == ValidatorEnforcementShape.CHECK_ONLY
-    assert store.list_validator_installations(contract.id)[-1].status == "success"
-    assert prompts and "PENDING ACTION EXAMPLES" not in prompts[0]
+    assert store.get_contract(contract.id).policy_ir == contract.policy_ir
+    assert store.list_validator_versions(contract_id=contract.id) == []
+    assert store.list_validator_installations(contract.id) == []
 
 
 def test_periodic_extraction_returns_structured_error_and_keeps_batch_for_retry(

@@ -16,6 +16,7 @@ from memory_as_contracts.extractor import (
     HeuristicContractExtractor,
     JsonContractExtractor,
     LLMCallError,
+    PolicyIRContractExtractor,
 )
 from memory_as_contracts.gate import ActionGate, ExcludedActionPattern
 from memory_as_contracts.logging_config import configure_logging
@@ -60,26 +61,12 @@ from memory_as_contracts.pattern_validation import (
     PatternVerificationResult,
     PatternVerifier,
 )
+from memory_as_contracts.policy_ir import PolicyIR, PolicyIREvaluator
 from memory_as_contracts.resolver import ConflictResolver
 from memory_as_contracts.retrieval import PromptIntakeRetriever, PromptRetrievalContext
 from memory_as_contracts.signatures import ActionSignatureBuilder
 from memory_as_contracts.store import ContractStore
 from memory_as_contracts.tool_capsules import ToolCapabilityCapsule
-from memory_as_contracts.validator_generation import (
-    VALIDATOR_GENERATION_SYSTEM_PROMPT,
-    ValidatorSnippetGenerator,
-    ValidatorSnippetPackage,
-)
-from memory_as_contracts.validator_installation import (
-    ValidatorInstaller,
-    ValidatorSnippetVerifier,
-    ValidatorVerificationResult,
-)
-from memory_as_contracts.validators import (
-    ValidatorRuntime,
-    ValidatorSandboxError,
-    ValidatorSandboxRunner,
-)
 
 __all__ = [
     "ActionGate",
@@ -116,6 +103,9 @@ __all__ = [
     "NanobotAdapter",
     "OpenClawAdapter",
     "PolicyCompiler",
+    "PolicyIRContractExtractor",
+    "PolicyIR",
+    "PolicyIREvaluator",
     "PromptIntakeRetriever",
     "PromptRetrievalContext",
     "Receipt",
@@ -136,22 +126,13 @@ __all__ = [
     "PatternVerifier",
     "ToolCapabilityCapsule",
     "ToolPattern",
-    "VALIDATOR_GENERATION_SYSTEM_PROMPT",
     "ValidatorEnforcementShape",
     "ValidatorInstallationRecord",
     "ValidatorInstallationStatus",
-    "ValidatorInstaller",
     "ValidatorRuntimeErrorRecord",
-    "ValidatorRuntime",
-    "ValidatorSandboxError",
-    "ValidatorSandboxRunner",
-    "ValidatorSnippetGenerator",
-    "ValidatorSnippetPackage",
-    "ValidatorSnippetVerifier",
     "ValidatorState",
     "ValidatorStateTransition",
     "ValidatorVerdict",
-    "ValidatorVerificationResult",
     "ValidatorVersion",
 ]
 

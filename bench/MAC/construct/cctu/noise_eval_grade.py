@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -544,9 +544,19 @@ def build_main_score_values(
 
 def build_contract_diagnostics(details: list[dict[str, Any]]) -> dict[str, Any]:
     contract = follow_taxonomy_metrics(details)
+    outcomes = Counter(
+        str(row.get("follow_outcome") or follow_outcome(
+            bool(row.get("anchor_matched")), bool(row.get("history_matched"))
+        ))
+        for row in details
+    )
     return {
         "constraint_follow_scores": {
             "noise_follow_rate": contract["noise_follow_rate"],
+            "outcome_counts": {
+                name: outcomes[name]
+                for name in ("correct_follow", "wrong_follow", "neither_followed")
+            },
         },
         "support": {
             "comparison_count": contract["comparison_count"],
@@ -608,6 +618,7 @@ def score_rows(
             "active_constraint_count": contract["active_constraint_count"],
             "history_constraint_count": contract["history_constraint_count"],
             "noise_followed": contract["noise_followed"],
+            "noise_follow_rate": contract["noise_follow_rate"],
             "outcome_counts": contract["outcome_counts"],
         },
         "support": {

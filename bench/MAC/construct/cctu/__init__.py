@@ -1,1 +1,1 @@
-"""CCTU-specific MAC construct pipeline (adapter through export)."""
+"""CCTU-specific MAC construct pipeline (adapter through noise-eval export)."""

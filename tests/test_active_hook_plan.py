@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import datetime, timezone
 
 from memory_as_contracts.adapters import AdapterContext, CodexAdapter
@@ -20,7 +18,6 @@ from memory_as_contracts.models import (
     Strength,
     ToolPattern,
     ValidatorEnforcementShape,
-    ValidatorVersion,
 )
 from memory_as_contracts.store import ContractStore
 
@@ -65,34 +62,34 @@ def path_contract(path: str = "src/**") -> Contract:
     )
 
 
-def install_rejecting_validator(
+def install_rejecting_policy(
     store: ContractStore,
     contract: Contract,
     *,
     check_patterns: list[ToolPattern],
-    check_code: str = "def check(action, log, context):\n    return reject('path rule active')\n",
-) -> ValidatorVersion:
-    stored = store.add_contract(contract)
-    snippet_hash = hashlib.sha256(
-        json.dumps(
-            {"check_code": check_code, "update_code": None},
-            sort_keys=True,
-        ).encode("utf-8")
-    ).hexdigest()
-    version = ValidatorVersion(
-        contract_id=stored.id,
-        enforcement_shape=ValidatorEnforcementShape.CHECK_ONLY,
-        check_code=check_code,
-        check_patterns=check_patterns,
-        snippet_hash=snippet_hash,
-        verification_hash=snippet_hash,
-    )
-    return store.add_validator_version(version)
+) -> Contract:
+    tools = [pattern.tool for pattern in check_patterns]
+    clauses = []
+    for pattern in check_patterns:
+        terms = [{"field": "tool_name", "op": "eq", "value": pattern.tool}]
+        for field, matcher in pattern.args.items():
+            if matcher.path_glob is not None:
+                terms.append({"field": f"args.{field}", "op": "glob", "value": matcher.path_glob})
+        clauses.append({"op": "all", "all": terms})
+    return store.add_contract(contract.model_copy(update={"policy_ir": {
+        "text": contract.text,
+        "effect": "deny",
+        "scope": {"level": "path", "path": contract.scope.path},
+        "target": {"phase": "pre", "tools": tools, "args": {"op": "any", "any": clauses}},
+        "obligation": {"kind": "current_action", "predicate": {
+            "field": "tool_name", "op": "in", "value": tools,
+        }},
+    }}))
 
 
 def test_path_level_prehook_activates_on_current_tool_path() -> None:
     store = make_store()
-    install_rejecting_validator(
+    install_rejecting_policy(
         store,
         path_contract(),
         check_patterns=[
@@ -127,14 +124,10 @@ def test_path_level_prehook_activates_on_current_tool_path() -> None:
 
 def test_path_level_matching_accumulates_within_user_turn() -> None:
     store = make_store()
-    install_rejecting_validator(
+    install_rejecting_policy(
         store,
         path_contract(),
         check_patterns=[ToolPattern(tool="Bash")],
-        check_code=(
-            "def check(action, log, context):\n"
-            "    return reject('path rule active')\n"
-        ),
     )
     adapter = CodexAdapter()
 
@@ -157,7 +150,7 @@ def test_path_level_matching_accumulates_within_user_turn() -> None:
 
 def test_path_scope_matching_is_directional() -> None:
     store = make_store()
-    install_rejecting_validator(
+    install_rejecting_policy(
         store,
         path_contract("src/sub"),
         check_patterns=[ToolPattern(tool="Bash")],
@@ -178,7 +171,7 @@ def test_path_scope_matching_is_directional() -> None:
     assert parent_active["mac"]["decision"] == "allow"
 
     store = make_store()
-    install_rejecting_validator(
+    install_rejecting_policy(
         store,
         path_contract("src"),
         check_patterns=[ToolPattern(tool="Bash")],
